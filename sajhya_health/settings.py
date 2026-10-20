@@ -11,21 +11,28 @@ https://docs.djangoproject.com/en/5.2/ref/settings/
 """
 
 from pathlib import Path
+import environ
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
+
+env = environ.Env()
+# .env is gitignored -- holds SECRET_KEY/DEBUG/ALLOWED_HOSTS/DATABASE_URL for
+# this machine. See .env.example for what it needs.
+if (BASE_DIR / '.env').exists():
+    environ.Env.read_env(BASE_DIR / '.env')
 
 
 # Quick-start development settings - unsuitable for production
 # See https://docs.djangoproject.com/en/5.2/howto/deployment/checklist/
 
 # SECURITY WARNING: keep the secret key used in production secret!
-SECRET_KEY = 'django-insecure-f6j=d@69b((6oy9l5-g*=j)daw6=wq%=yf&dm)-g+kddc)hn-2'
+SECRET_KEY = env('SECRET_KEY', default='django-insecure-f6j=d@69b((6oy9l5-g*=j)daw6=wq%=yf&dm)-g+kddc)hn-2')
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = True
+DEBUG = env.bool('DEBUG', default=True)
 
-ALLOWED_HOSTS = []
+ALLOWED_HOSTS = env.list('ALLOWED_HOSTS', default=[])
 
 
 # Application definition
@@ -72,12 +79,10 @@ WSGI_APPLICATION = 'sajhya_health.wsgi.application'
 # Database
 # https://docs.djangoproject.com/en/5.2/ref/settings/#databases
 
-DATABASES = {
-    'default': {
-        'ENGINE': 'django.db.backends.sqlite3',
-        'NAME': BASE_DIR / 'db.sqlite3',
-    }
-}
+_db_config = env.db(default=f'sqlite:///{BASE_DIR / "db.sqlite3"}')
+if _db_config['ENGINE'] == 'django.db.backends.mysql':
+    _db_config['OPTIONS'] = {'charset': 'utf8mb4'}
+DATABASES = {'default': _db_config}
 
 
 # Password validation
