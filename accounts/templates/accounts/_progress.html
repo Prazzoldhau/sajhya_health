@@ -1,0 +1,7 @@
+<ol class="onboarding-steps">
+    {% for n, label, done in steps %}
+    <li class="{% if n == step %}current{% elif done %}done{% endif %}">
+        <span>{% if done and n != step %}<i class="fas fa-check"></i>{% else %}{{ n }}{% endif %}</span> {{ label }}
+    </li>
+    {% endfor %}
+</ol>

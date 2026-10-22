@@ -1,0 +1,39 @@
+  main { padding-top: 18px; }
+  .sn-wrap { max-width: 980px; }
+  .sn-head { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; margin-bottom: 12px; }
+  .sn-sec { background: #fff; border: 1px solid var(--line); border-radius: 12px; margin-bottom: 14px; overflow: hidden; }
+  .sn-sec > header { display: flex; align-items: center; gap: 12px; padding: 12px 16px; background: #f6fbf8; border-bottom: 1px solid var(--line); }
+  .sn-sec > header .letter { width: 32px; height: 32px; border-radius: 9px; background: var(--green); color: #fff; font-weight: 800; display: grid; place-items: center; }
+  .sn-sec > header h3 { margin: 0; font-size: 15px; } .sn-sec > header span.hint { font-size: 11.5px; }
+  .sn-body { padding: 14px 16px 6px; display: grid; gap: 12px; }
+  .sn-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 12px; }
+  .sn-f { display: grid; gap: 4px; font-size: 12px; font-weight: 700; color: var(--muted); align-content: start; }
+  .sn-f input, .sn-f select, .sn-f textarea, .sn-rows input, .sn-rows select { border: 1px solid var(--line); border-radius: 8px; padding: 8px 10px; font: inherit; font-weight: 400; color: var(--ink); background: #fff; width: 100%; }
+  .sn-f input, .sn-f select, .sn-rows input, .sn-rows select { height: 36px; padding-top: 0; padding-bottom: 0; }
+  .sn-f textarea { min-height: 70px; resize: vertical; }
+  .sn-checks { display: flex; flex-wrap: wrap; gap: 6px 16px; }
+  .sn-checks label { display: flex; gap: 6px; align-items: center; font-size: 12.5px; font-weight: 500; color: var(--ink); }
+  .sn-checks input { width: auto; height: auto; }
+  .sn-sub { font-size: 11.5px; font-weight: 800; color: var(--green-dark); text-transform: uppercase; letter-spacing: .04em; margin: 6px 0 -4px; }
+  .sn-rows { display: grid; gap: 6px; }
+  .sn-row { display: grid; gap: 6px; align-items: center; }
+  .sn-row.head { font-size: 10.5px; font-weight: 800; color: var(--muted); }
+  .sn-row button.x { border: 0; background: transparent; color: #b83b3b; font-size: 16px; cursor: pointer; }
+  .sn-row label.cb { display: flex; justify-content: center; }
+  .sn-row label.cb input { width: auto; height: auto; }
+  .sn-add { background: none; border: 0; color: var(--green-dark); font-weight: 700; cursor: pointer; padding: 4px 0; text-align: left; font-size: 12.5px; }
+  .sn-chips { display: flex; flex-wrap: wrap; gap: 6px; }
+  .sn-chip { border: 1px solid #cfe6d8; background: #fff; color: var(--green-dark); border-radius: 14px; font-size: 11.5px; font-weight: 700; padding: 4px 10px; cursor: pointer; }
+  .sn-actions { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; margin: 4px 0 30px; position: sticky; bottom: 0; background: linear-gradient(to top, var(--page) 70%, transparent); padding: 12px 0; }
+  .sn-error { background: #fde8e8; color: #8a2a2a; border-radius: 9px; padding: 10px 14px; margin-bottom: 12px; font-size: 12.5px; }
+  .sn-error li { margin-left: 16px; }
+  .sn-banner { background: #eaf3ff; border: 1px solid #c3d9f5; color: #2c5a94; border-radius: 10px; padding: 10px 14px; font-size: 12.5px; margin-bottom: 12px; }
+  .sn-read h4 { margin: 14px 0 4px; font-size: 12px; color: var(--green-dark); text-transform: uppercase; letter-spacing: .04em; }
+  .sn-read p { margin: 0 0 6px; white-space: pre-wrap; font-size: 13.5px; }
+  .sn-read table { width: 100%; border-collapse: collapse; font-size: 12.5px; margin-bottom: 6px; }
+  .sn-read th { text-align: left; font-size: 10.5px; color: var(--muted); padding: 6px 8px; border-bottom: 1px solid var(--line); }
+  .sn-read td { padding: 6px 8px; border-bottom: 1px solid #eef3ef; }
+  .sn-tag { display: inline-block; padding: 2px 9px; border-radius: 11px; font-size: 11px; font-weight: 750; background: #e7f7ed; color: #16834f; }
+  .sn-tag.warn { background: #fff3d6; color: #a97510; } .sn-tag.bad { background: #fde8e8; color: #b83b3b; } .sn-tag.draft { background: #eef3ef; color: #4b5f55; }
+  @media print { .sn-sec { break-inside: avoid; } }
+  @media (max-width: 700px) { .sn-row { grid-template-columns: 1fr 1fr !important; } .sn-row.head { display: none; } }

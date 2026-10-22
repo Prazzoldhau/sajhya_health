@@ -1,0 +1,85 @@
+{% extends 'marketplace/base.html' %}
+{% load static %}
+{% load marketplace_extras %}
+
+{% block title %}Checkout — Sajhya {{ catalog.label }}{% endblock %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="{{ 'css/marketplace-store.css'|plain_static }}">
+{% endblock %}
+
+{% block content %}
+<div class="store">
+
+    {% include 'marketplace/_store_header.html' %}
+
+    <div class="store-wrap">
+        <div class="store-layout">
+
+            <!-- Checkout Form -->
+            <div>
+                <h2 class="store-heading">Delivery Details</h2>
+                <form method="POST" action="">
+                    {% csrf_token %}
+
+                    
+                    <div class="store-form-row">
+                        <div class="store-form-group">
+                            <label class="store-label">Full Name <span class="store-required">*</span></label>
+                            <input type="text" name="customer_name" class="store-input" placeholder="Your full name" required
+                                   value="{{ prefill.name }}">
+                        </div>
+                        <div class="store-form-group">
+                            <label class="store-label">Phone Number <span class="store-required">*</span></label>
+                            <input type="tel" name="customer_phone" class="store-input" placeholder="98XXXXXXXX" required
+                                   value="{{ prefill.phone }}">
+                        </div>
+                    </div>
+
+                    <div class="store-form-group">
+                        <label class="store-label">Email Address <span class="store-required">*</span></label>
+                        <input type="email" name="customer_email" class="store-input" placeholder="your@email.com" required
+                               value="{{ prefill.email }}">
+                    </div>
+
+                    <div class="store-form-group">
+                        <label class="store-label">Delivery Address <span class="store-required">*</span></label>
+                        <textarea name="delivery_address" class="store-input store-textarea" rows="3"
+                                  placeholder="Full delivery address (City, District)" required>{{ prefill.address }}</textarea>
+                    </div>
+
+                    <div class="store-form-group">
+                        <label class="store-label">Additional Notes</label>
+                        <textarea name="notes" class="store-input store-textarea" rows="2"
+                                  placeholder="Any special instructions or notes for your order..."></textarea>
+                    </div>
+
+                    <button type="submit" class="store-btn-primary store-btn-full">
+                        Place Order
+                    </button>
+                </form>
+            </div>
+
+            <!-- Order Summary -->
+            <div class="store-summary">
+                <h3 class="store-summary-title">Your Order</h3>
+                {% for item in cart_items %}
+                <div class="store-summary-item">
+                    <span>{{ item.name }} <span class="store-qty-tag">×{{ item.quantity }}</span></span>
+                    <span>{{ item.item_total|npr }}</span>
+                </div>
+                {% endfor %}
+                <div class="store-summary-divider"></div>
+                <div class="store-summary-row store-summary-total">
+                    <span>Total</span>
+                    <span>{% if total %}NPR {{ total }}{% else %}To be quoted{% endif %}</span>
+                </div>
+                <div class="store-checkout-note">
+                    <p>Our team will contact you within 24 hours to confirm your order and arrange delivery.</p>
+                </div>
+            </div>
+
+        </div>
+    </div>
+</div>
+{% endblock %}

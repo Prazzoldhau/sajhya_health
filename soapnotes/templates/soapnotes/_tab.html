@@ -1,0 +1,21 @@
+{# The "SOAP Notes" tab of the patient page. Context: soap_notes (queryset), patient #}
+<div class="section-title" style="padding-top:18px"><span class="bar">SOAP Notes</span>
+  <a class="primary-btn" href="{% url 'soapnotes:new' patient.pk %}" style="height:34px;text-decoration:none;display:inline-flex;align-items:center">＋ New SOAP note</a></div>
+<div class="as-wrap">
+  <p class="hint" style="margin:0 0 10px">Subjective, Objective, Assessment, Plan - with baseline metrics and goals that feed the treatment plan. Handy when no standard scale fits.</p>
+  {% for n in soap_notes %}
+  <a href="{% if n.is_final or n.author_id != profile.pk %}{% url 'soapnotes:detail' n.pk %}{% else %}{% url 'soapnotes:edit' n.pk %}{% endif %}" class="as-card" style="text-decoration:none;color:inherit;margin-bottom:10px">
+    <h3>{{ n.get_note_type_display }} <span class="sub">· {{ n.note_date|date:"M j, Y" }} · {{ n.author_name }}</span>
+      <span class="tone {% if n.is_final %}good{% else %}warn{% endif %}" style="float:right">{{ n.get_status_display }}</span></h3>
+    <div class="sub" style="font-size:12.5px;color:var(--ink)">{{ n.headline }}</div>
+    <div class="as-chips">
+      {% if n.pain_now != None %}<span class="as-chip">Pain {{ n.pain_now }}/10</span>{% endif %}
+      {% if n.measures %}<span class="as-chip">{{ n.measures|length }} metric{{ n.measures|length|pluralize }}</span>{% endif %}
+      {% if n.goals %}<span class="as-chip">{{ n.goals|length }} goal{{ n.goals|length|pluralize }}</span>{% endif %}
+      {% if n.icd10_code %}<span class="as-chip">{{ n.icd10_code }}</span>{% endif %}
+    </div>
+  </a>
+  {% empty %}
+  <div style="padding:26px;text-align:center;color:var(--muted)">No SOAP notes yet. Click <b>New SOAP note</b> to record the first one; the treatment plan can then start from it.</div>
+  {% endfor %}
+</div>

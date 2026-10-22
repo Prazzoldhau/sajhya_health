@@ -1,0 +1,85 @@
+{% extends 'marketplace/base.html' %}
+{% load static %}
+{% load marketplace_extras %}
+
+{% block title %}Your Cart — Sajhya {{ catalog.label }}{% endblock %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="{{ 'css/marketplace-store.css'|plain_static }}">
+{% endblock %}
+
+{% block content %}
+<div class="store">
+
+    {% include 'marketplace/_store_header.html' %}
+
+    <div class="store-wrap">
+
+        {% if cart_items %}
+        <div class="store-layout">
+
+            <!-- Cart Items -->
+            <div>
+                <h2 class="store-heading">Cart Items <span class="store-count-tag">{{ cart_count }} item{{ cart_count|pluralize }}</span></h2>
+
+                {% for item in cart_items %}
+                <div class="store-cart-row">
+                    {% if item.image %}
+                    <img src="{{ item.image }}" alt="{{ item.name }}" class="store-cart-icon-img">
+                    {% else %}
+                    <div class="store-cart-icon">📦</div>
+                    {% endif %}
+                    <div class="store-cart-item-info">
+                        <div class="store-cart-item-name">{{ item.name }}</div>
+                        <div class="store-cart-item-meta">{{ item.category }}</div>
+                        <div class="store-cart-item-price">{{ item.price|npr }}{% if item.price %} each{% endif %}</div>
+                    </div>
+                    <form method="POST" action="{% url catalog.urls.update item.product_id %}" class="store-qty-form">
+                        {% csrf_token %}
+                        <button type="submit" name="quantity" value="{{ item.quantity|add:'-1' }}" class="store-qty-btn">−</button>
+                        <span class="store-qty-val">{{ item.quantity }}</span>
+                        <button type="submit" name="quantity" value="{{ item.quantity|add:'1' }}" class="store-qty-btn">+</button>
+                    </form>
+                    <div class="store-cart-line-total">{{ item.item_total|npr }}</div>
+                    <a href="{% url catalog.urls.remove item.product_id %}" class="store-remove-btn" title="Remove">✕</a>
+                </div>
+                {% endfor %}
+            </div>
+
+            <!-- Order Summary -->
+            <div class="store-summary">
+                <h3 class="store-summary-title">Order Summary</h3>
+                <div class="store-summary-row">
+                    <span>Subtotal</span>
+                    <span>{% if total %}NPR {{ total }}{% else %}To be quoted{% endif %}</span>
+                </div>
+                <div class="store-summary-row">
+                    <span>Delivery</span>
+                    <span class="store-free-delivery">To be quoted</span>
+                </div>
+                <div class="store-summary-divider"></div>
+                <div class="store-summary-row store-summary-total">
+                    <span>Total</span>
+                    <span>{% if total %}NPR {{ total }}{% else %}To be quoted{% endif %}</span>
+                </div>
+                <a href="{% url catalog.urls.checkout %}" class="store-btn-primary store-btn-full" style="margin-top:1.25rem;">
+                    Proceed to Checkout →
+                </a>
+                <a href="{% url catalog.urls.list %}" class="store-btn-outline store-btn-full" style="margin-top:0.75rem;">
+                    Continue Shopping
+                </a>
+            </div>
+
+        </div>
+        {% else %}
+        <div class="store-empty">
+            <div style="font-size:3rem; margin-bottom:1rem;">🛒</div>
+            <h3>Your cart is empty</h3>
+            <p>Browse the marketplace and add items to your cart.</p>
+            <a href="{% url catalog.urls.list %}" class="store-btn-primary" style="margin-top:1.5rem; display:inline-flex;">Shop Now</a>
+        </div>
+        {% endif %}
+
+    </div>
+</div>
+{% endblock %}

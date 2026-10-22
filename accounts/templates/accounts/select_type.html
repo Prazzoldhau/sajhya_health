@@ -1,0 +1,22 @@
+{% extends 'accounts/base.html' %}
+{% block title %}Select {{ label }} - Sajhya Health{% endblock %}
+{% block content %}
+<div class="text-center mb-5">
+    <h1 class="display-5 fw-bold mb-3 page-title">Select your {{ label|lower }}</h1>
+    <p class="lead"><a href="{% url 'accounts:package' %}" class="page-lead">&larr; Back to account types</a></p>
+</div>
+<div class="row g-4 justify-content-center">
+    {% for option in options %}
+    <div class="col-6 col-md-3">
+        <a class="card option-card" href="{% url 'accounts:signup' account_type option.pk %}">
+            <div class="card-body">
+                <i class="fas fa-{% if account_type == 'professional' %}user-md{% elif account_type == 'clinic' %}clinic-medical{% else %}hospital{% endif %}"></i>
+                <h5>{{ option.name }}</h5>
+            </div>
+        </a>
+    </div>
+    {% empty %}
+    <p class="text-center">No options available yet.</p>
+    {% endfor %}
+</div>
+{% endblock %}

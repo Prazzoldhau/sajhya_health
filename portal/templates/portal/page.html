@@ -1,0 +1,192 @@
+{% extends 'portal/base.html' %}
+{% block content %}
+
+{% if section == 'home' %}
+  <h1>Hello, {% if patient %}{{ patient.name }}{% else %}{{ user.get_username }}{% endif %}</h1>
+  <p class="muted">{% if patient %}Your treatment{% if patient.clinic %} at {{ patient.clinic.name }}{% endif %}, plus our pharmacy, shop and lab services.{% else %}Welcome to your Sajhya Health dashboard. Browse our pharmacy, marketplace and lab investigations below.{% endif %}</p>
+
+  {% if patient %}
+  <div class="grid three" style="margin-top:18px">
+    <div class="card">
+      <h3>Next appointment</h3>
+      {% if next_appointment %}<div class="stat">{{ next_appointment.start|date:"l, M j" }}</div><div class="muted">{{ next_appointment.start|time:"H:i" }} · {{ next_appointment.get_session_type_display }}</div>
+      {% elif patient.next_appointment %}<div class="stat">{{ patient.next_appointment|date:"l, M j" }}</div>
+      {% else %}<div class="muted">Nothing booked yet. Contact your physiotherapist to book your next visit.</div>{% endif %}
+    </div>
+    <a class="card link" href="{% url 'portal:exercises' %}?p={{ patient.pk }}">
+      <h3>Today's exercises</h3>
+      {% if prescription %}<div class="stat">{{ prescription.completion_percentage }}% done</div><div class="bar"><i style="width:{{ prescription.completion_percentage }}%"></i></div><div class="muted">{{ prescription.exercises.count }} exercise{{ prescription.exercises.count|pluralize }} assigned</div>
+      {% else %}<div class="muted">No exercises assigned yet.</div>{% endif %}
+    </a>
+    <a class="card link" href="{% url 'portal:plan' %}?p={{ patient.pk }}">
+      <h3>Treatment plan</h3>
+      {% if plan %}<b>{{ plan.title }}</b>{% if plan.diagnosis %}<div class="muted">{{ plan.diagnosis }}</div>{% endif %}
+        {% if total_weeks %}<div class="bar"><i style="width:{% widthratio current_week total_weeks 100 %}%"></i></div><div class="muted">Week {{ current_week }} of {{ total_weeks }}</div>{% endif %}
+      {% else %}<div class="muted">Your physiotherapist has not shared a plan yet.</div>{% endif %}
+    </a>
+  </div>
+  {% else %}
+  <div class="card" style="margin-top:18px;display:flex;gap:16px;align-items:center;flex-wrap:wrap">
+    <div style="flex:1;min-width:240px"><h3>Have a treatment record with a physiotherapist?</h3><div class="muted">Link it with the code they gave you and your plan, exercises and advice appear here. You can do this any time in Settings.</div></div>
+    <a class="btn ghost" href="{% url 'portal:settings' %}">Open Settings</a>
+  </div>
+  {% endif %}
+
+  {% if latest_order or latest_booking %}
+  <h2>My recent activity</h2>
+  <div class="grid two">
+    {% if latest_order %}<a class="card link" href="{% url 'portal:orders' %}"><h3>Latest order #{{ latest_order.order_number }}</h3><span class="pill">{{ latest_order.get_status_display }}</span> <span class="muted">NPR {{ latest_order.total_amount }} · {{ latest_order.created_at|date:"M j" }}</span></a>{% endif %}
+    {% if latest_booking %}<a class="card link" href="{% url 'portal:lab' %}"><h3>Latest lab booking #{{ latest_booking.request_number }}</h3><span class="pill">{{ latest_booking.get_status_display }}</span> <span class="muted">NPR {{ latest_booking.total_amount }} · {{ latest_booking.created_at|date:"M j" }}</span></a>{% endif %}
+  </div>
+  {% endif %}
+
+  <h2>Shop &amp; services</h2>
+  {% include 'portal/_services.html' %}
+
+{% elif section == 'plan' %}
+  <h1>Treatment plan</h1>
+  {% if not patient %}{% include 'portal/_unlinked.html' %}
+  {% elif plan %}
+  <div class="card" style="margin:14px 0"><h3 style="font-size:19px">{{ plan.title }}</h3>{% if plan.diagnosis %}<div class="muted">{{ plan.diagnosis }}</div>{% endif %}
+    {% if total_weeks %}<div class="bar"><i style="width:{% widthratio current_week total_weeks 100 %}%"></i></div><div class="muted">Week {{ current_week }} of {{ total_weeks }} · started {{ plan.start_date|date:"M j, Y" }}</div>{% endif %}</div>
+  <div class="grid two">
+    <div>
+      {% if goals %}<h2 style="margin-top:0">My goals</h2><div class="card">{% for g in goals %}<div style="padding:6px 0">{% if g.achieved %}✅{% else %}⬜{% endif %} {{ g.text }} <span class="pill {% if g.term == 'long' %}warn{% endif %}">{% if g.term == 'long' %}long-term{% else %}short-term{% endif %}</span>{% if g.target_date %} <span class="muted">by {{ g.target_date|date:"M j, Y" }}</span>{% endif %}</div>{% endfor %}</div>{% endif %}
+      {% if measures %}<h2>My progress</h2><div class="card"><table><thead><tr><th>Measure</th><th>Start</th><th>Now</th><th>Goal</th></tr></thead><tbody>
+        {% for m in measures %}<tr><td>{{ m.name }}</td><td>{{ m.baseline|default_if_none:"-" }} {{ m.unit }}</td><td><b>{{ m.latest|default_if_none:"-" }}</b> {{ m.unit }}</td><td>{{ m.target|default_if_none:"-" }} {{ m.unit }}</td></tr>
+        {% if m.progress_pct != None %}<tr><td colspan="4" style="border:0;padding-top:0"><div class="bar"><i style="width:{{ m.progress_pct }}%"></i></div></td></tr>{% endif %}{% endfor %}</tbody></table></div>{% endif %}
+    </div>
+    <div>
+      <h2 style="margin-top:0">My treatment phases</h2>
+      {% for ph in phases %}
+      <div class="card" style="margin-bottom:12px"><h3>{{ ph.name }} <span class="pill {% if ph.status != 'current' %}warn{% endif %}">{{ ph.get_status_display }}</span></h3>
+        <div class="muted">Weeks {{ ph.week_start }}-{{ ph.week_end }} · {{ ph.frequency_per_week }} visit{{ ph.frequency_per_week|pluralize }} a week{% if ph.goal %} · {{ ph.goal }}{% endif %}</div>
+        {% if ph.clinic_items %}<div style="margin-top:8px"><b>At the clinic</b><ul>{% for i in ph.clinic_items %}<li>{{ i.text }}</li>{% endfor %}</ul></div>{% endif %}
+        {% if ph.hep_items %}<div><b>At home</b><ul>{% for i in ph.hep_items %}<li>{{ i.text }}{% if i.dosage %} <span class="muted">- {{ i.dosage }}</span>{% endif %}</li>{% endfor %}</ul></div>{% endif %}
+      </div>
+      {% endfor %}
+    </div>
+  </div>
+  {% else %}<div class="card empty"><div class="big-ic">▤</div>Your physiotherapist has not shared a treatment plan yet.</div>{% endif %}
+
+{% elif section == 'exercises' %}
+  <h1>My exercises</h1>
+  {% if not patient %}{% include 'portal/_unlinked.html' %}
+  {% elif prescription %}
+  <div class="card" style="margin:14px 0"><h3 style="font-size:18px">{{ prescription.condition_label|default:"My exercises" }}</h3>
+    <div class="bar"><i style="width:{{ prescription.completion_percentage }}%"></i></div><div class="muted">{{ prescription.completion_percentage }}% done · assigned {{ prescription.start_date|date:"M j, Y" }}{% if prescription.end_date %} · until {{ prescription.end_date|date:"M j, Y" }}{% endif %}</div></div>
+  <div class="grid two">
+  {% for ex in prescription.exercises.all %}
+  <div class="card ex {% if ex.is_completed %}done{% endif %}">
+    {% if ex.cover %}<img class="thumb" src="{{ ex.cover }}" alt="">{% else %}<span class="thumb">{{ ex.exercise_name|slice:":1"|upper }}</span>{% endif %}
+    <div class="grow">
+      <h3>{{ ex.exercise_name }}</h3>
+      <div class="muted">{{ ex.dose_label }}{% if ex.rest_time_sec %} · rest {{ ex.rest_time_sec }}s{% endif %} · {{ ex.schedule_label }}</div>
+      {% if ex.exercise %}
+      <details><summary>How to do it</summary>
+        {% if ex.exercise.exercise_description %}<p>{{ ex.exercise.exercise_description }}</p>{% endif %}
+        {% for url in ex.exercise.images %}<img src="{{ url }}" alt="Step {{ forloop.counter }}" loading="lazy">{% endfor %}
+        {% if ex.exercise.youtube_url %}<p><a href="{{ ex.exercise.youtube_url }}" target="_blank" rel="noopener">Watch the video</a></p>{% endif %}
+        {% if ex.exercise.hosted_video_url %}<video controls preload="none" style="width:100%;max-width:420px;border-radius:10px"><source src="{{ ex.exercise.hosted_video_url }}"></video>{% endif %}
+      </details>
+      {% endif %}
+      <div class="row" style="margin-top:10px">
+        <form class="inline" method="post" action="{% url 'portal:exercise-done' patient.pk ex.pk %}">{% csrf_token %}<button class="btn small {% if ex.is_completed %}ghost{% endif %}" type="submit">{% if ex.is_completed %}✓ Done - undo{% else %}Mark as done{% endif %}</button></form>
+      </div>
+      <details><summary>How did it feel?</summary>
+        <form method="post" action="{% url 'portal:exercise-feedback' patient.pk ex.pk %}" style="margin-top:6px">{% csrf_token %}
+          <label class="f"><select name="feedback_type">{% for key, label in feedback_choices %}<option value="{{ key }}">{{ label }}</option>{% endfor %}</select></label>
+          <label class="f"><textarea name="note" maxlength="300" placeholder="Anything your physiotherapist should know (optional)"></textarea></label>
+          <button class="btn small ghost" type="submit">Send</button>
+        </form>
+        {% with last=ex.feedback_logs.all|first %}{% if last %}<p class="muted">Last sent: {{ last.get_feedback_type_display }} · {{ last.logged_at|date:"M j" }}</p>{% endif %}{% endwith %}
+      </details>
+    </div>
+  </div>
+  {% endfor %}
+  </div>
+  <p class="muted">If an exercise causes sharp pain or makes your symptoms worse, stop and contact your physiotherapist.</p>
+  {% else %}<div class="card empty"><div class="big-ic">♧</div>No exercises have been assigned to you yet.</div>{% endif %}
+
+{% elif section == 'advice' %}
+  <h1>Do's &amp; don'ts</h1>
+  {% if not patient %}{% include 'portal/_unlinked.html' %}
+  {% else %}
+  <div class="grid two" style="margin-top:14px">
+    {% if plan and plan.education %}<div class="card box-do"><h3>✅ Do</h3><p>{{ plan.education }}</p></div>{% endif %}
+    {% if plan and plan.precautions %}<div class="card box-dont"><h3>⛔ Don't</h3><p>{{ plan.precautions }}</p></div>{% endif %}
+  </div>
+  {% if not plan or not plan.education and not plan.precautions %}<div class="card empty"><div class="big-ic">✓</div>Your physiotherapist has not added advice yet. Until they do, follow what they told you in the clinic.</div>{% endif %}
+  <div class="card"><h3>Always</h3><ul><li>Stop and contact your physiotherapist if pain or symptoms get worse.</li><li>Seek urgent medical help for sudden weakness, numbness, chest pain or loss of bladder/bowel control.</li></ul></div>
+  {% endif %}
+
+{% elif section == 'services' %}
+  <h1>Shop &amp; services</h1>
+  <p class="muted">Everything Sajhya offers, in one place.</p>
+  <div style="margin-top:16px">{% include 'portal/_services.html' %}</div>
+
+{% elif section == 'orders' %}
+  <h1>My orders</h1>
+  <p class="muted">Pharmacy and marketplace orders placed from your account.</p>
+  <div style="margin-top:14px">
+  {% for r in orders %}
+  <div class="card" style="margin-bottom:12px">
+    <div class="row"><h3 style="margin:0">#{{ r.order.order_number }}</h3><span class="pill {{ r.tone }}">{{ r.order.get_status_display }}</span><span class="pill warn">{{ r.order.get_order_type_display }}</span>
+      <span class="muted" style="margin-left:auto">{{ r.order.created_at|date:"M j, Y" }}</span></div>
+    <table style="margin-top:8px"><tbody>{% for i in r.items %}<tr><td>{{ i.product_name }}</td><td style="width:60px">x{{ i.quantity }}</td><td style="width:110px;text-align:right">NPR {{ i.unit_price }}</td></tr>{% endfor %}</tbody></table>
+    <div class="row" style="margin-top:8px"><b>Total NPR {{ r.order.total_amount }}</b><a class="btn small ghost" href="{{ r.url }}" style="margin-left:auto">View details</a></div>
+  </div>
+  {% empty %}<div class="card empty"><div class="big-ic">📦</div>No orders yet.<p><a class="btn small" href="{% url 'marketplace:pharmacy' %}">Browse the pharmacy</a> <a class="btn small ghost" href="{% url 'marketplace:marketplace' %}">Browse the marketplace</a></p></div>{% endfor %}
+  </div>
+  {% include 'portal/_claim.html' with kind='order' label='order' %}
+
+{% elif section == 'lab' %}
+  <h1>My lab bookings</h1>
+  <p class="muted">Lab investigations booked from your account. Our team calls to schedule sample collection.</p>
+  <div style="margin-top:14px">
+  {% for r in bookings %}
+  <div class="card" style="margin-bottom:12px">
+    <div class="row"><h3 style="margin:0">#{{ r.booking.request_number }}</h3><span class="pill {{ r.tone }}">{{ r.booking.get_status_display }}</span>
+      <span class="muted" style="margin-left:auto">{{ r.booking.created_at|date:"M j, Y" }}</span></div>
+    <table style="margin-top:8px"><tbody>{% for i in r.items %}<tr><td>{{ i.test_name }}</td><td style="width:110px;text-align:right">NPR {{ i.price }}</td></tr>{% endfor %}</tbody></table>
+    <div class="row" style="margin-top:8px"><b>Total NPR {{ r.booking.total_amount }}</b><a class="btn small ghost" href="{{ r.url }}" style="margin-left:auto">View details</a></div>
+  </div>
+  {% empty %}<div class="card empty"><div class="big-ic">🧪</div>No lab bookings yet.<p><a class="btn small" href="{% url 'lab:tests' %}">Book a test</a></p></div>{% endfor %}
+  </div>
+  {% include 'portal/_claim.html' with kind='lab' label='booking' %}
+
+{% elif section == 'settings' %}
+  <h1>Settings</h1>
+  <p class="muted">Your account and the treatment records linked to it.</p>
+  <div class="grid two" style="margin-top:16px">
+    <div>
+      <h2 style="margin-top:0">Link a treatment record</h2>
+      <div class="card">
+        <p class="muted" style="margin-top:0">Your physiotherapist gives you a one-time access code. Enter it with your date of birth to see your treatment plan, exercises and advice on your dashboard.</p>
+        <form method="post" action="{% url 'portal:link' %}">{% csrf_token %}
+          <label class="f">Access code<input type="text" name="code" placeholder="e.g. K7M2-9QXA" autocomplete="off" autocapitalize="characters" required></label>
+          <label class="f">Your date of birth<input type="date" name="dob" required></label>
+          <button class="btn" type="submit">Link my record</button>
+        </form>
+        <p class="muted" style="margin-bottom:0">The code works once and expires after 7 days. After {{ max_attempts }} wrong tries it stops working and you need a new one.</p>
+      </div>
+      <h2>Linked records</h2>
+      {% for l in links %}<div class="card row" style="margin-bottom:10px"><div><b>{{ l.patient.name }}</b><div class="muted">Linked {{ l.linked_at|date:"M j, Y" }}</div></div>
+        <span style="margin-left:auto;display:flex;gap:8px"><a class="btn small" href="{% url 'portal:home' %}?p={{ l.patient_id }}">Open</a>
+        <form method="post" action="{% url 'portal:unlink' l.patient_id %}" onsubmit="return confirm('Remove this record from your account?')" class="inline">{% csrf_token %}<button class="btn small ghost" type="submit">Unlink</button></form></span></div>
+      {% empty %}<div class="card muted">No treatment record linked yet.</div>{% endfor %}
+    </div>
+    <div>
+      <h2 style="margin-top:0">Account</h2>
+      <div class="card">
+        <div class="muted">Username</div><div style="margin-bottom:12px"><b>{{ user.get_username }}</b></div>
+        <form method="post">{% csrf_token %}<input type="hidden" name="form" value="email">
+          <label class="f">Email address<input type="email" name="email" value="{{ email_form.email.value|default:user.email }}" required></label>
+          <button class="btn small" type="submit">Save email</button></form>
+      </div>
+      <h2>Password</h2>
+      <div class="card"><a class="btn ghost" href="{% url 'accounts:password-change' %}">Change password</a></div>
+    </div>
+  </div>
+{% endif %}
+{% endblock %}

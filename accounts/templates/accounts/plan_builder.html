@@ -1,0 +1,254 @@
+{% extends 'accounts/pro_base.html' %}
+{% block title %}{% if plan %}Edit plan{% else %}New treatment plan{% endif %} | Sajhya Health{% endblock %}
+{% block extra_css %}
+  .pb { max-width: 1060px; }
+  .ctx { border: 1px solid #9fd5b5; background: #f4fbf6; border-radius: 10px; padding: 16px 18px; margin-bottom: 18px; }
+  .ctx h3 { margin: 0 0 12px; font-size: 13px; color: var(--green-dark); }
+  .ctx-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px 16px; }
+  .ctx-grid .wide { grid-column: span 2; }
+  .ctx .k { font-size: 10px; text-transform: uppercase; letter-spacing: .6px; color: #7c9186; font-weight: 800; margin-bottom: 4px; }
+  .ctx .v { font-weight: 700; }
+  .step-title { display: flex; align-items: center; gap: 10px; font-size: 17px; font-weight: 800; color: var(--green-dark); margin: 26px 0 12px; }
+  .step-title span { background: var(--green); color: #fff; font-size: 11px; padding: 3px 9px; border-radius: 12px; }
+  .sect { background: #fff; border: 1px solid var(--line); border-radius: 10px; padding: 14px 16px; margin-bottom: 14px; }
+  .sect h4 { margin: 0 0 10px; font-size: 13px; }
+  .pb input, .pb select, .pb textarea { border: 1px solid #dce8e0; border-radius: 8px; padding: 8px 10px; background: #fbfdfb; outline: none; font: inherit; width: 100%; }
+  .pb input:focus, .pb select:focus, .pb textarea:focus { border-color: var(--green); box-shadow: 0 0 0 3px #16865318; }
+  .row-grid { display: grid; gap: 8px; align-items: center; margin-bottom: 8px; }
+  .row-measure { grid-template-columns: minmax(0, 2.4fr) 80px 100px 100px 34px; }
+  .row-goal { grid-template-columns: minmax(0, 3fr) 130px 150px 34px; }
+  .row-head { font-size: 10px; font-weight: 800; color: #789084; text-transform: uppercase; letter-spacing: .5px; margin-bottom: 6px; }
+  .icon-btn2 { width: 32px; height: 32px; border: 1px solid #e3ece6; border-radius: 8px; background: #fff; color: #8a9d92; cursor: pointer; padding: 0; }
+  .icon-btn2:hover { color: #b83b3b; border-color: #f0c5c5; }
+  .chips { display: flex; flex-wrap: wrap; gap: 6px; margin: 4px 0 12px; }
+  .chip { border: 1px dashed #9fd5b5; background: #f4fbf6; color: var(--green-dark); border-radius: 14px; padding: 4px 10px; font-size: 11px; font-weight: 700; cursor: pointer; }
+  .add-link { border: 0; background: transparent; color: var(--green); font-weight: 800; font-size: 12px; cursor: pointer; padding: 4px 0; }
+  .phase { border: 1px solid #cfe6d8; border-radius: 10px; margin-bottom: 14px; overflow: hidden; background: #fff; }
+  .phase-head { background: #2b6a4e; color: #fff; display: grid; grid-template-columns: minmax(0, 1.6fr) 62px 62px 70px minmax(0, 1fr) auto; gap: 8px; align-items: end; padding: 10px 12px; }
+  .phase-head label { font-size: 9px; text-transform: uppercase; letter-spacing: .5px; font-weight: 800; opacity: .85; display: grid; gap: 4px; }
+  .phase-head input { background: #fff; }
+  .phase-tools { display: flex; gap: 4px; }
+  .phase-tools button { width: 30px; height: 32px; border: 0; border-radius: 6px; background: #ffffff26; color: #fff; cursor: pointer; }
+  .phase-body { display: grid; grid-template-columns: 1fr 1fr; gap: 0; }
+  .phase-body > div { padding: 12px 14px; }
+  .phase-body > div + div { border-left: 1px solid #e4efe8; }
+  .phase-body h5 { font-size: 11px; text-transform: uppercase; letter-spacing: .5px; color: #5d7568; margin: 0 0 8px; }
+  .item-row { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 6px; margin-bottom: 6px; }
+  .item-row.hep { grid-template-columns: minmax(0, 1.6fr) minmax(0, 1fr) auto; }
+  .phase-goal { padding: 0 14px 12px; }
+  .summary { background: #f4fbf6; border: 1px solid #cfe6d8; border-radius: 10px; padding: 10px 14px; color: var(--green-dark); font-weight: 700; font-size: 12px; margin-bottom: 14px; }
+  .precaution { border: 1px solid #f0c5c5; background: #fff3f3; border-radius: 10px; padding: 12px 14px; }
+  .precaution textarea { background: #fff; }
+  .err { background: #fde8e8; border: 1px solid #f0c5c5; color: #9b2c2c; padding: 10px 14px; border-radius: 8px; margin-bottom: 14px; font-weight: 600; }
+  .actions { display: flex; justify-content: flex-end; gap: 10px; margin: 22px 0 40px; flex-wrap: wrap; }
+  .btn-slate { background: #6b8274; color: #fff; border: 0; height: 42px; padding: 0 18px; border-radius: 8px; font-weight: 700; cursor: pointer; }
+  .btn-mint { background: #52b788; color: #fff; border: 0; height: 42px; padding: 0 18px; border-radius: 8px; font-weight: 700; cursor: pointer; }
+  .btn-dark { background: #1e4d36; color: #fff; border: 0; height: 42px; padding: 0 20px; border-radius: 8px; font-weight: 800; cursor: pointer; }
+  .icd-list { z-index: 70; }
+  @media (max-width: 900px) { .ctx-grid { grid-template-columns: 1fr 1fr; } .phase-head { grid-template-columns: 1fr 1fr; } .phase-body { grid-template-columns: 1fr; } .phase-body > div + div { border-left: 0; border-top: 1px solid #e4efe8; } .row-measure, .row-goal { grid-template-columns: 1fr 1fr; } }
+{% endblock %}
+
+{% block main %}
+<div class="pb">
+  <a class="back-link no-print" href="{% if plan %}{% url 'accounts:plan-detail' plan.pk %}{% else %}{% url 'accounts:patient-detail' patient.pk %}?tab=plan{% endif %}">← Back</a>
+  <h1 style="margin:0 0 14px">{% if plan %}Edit treatment plan{% else %}New treatment plan{% endif %}</h1>
+
+  {% if soap_note %}<div class="no-print" style="background:#eaf3ff;border:1px solid #c3d9f5;color:#2c5a94;border-radius:10px;padding:10px 14px;margin-bottom:12px;font-size:13px">Started from the SOAP note of <b>{{ soap_note.note_date|date:"M j, Y" }}</b>: baseline metrics, goals, frequency, precautions and education are pre-filled - review and edit. <a href="?from_soap=none">Start blank instead</a></div>{% elif not plan and patient.soap_notes.exists %}<div class="no-print" style="margin-bottom:12px;font-size:13px"><a href="?">Start from the latest SOAP note instead</a></div>{% endif %}
+  <div class="ctx">
+    <h3>Active Patient Context</h3>
+    <div class="ctx-grid">
+      <div><div class="k">Patient</div><div class="v">{{ patient.name }}</div></div>
+      <div><div class="k">Age / Gender</div><div class="v">{% if patient.age != None %}{{ patient.age }}{% else %}—{% endif %} / {{ patient.get_gender_display|default:"—" }}</div></div>
+      <div><div class="k">Case ID</div><div class="v">{{ patient.patient_code }}</div></div>
+      <div><div class="k">Plan status</div><div class="v">{% if plan %}{{ plan.get_status_display }}{% else %}New draft{% endif %}</div></div>
+      <div class="wide"><div class="k">Plan title</div><input id="f_title" placeholder="e.g. Right shoulder rehabilitation"></div>
+      <div><div class="k">Onset date</div><input id="f_onset_date" type="date"></div>
+      <div><div class="k">Plan start date</div><input id="f_start_date" type="date"></div>
+      <div class="wide" style="position:relative"><div class="k">Primary diagnosis</div><input id="id_diagnosis" autocomplete="off"></div>
+      <div style="position:relative"><div class="k">ICD-10</div><input id="id_icd10_code" autocomplete="off"></div>
+    </div>
+  </div>
+
+  <div id="app"></div>
+
+  <div class="step-title">Precautions / Contraindications</div>
+  <div class="precaution"><textarea id="f_precautions" rows="3" placeholder="Strictly avoid: e.g. overhead lifting &gt; 5 lbs, sudden ballistic movements, pushing into sharp pain. Stop if ... is triggered."></textarea></div>
+
+  <div class="step-title">Patient education &amp; notes</div>
+  <div class="sect"><textarea id="f_education" rows="3" placeholder="Advice given to the patient: activity modification, posture, flare-up plan, when to call..."></textarea></div>
+
+  <div class="err" id="err" hidden></div>
+  <div class="actions no-print">
+    <button type="button" class="btn-slate" id="saveDraft">Save Draft</button>
+    <button type="button" class="btn-mint" onclick="window.print()">Print / Export to Patient</button>
+    <button type="button" class="btn-dark" id="publish">{% if plan and plan.status != 'draft' %}Save Changes{% else %}Finalize &amp; Publish Plan{% endif %}</button>
+  </div>
+</div>
+
+<datalist id="dl-suggest">{% for s in suggestions %}<option value="{{ s }}">{% endfor %}</datalist>
+{{ state|json_script:"plan-state" }}
+{% include 'accounts/_icd_picker.html' %}
+<script>
+(function () {
+  var S = JSON.parse(document.getElementById('plan-state').textContent);
+  var SAVE_URL = "{{ save_url }}", CSRF = "{{ csrf_token }}", IS_PUBLISHED = {% if plan and plan.status != 'draft' %}true{% else %}false{% endif %};
+  var PRESETS = [{% for name, unit in presets %}["{{ name|escapejs }}", "{{ unit|escapejs }}"]{% if not forloop.last %}, {% endif %}{% endfor %}];
+  var $ = function (id) { return document.getElementById(id); };
+  var app = $('app');
+
+  function el(tag, props) {
+    var node = document.createElement(tag);
+    props = props || {};
+    Object.keys(props).forEach(function (k) {
+      if (k === 'text') node.textContent = props[k];
+      else if (k === 'on') Object.keys(props.on).forEach(function (e) { node.addEventListener(e, props.on[e]); });
+      else if (k === 'value') node.value = props[k];
+      else node.setAttribute(k, props[k]);
+    });
+    for (var i = 2; i < arguments.length; i++) { if (arguments[i]) node.appendChild(arguments[i]); }
+    return node;
+  }
+  function input(obj, key, attrs) {
+    var a = Object.assign({ value: obj[key] == null ? '' : obj[key] }, attrs || {});
+    a.on = { input: function (e) { obj[key] = e.target.value; update(); } };
+    return el('input', a);
+  }
+  function delBtn(fn) { return el('button', { type: 'button', class: 'icon-btn2', title: 'Remove', text: '✕', on: { click: fn } }); }
+
+  // ---- static fields <-> state ----
+  [['f_title', 'title'], ['f_onset_date', 'onset_date'], ['f_start_date', 'start_date'], ['id_diagnosis', 'diagnosis'],
+   ['id_icd10_code', 'icd10_code'], ['f_precautions', 'precautions'], ['f_education', 'education']].forEach(function (p) {
+    var node = $(p[0]); node.value = S[p[1]] || '';
+    node.addEventListener('input', function () { S[p[1]] = node.value; });
+    node.addEventListener('change', function () { S[p[1]] = node.value; });
+  });
+
+  var measuresBox = el('div'), goalsBox = el('div'), phasesBox = el('div'), summary = el('div', { class: 'summary' });
+  app.appendChild(el('div', { class: 'step-title' }, el('span', { text: 'STEP 1' }), document.createTextNode('Baseline Metrics & Clinical Goals')));
+  var s1 = el('div', { class: 'sect' }, el('h4', { text: 'Baseline metrics' }), measuresBox);
+  var s1b = el('div', { class: 'sect' }, el('h4', { text: 'Goals (SMART: specific, measurable, achievable, relevant, time-bound)' }), goalsBox);
+  app.appendChild(s1); app.appendChild(s1b);
+  app.appendChild(el('div', { class: 'step-title' }, el('span', { text: 'STEP 2' }), document.createTextNode('Prescribe Interventions & Plan Breakdown')));
+  app.appendChild(phasesBox); app.appendChild(summary);
+
+  function renderMeasures() {
+    measuresBox.innerHTML = '';
+    var chips = el('div', { class: 'chips' });
+    PRESETS.forEach(function (p) {
+      chips.appendChild(el('button', { type: 'button', class: 'chip', text: '+ ' + p[0], on: { click: function () {
+        S.measures.push({ id: null, name: p[0], unit: p[1], baseline: '', target: '' }); renderMeasures(); } } }));
+    });
+    measuresBox.appendChild(chips);
+    if (S.measures.length) {
+      var head = el('div', { class: 'row-grid row-measure row-head' });
+      ['Measure', 'Unit', 'Baseline', 'Target', ''].forEach(function (t) { head.appendChild(el('div', { text: t })); });
+      measuresBox.appendChild(head);
+    }
+    S.measures.forEach(function (m) {
+      measuresBox.appendChild(el('div', { class: 'row-grid row-measure' },
+        input(m, 'name', { placeholder: 'e.g. Shoulder abduction ROM' }), input(m, 'unit', { placeholder: '°' }),
+        input(m, 'baseline', { type: 'number', step: 'any', placeholder: 'Now' }), input(m, 'target', { type: 'number', step: 'any', placeholder: 'Goal' }),
+        delBtn(function () { S.measures.splice(S.measures.indexOf(m), 1); renderMeasures(); })));
+    });
+    measuresBox.appendChild(el('button', { type: 'button', class: 'add-link', text: '+ Add custom measure', on: { click: function () {
+      S.measures.push({ id: null, name: '', unit: '', baseline: '', target: '' }); renderMeasures(); } } }));
+  }
+
+  function renderGoals() {
+    goalsBox.innerHTML = '';
+    S.goals.forEach(function (g) {
+      var term = el('select', { on: { change: function (e) { g.term = e.target.value; } } },
+        el('option', { value: 'short', text: 'Short-term' }), el('option', { value: 'long', text: 'Long-term' }));
+      term.value = g.term;
+      goalsBox.appendChild(el('div', { class: 'row-grid row-goal' },
+        input(g, 'text', { placeholder: 'e.g. Achieve 170° pain-free passive abduction' }), term,
+        input(g, 'target_date', { type: 'date' }),
+        delBtn(function () { S.goals.splice(S.goals.indexOf(g), 1); renderGoals(); })));
+    });
+    goalsBox.appendChild(el('button', { type: 'button', class: 'add-link', text: '+ Add goal', on: { click: function () {
+      S.goals.push({ id: null, text: '', term: 'short', target_date: '' }); renderGoals(); } } }));
+  }
+
+  function itemList(phase, kind) {
+    var wrap = el('div');
+    phase.items.filter(function (i) { return i.kind === kind; }).forEach(function (it) {
+      var row = el('div', { class: 'item-row' + (kind === 'hep' ? ' hep' : '') },
+        input(it, 'text', { list: 'dl-suggest', placeholder: kind === 'hep' ? 'Exercise' : 'Intervention' }));
+      if (kind === 'hep') { var dose = input(it, 'dosage', { placeholder: 'e.g. 3x/day, 10 reps' }); row.appendChild(dose); libraryPick(row.firstChild, it, dose); }
+      row.appendChild(delBtn(function () { phase.items.splice(phase.items.indexOf(it), 1); renderPhases(); }));
+      wrap.appendChild(row);
+    });
+    wrap.appendChild(el('button', { type: 'button', class: 'add-link', text: kind === 'hep' ? '+ Add exercise' : '+ Add intervention', on: { click: function () {
+      phase.items.push({ kind: kind, text: '', dosage: '' }); renderPhases(); } } }));
+    return wrap;
+  }
+
+  // home-exercise rows search the exercise library as you type; picking one fills name + default dose
+  var LIB_URL = "{% url 'exercises:search' %}";
+  function libraryPick(nameInput, item, doseInput) {
+    SajhyaUI.picker(nameInput, {
+      url: LIB_URL,
+      render: function (r) { return '<span class="ex-cell">' + SajhyaUI.thumb(r.name, r.cover) + '<span><b>' + SajhyaUI.esc(r.name) + '</b> <span style="color:#7c9186">' + SajhyaUI.esc(r.dose) + '</span></span></span>'; },
+      onPick: function (r) { item.text = r.name; item.dosage = r.dose; nameInput.value = r.name; doseInput.value = r.dose; },
+    });
+  }
+
+  function labelled(text, node) { return el('label', { text: text }, node); }
+
+  function renderPhases() {
+    phasesBox.innerHTML = '';
+    S.phases.forEach(function (ph, idx) {
+      var tools = el('div', { class: 'phase-tools' },
+        el('button', { type: 'button', title: 'Move up', text: '↑', on: { click: function () { if (idx) { S.phases.splice(idx - 1, 0, S.phases.splice(idx, 1)[0]); renderPhases(); } } } }),
+        el('button', { type: 'button', title: 'Move down', text: '↓', on: { click: function () { if (idx < S.phases.length - 1) { S.phases.splice(idx + 1, 0, S.phases.splice(idx, 1)[0]); renderPhases(); } } } }),
+        el('button', { type: 'button', title: 'Remove phase', text: '✕', on: { click: function () {
+          if (!ph.items.length || confirm('Remove this phase and its interventions?')) { S.phases.splice(idx, 1); renderPhases(); } } } }));
+      var head = el('div', { class: 'phase-head' },
+        labelled('Phase', input(ph, 'name', { placeholder: 'Phase name' })),
+        labelled('From wk', input(ph, 'week_start', { type: 'number', min: 1 })),
+        labelled('To wk', input(ph, 'week_end', { type: 'number', min: 1 })),
+        labelled('Per week', input(ph, 'frequency_per_week', { type: 'number', min: 0, max: 14 })),
+        labelled('Frequency note', input(ph, 'frequency_note', { placeholder: 'Clinic / Home' })), tools);
+      var body = el('div', { class: 'phase-body' },
+        el('div', {}, el('h5', { text: 'Clinical interventions (in-clinic)' }), itemList(ph, 'clinic')),
+        el('div', {}, el('h5', { text: 'Home exercise program (HEP)' }), itemList(ph, 'hep')));
+      var goal = el('div', { class: 'phase-goal' }, labelled('Phase goal / criteria to progress', input(ph, 'goal', { placeholder: 'e.g. Pain < 3/10 and 140° abduction before moving on' })));
+      goal.firstChild.style.cssText = 'font-size:10px;font-weight:800;text-transform:uppercase;color:#5d7568;display:grid;gap:4px';
+      phasesBox.appendChild(el('div', { class: 'phase' }, head, body, goal));
+    });
+    phasesBox.appendChild(el('button', { type: 'button', class: 'add-link', text: '+ Add phase', on: { click: function () {
+      var last = S.phases[S.phases.length - 1], start = last ? (parseInt(last.week_end, 10) || 0) + 1 : 1;
+      S.phases.push({ id: null, name: 'Phase ' + (S.phases.length + 1), week_start: start, week_end: start + 1,
+                      frequency_per_week: last ? Math.max(1, last.frequency_per_week - 1) : 3, frequency_note: 'Clinic', goal: '', items: [] });
+      renderPhases(); } } }));
+    update();
+  }
+
+  function update() {
+    var weeks = 0, sessions = 0;
+    S.phases.forEach(function (p) {
+      var a = parseInt(p.week_start, 10), b = parseInt(p.week_end, 10);
+      if (a && b && b >= a) { weeks = Math.max(weeks, b); sessions += (b - a + 1) * (parseInt(p.frequency_per_week, 10) || 0); }
+    });
+    summary.textContent = 'Plan length: ' + weeks + ' week' + (weeks === 1 ? '' : 's') + ' · ' + sessions + ' planned sessions across ' + S.phases.length + ' phase' + (S.phases.length === 1 ? '' : 's');
+  }
+
+  function save(action) {
+    var err = $('err'); err.hidden = true;
+    S.action = action;
+    fetch(SAVE_URL, { method: 'POST', credentials: 'same-origin', headers: { 'Content-Type': 'application/json', 'X-CSRFToken': CSRF }, body: JSON.stringify(S) })
+      .then(function (r) { return r.json().then(function (d) { return { ok: r.ok, d: d }; }); })
+      .then(function (res) {
+        if (res.ok && res.d.ok) { window.location = res.d.redirect; }
+        else { err.textContent = res.d.error || 'Could not save the plan.'; err.hidden = false; err.scrollIntoView({ behavior: 'smooth', block: 'center' }); }
+      })
+      .catch(function () { err.textContent = 'Network error - the plan was not saved.'; err.hidden = false; });
+  }
+  $('saveDraft').addEventListener('click', function () { save('draft'); });
+  $('publish').addEventListener('click', function () { save(IS_PUBLISHED ? 'draft' : 'publish'); });
+  if (IS_PUBLISHED) $('saveDraft').style.display = 'none';
+
+  renderMeasures(); renderGoals(); renderPhases();
+})();
+</script>
+{% endblock %}

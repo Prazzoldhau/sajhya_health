@@ -1,0 +1,9 @@
+<h2>Placed one before you had an account?</h2>
+<form method="post" action="{% url 'portal:claim' %}" class="card">{% csrf_token %}<input type="hidden" name="kind" value="{{ kind }}">
+  <p class="muted" style="margin-top:0">Add an earlier {{ label }} to this account with its number and the email address it was placed with. (Orders and bookings made in this browser before you signed in are added automatically.)</p>
+  <div class="grid two" style="margin-bottom:0">
+    <label class="f">{{ label|capfirst }} number<input type="text" name="number" placeholder="e.g. #1234" required></label>
+    <label class="f">Email used<input type="email" name="email" required></label>
+  </div>
+  <button class="btn small" type="submit">Add to my account</button>
+</form>

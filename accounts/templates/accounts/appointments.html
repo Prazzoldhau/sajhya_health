@@ -1,0 +1,329 @@
+{% extends 'accounts/pro_base.html' %}
+{% block title %}Appointments | Sajhya Health{% endblock %}
+{% block extra_css %}
+  main { padding-top: 18px; }
+  .appt-head { display: flex; align-items: center; gap: 16px; flex-wrap: wrap; margin-bottom: 14px; }
+  .appt-head h1 { margin: 0 8px 0 0; font-size: 26px; }
+  .appt-layout { display: grid; grid-template-columns: 270px minmax(0, 1fr); gap: 14px; align-items: start; }
+  .side { background: #eef6f1; border: 1px solid var(--line); border-radius: 12px; padding: 12px; }
+  .side select.who { width: 100%; height: 38px; border: 1px solid #d3e4da; border-radius: 8px; background: #fff; padding: 0 10px; margin-bottom: 12px; font-weight: 600; }
+  .seg { display: grid; grid-template-columns: 1fr 1fr; background: #dcebe2; border-radius: 10px; padding: 3px; margin-bottom: 12px; }
+  .seg button { border: 0; background: transparent; padding: 8px; border-radius: 8px; font-weight: 700; color: #5d7568; }
+  .seg button.on { background: var(--green-dark); color: #fff; }
+  .mini-head { display: flex; align-items: center; justify-content: space-between; font-weight: 800; margin-bottom: 8px; }
+  .mini-head a { color: var(--green-dark); text-decoration: none; padding: 2px 8px; }
+  .mini-cal { width: 100%; border-collapse: collapse; text-align: center; font-size: 11px; }
+  .mini-cal th { color: #7c9186; font-weight: 700; padding: 4px 0; background: transparent; border: 0; font-size: 10px; }
+  .mini-cal td { padding: 1px; border: 0; }
+  .mini-cal a { display: block; padding: 6px 0; border-radius: 6px; color: var(--ink); text-decoration: none; }
+  .mini-cal a:hover { background: #d9eee2; }
+  .mini-cal .out a { color: #aebdb4; }
+  .mini-cal .rng a { background: #cfe9da; }
+  .mini-cal .tod a { background: var(--green); color: #fff; font-weight: 800; }
+  .todo-title { font-size: 15px; font-weight: 800; margin: 4px 2px 10px; }
+  .todo-add { color: var(--green-dark); font-weight: 700; background: transparent; border: 0; padding: 4px 2px; }
+  .todo-chips { display: flex; gap: 6px; margin: 10px 2px; align-items: center; }
+  .todo-chips button { border: 0; background: #dcebe2; color: #5d7568; font-size: 10px; font-weight: 700; padding: 3px 8px; border-radius: 10px; }
+  .todo-chips button.on { background: var(--green-dark); color: #fff; }
+  .task { display: flex; align-items: flex-start; gap: 9px; padding: 10px; border-radius: 9px; margin-bottom: 8px; }
+  .task.t0 { background: #dcefe3; } .task.t1 { background: #d9ebe8; } .task.t2 { background: #e6e9d6; } .task.t3 { background: #eadfd0; }
+  .task form { margin: 0; }
+  .task .check { width: 18px; height: 18px; border-radius: 50%; border: 2px solid #7fa793; background: transparent; padding: 0; margin-top: 2px; color: #fff; font-size: 10px; line-height: 1; }
+  .task.done .check { background: var(--green); border-color: var(--green); }
+  .task.done .t-text { text-decoration: line-through; opacity: .6; }
+  .task .t-text { font-size: 12px; font-weight: 600; }
+  .task .t-due { font-size: 10px; color: #6c8178; margin-top: 3px; }
+  .task .t-del { margin-left: auto; border: 0; background: transparent; color: #9aaca1; font-size: 15px; }
+  .task-form { display: grid; gap: 6px; margin-bottom: 10px; }
+  .task-form input { height: 34px; border: 1px solid #d3e4da; border-radius: 8px; padding: 0 10px; background: #fff; width: 100%; }
+  .cal-card { background: #fff; border: 1px solid var(--line); border-radius: 12px; overflow: hidden; }
+  .cal-bar { display: flex; align-items: center; gap: 8px; padding: 10px 14px; border-bottom: 1px solid var(--line); }
+  .cal-bar .range { font-weight: 800; margin-left: 6px; }
+  .cal-scroll { overflow: auto; max-height: calc(100vh - 235px); position: relative; }
+  .cal-grid { display: grid; grid-template-columns: 56px repeat(var(--cols), minmax(150px, 1fr)); min-width: 100%; }
+  .cal-corner, .cal-dayhead { position: sticky; top: 0; z-index: 8; background: #f6faf7; border-bottom: 1px solid var(--line); border-left: 1px solid var(--line); text-align: center; padding: 9px 4px 6px; font-weight: 700; font-size: 12px; }
+  .cal-corner { border-left: 0; }
+  .cal-dayhead.today { background: #d4ecdd; color: var(--green-dark); }
+  .cal-dayhead small { display: block; color: #8aa095; font-size: 10px; font-weight: 600; margin-top: 3px; }
+  .gutter { position: relative; height: var(--gh); }
+  .gutter span { position: absolute; right: 8px; transform: translateY(-50%); font-size: 10px; color: #7c9186; }
+  .gutter span:first-child { transform: none; }
+  .day-col { position: relative; height: var(--gh); border-left: 1px solid var(--line); cursor: cell;
+    background-image: repeating-linear-gradient(to bottom, #e6efe9 0, #e6efe9 1px, transparent 1px, transparent calc(var(--hr) / 2 - 1px), #f1f6f3 calc(var(--hr) / 2 - 1px), #f1f6f3 calc(var(--hr) / 2), transparent calc(var(--hr) / 2), transparent var(--hr)); }
+  .day-col.today { background-color: #f7fcf9; }
+  .ev { position: absolute; border-radius: 4px; border: 1px solid; padding: 4px 8px; overflow: hidden; font-size: 11px; line-height: 1.3; cursor: pointer; box-shadow: 0 1px 2px #0001; }
+  .ev b { display: block; font-size: 12px; }
+  .ev .tag { font-size: 9px; opacity: .75; }
+  .ev:hover { filter: brightness(.97); z-index: 3; }
+  .ev-initial { background: #d6efe3; border-color: #a8d6bf; color: #134a33; }
+  .ev-treatment { background: #bfe5dc; border-color: #8fcfc0; color: #0f4a42; }
+  .ev-followup { background: #e3ecd0; border-color: #c3d49f; color: #3d4c14; }
+  .ev-unavailable { background: repeating-linear-gradient(45deg, #eef1ef, #eef1ef 6px, #e3e8e5 6px, #e3e8e5 12px); border-color: #c4cdc8; color: #5d6b63; }
+  .ev-available { background: #fff; border: 1.5px dashed var(--green); color: var(--green-dark); }
+  .ev.attended { opacity: .72; }
+  .ev.attended b::after { content: ' ✓'; color: var(--green); }
+  .now-line { position: absolute; left: 0; right: 0; height: 0; border-top: 2px solid #e85d5d; z-index: 5; pointer-events: none; }
+  .kbd { display: inline-block; min-width: 24px; text-align: center; padding: 2px 7px; border: 1px solid #cfe0d6; border-bottom-width: 2px; border-radius: 5px; background: #f6faf7; font-weight: 700; font-size: 11px; }
+  .keys { padding: 4px 24px 22px; display: grid; gap: 10px; font-size: 13px; }
+  .keys div { display: flex; justify-content: space-between; align-items: center; }
+  .detail-row { padding: 2px 24px; font-size: 13px; color: #426052; }
+  .detail-actions { display: flex; gap: 8px; flex-wrap: wrap; padding: 16px 24px 22px; }
+  @media (max-width: 1000px) { .appt-layout { grid-template-columns: 1fr; } .cal-scroll { max-height: 70vh; } }
+{% endblock %}
+
+{% block main %}
+<div class="appt-head">
+  <h1>Appointments</h1>
+  <button type="button" class="pill solid" data-open="apptModal">＋ New appointment</button>
+  <button type="button" class="pill" data-block="available">One-off availability</button>
+  <button type="button" class="pill" data-block="unavailable">Unavailable block</button>
+  <button type="button" class="pill" onclick="notify('SMS rescheduling is not connected yet.')">Reschedule SMS</button>
+  <button type="button" class="pill icon" title="Refresh" onclick="location.reload()">↻</button>
+  <button type="button" class="pill icon" title="Notifications" onclick="notify('No new notifications.')">♧</button>
+  <form method="get" class="pill" style="padding:0 6px">
+    <input type="hidden" name="date" value="{{ start_date|date:'Y-m-d' }}">
+    <select name="days" onchange="this.form.submit()" aria-label="Days shown">
+      <option value="1" {% if days == 1 %}selected{% endif %}>1 Day</option>
+      <option value="3" {% if days == 3 %}selected{% endif %}>3 Days</option>
+      <option value="7" {% if days == 7 %}selected{% endif %}>7 Days</option>
+    </select>
+  </form>
+  <button type="button" class="pill" onclick="notify('Schedule & visibility settings are not connected yet.')">Schedule &amp; visibility</button>
+  <button type="button" class="pill" data-open="keysModal">Shortcut keys</button>
+</div>
+
+<div class="appt-layout">
+  <aside class="side">
+    <select class="who" aria-label="Practitioner"><option>{{ display_name }}</option></select>
+    <div class="seg" id="panelSeg">
+      <button type="button" data-panel="calendar" class="{% if panel != 'todo' %}on{% endif %}">Calendar</button>
+      <button type="button" data-panel="todo" class="{% if panel == 'todo' %}on{% endif %}">To-do List</button>
+    </div>
+
+    <div id="panel-calendar" {% if panel == 'todo' %}hidden{% endif %}>
+      <div class="mini-head"><a href="?date={{ prev_month|date:'Y-m-d' }}&days={{ days }}">‹</a><span>{{ month_label }}</span><a href="?date={{ next_month|date:'Y-m-d' }}&days={{ days }}">›</a></div>
+      <table class="mini-cal">
+        <thead><tr><th>Su</th><th>Mo</th><th>Tu</th><th>We</th><th>Th</th><th>Fr</th><th>Sa</th></tr></thead>
+        <tbody>
+        {% for week in weeks %}<tr>
+          {% for c in week %}<td class="{% if not c.in_month %}out{% endif %} {% if c.in_range %}rng{% endif %} {% if c.is_today %}tod{% endif %}"><a href="?date={{ c.date|date:'Y-m-d' }}&days={{ days }}">{{ c.date.day }}</a></td>{% endfor %}
+        </tr>{% endfor %}
+        </tbody>
+      </table>
+    </div>
+
+    <div id="panel-todo" {% if panel != 'todo' %}hidden{% endif %}>
+      <div class="todo-title">My To-do List</div>
+      <button type="button" class="todo-add" id="todoAddBtn">＋ Add a task</button>
+      <form method="post" action="{% url 'accounts:task-add' %}" class="task-form" id="taskForm" hidden>
+        {% csrf_token %}
+        {{ task_form.text }}
+        {{ task_form.due }}
+        <button type="submit" class="pill solid" style="justify-content:center">Add task</button>
+      </form>
+      <div class="todo-chips"><button type="button" class="on" data-filter="open">Open {{ open_count }}</button><button type="button" data-filter="done">Completed {{ done_count }}</button></div>
+      {% for t in tasks %}
+      <div class="task t{{ t.tint }} {% if t.done %}done{% endif %}" data-state="{% if t.done %}done{% else %}open{% endif %}" {% if t.done %}hidden{% endif %}>
+        <form method="post" action="{% url 'accounts:task-toggle' t.pk %}">{% csrf_token %}<button class="check" type="submit" aria-label="Toggle done">{% if t.done %}✓{% endif %}</button></form>
+        <div><div class="t-text">{{ t.text }}</div><div class="t-due">{{ t.label }}</div></div>
+        <form method="post" action="{% url 'accounts:task-delete' t.pk %}" class="t-del-f" style="margin-left:auto">{% csrf_token %}<button class="t-del" type="submit" aria-label="Delete task">×</button></form>
+      </div>
+      {% empty %}
+      <p class="patient-id" style="padding:6px 2px">No tasks yet.</p>
+      {% endfor %}
+    </div>
+  </aside>
+
+  <section class="cal-card">
+    <div class="cal-bar">
+      <a class="pill icon" id="navPrev" href="?date={{ prev_date|date:'Y-m-d' }}&days={{ days }}" aria-label="Previous">‹</a>
+      <a class="pill" id="navToday" href="?date={{ today|date:'Y-m-d' }}&days={{ days }}">Today</a>
+      <a class="pill icon" id="navNext" href="?date={{ next_date|date:'Y-m-d' }}&days={{ days }}" aria-label="Next">›</a>
+      <span class="range">{{ range_label }}</span>
+    </div>
+    <div class="cal-scroll" id="calScroll">
+      <div class="cal-grid" style="--cols:{{ columns|length }};--gh:{{ grid_height }}px;--hr:{% widthratio 60 1 px_per_min %}px">
+        <div class="cal-corner"></div>
+        {% for col in columns %}<div class="cal-dayhead {% if col.is_today %}today{% endif %}">{{ col.label }}<small>{{ display_name }}</small></div>{% endfor %}
+        <div class="gutter">{% for h in hours %}<span style="top:{{ h.top }}px">{{ h.label }}</span>{% endfor %}</div>
+        {% for col in columns %}
+        <div class="day-col {% if col.is_today %}today{% endif %}" data-date="{{ col.iso }}" {% if col.is_today %}data-today="1"{% endif %}>
+          {% for e in col.events %}
+          <div class="ev ev-{{ e.css }} {{ e.status }}" style="top:{{ e.top }}px;height:{{ e.height }}px;left:calc({{ e.left }}% + 2px);width:calc({{ e.width }}% - 4px)"
+               data-id="{{ e.id }}" data-kind="{{ e.kind }}" data-status="{{ e.status }}" data-title="{{ e.title }}" data-time="{{ e.time_label }}"
+               data-type="{{ e.type_label }}" data-patient-url="{{ e.patient_url }}" data-code="{{ e.patient_code }}" data-notes="{{ e.notes }}">
+            <b>{{ e.title }}</b>{{ e.time_label }}{% if e.height > 52 %}<div class="tag">{{ e.type_label }}</div>{% endif %}
+          </div>
+          {% endfor %}
+        </div>
+        {% endfor %}
+      </div>
+    </div>
+  </section>
+</div>
+{% endblock %}
+
+{% block modals %}
+<div class="modal-backdrop" id="apptModal" role="dialog" aria-modal="true">
+  <div class="modal-card" style="max-width:480px">
+    <div class="modal-head"><h2>New appointment</h2><button type="button" class="modal-x" data-close aria-label="Close">×</button></div>
+    <form method="post" action="{% url 'accounts:appointment-create' %}" class="mini-form">
+      {% csrf_token %}
+      <input type="hidden" name="days" value="{{ days }}">
+      <label>Patient
+        <span class="psearch" style="position:relative;display:block">
+          <input type="search" id="patientSearch" placeholder="Search by name, phone or patient ID..." autocomplete="off">
+          <input type="hidden" name="patient" id="id_patient">
+          <span class="hint" id="patientChosen" style="display:block;margin-top:4px"></span>
+        </span>
+      </label>
+      <div class="two"><label>Date {{ appointment_form.date }}</label><label>Start time {{ appointment_form.start_time }}</label></div>
+      <div class="two"><label>Duration {{ appointment_form.duration }}</label><label>Type {{ appointment_form.session_type }}</label></div>
+      <label>Notes {{ appointment_form.notes }}</label>
+      <div class="pf-actions" style="padding:10px 0 0"><button type="button" class="secondary-btn" data-close>Cancel</button><button type="submit" class="primary-btn">Book appointment</button></div>
+    </form>
+  </div>
+</div>
+
+<div class="modal-backdrop" id="blockModal" role="dialog" aria-modal="true">
+  <div class="modal-card" style="max-width:440px">
+    <div class="modal-head"><h2>Block time</h2><button type="button" class="modal-x" data-close aria-label="Close">×</button></div>
+    <form method="post" action="{% url 'accounts:block-create' %}" class="mini-form">
+      {% csrf_token %}
+      <input type="hidden" name="days" value="{{ days }}">
+      <label>Type {{ block_form.kind }}</label>
+      <label>Label {{ block_form.title }}</label>
+      <label>Date {{ block_form.date }}</label>
+      <div class="two"><label>From {{ block_form.start_time }}</label><label>To {{ block_form.end_time }}</label></div>
+      <div class="pf-actions" style="padding:10px 0 0"><button type="button" class="secondary-btn" data-close>Cancel</button><button type="submit" class="primary-btn">Save</button></div>
+    </form>
+  </div>
+</div>
+
+<div class="modal-backdrop" id="detailModal" role="dialog" aria-modal="true">
+  <div class="modal-card" style="max-width:420px">
+    <div class="modal-head"><h2 id="dTitle">Appointment</h2><button type="button" class="modal-x" data-close aria-label="Close">×</button></div>
+    <div class="detail-row" id="dTime"></div>
+    <div class="detail-row" id="dType"></div>
+    <div class="detail-row" id="dNotes"></div>
+    <form method="post" id="actionForm" class="detail-actions" data-url="{% url 'accounts:appointment-action' 0 %}">
+      {% csrf_token %}
+      <input type="hidden" name="days" value="{{ days }}">
+      <a class="secondary-btn" id="dOpen" href="#" style="text-decoration:none;display:inline-flex;align-items:center">Open patient</a>
+      <button class="primary-btn" name="action" value="attend" id="dAttend">Mark attended</button>
+      <button class="secondary-btn" name="action" value="cancel" id="dCancel">Cancel appointment</button>
+      <button class="secondary-btn" name="action" value="delete" id="dDelete" onclick="return confirm('Remove this from the calendar?')">Remove</button>
+    </form>
+  </div>
+</div>
+
+<div class="modal-backdrop" id="keysModal" role="dialog" aria-modal="true">
+  <div class="modal-card" style="max-width:380px">
+    <div class="modal-head"><h2>Shortcut keys</h2><button type="button" class="modal-x" data-close aria-label="Close">×</button></div>
+    <div class="keys">
+      <div>Previous / next period <span><span class="kbd">←</span> <span class="kbd">→</span></span></div>
+      <div>Jump to today <span class="kbd">T</span></div>
+      <div>New appointment <span class="kbd">N</span></div>
+      <div>Show 1 / 3 / 7 days <span><span class="kbd">1</span> <span class="kbd">3</span> <span class="kbd">7</span></span></div>
+      <div>Close a window <span class="kbd">Esc</span></div>
+    </div>
+  </div>
+</div>
+
+<script>
+(function () {
+  var PX = {{ px_per_min }}, GRID_START = {{ grid_start_min }};
+  function $(id) { return document.getElementById(id); }
+  var openModal = SajhyaUI.openModal;
+  function typing(e) { return /INPUT|TEXTAREA|SELECT/.test((e.target.tagName || '')); }
+
+  function pad(n) { return (n < 10 ? '0' : '') + n; }
+  function fillTime(prefix, date, minutes) {
+    var f = $(prefix + 'date'); if (f && date) f.value = date;
+    var t = $(prefix + 'start_time'); if (t) t.value = pad(Math.floor(minutes / 60)) + ':' + pad(minutes % 60);
+  }
+
+  // open the block modal from the toolbar
+  document.querySelectorAll('[data-block]').forEach(function (b) {
+    b.addEventListener('click', function () {
+      $('blockModal').querySelector('select').value = b.dataset.block;
+      openModal('blockModal');
+    });
+  });
+
+  // click an empty slot -> new appointment at that time
+  document.querySelectorAll('.day-col').forEach(function (col) {
+    col.addEventListener('click', function (e) {
+      if (e.target.closest('.ev')) return;
+      var y = e.clientY - col.getBoundingClientRect().top;
+      var mins = Math.round((GRID_START + y / PX) / 15) * 15;
+      fillTime('id_', col.dataset.date, mins);
+      openModal('apptModal');
+    });
+  });
+
+  // click an appointment -> details
+  document.querySelectorAll('.ev').forEach(function (ev) {
+    ev.addEventListener('click', function () {
+      var d = ev.dataset, isAppt = d.kind === 'appointment';
+      $('dTitle').textContent = d.title;
+      $('dTime').textContent = d.time + (isAppt ? ' · ' + d.status : '');
+      $('dType').textContent = d.type + (d.code ? ' · ' + d.code : '');
+      $('dNotes').textContent = d.notes || '';
+      $('actionForm').action = $('actionForm').dataset.url.replace('/0/', '/' + d.id + '/');
+      $('dOpen').style.display = isAppt ? '' : 'none';
+      $('dOpen').href = d.patientUrl || '#';
+      $('dAttend').style.display = isAppt && d.status === 'scheduled' ? '' : 'none';
+      $('dCancel').style.display = isAppt && d.status === 'scheduled' ? '' : 'none';
+      openModal('detailModal');
+    });
+  });
+
+  // left panel tabs
+  document.querySelectorAll('#panelSeg button').forEach(function (b) {
+    b.addEventListener('click', function () {
+      document.querySelectorAll('#panelSeg button').forEach(function (x) { x.classList.toggle('on', x === b); });
+      $('panel-calendar').hidden = b.dataset.panel !== 'calendar';
+      $('panel-todo').hidden = b.dataset.panel !== 'todo';
+    });
+  });
+  $('todoAddBtn').addEventListener('click', function () { var f = $('taskForm'); f.hidden = !f.hidden; if (!f.hidden) f.querySelector('input').focus(); });
+  document.querySelectorAll('.todo-chips button').forEach(function (b) {
+    b.addEventListener('click', function () {
+      document.querySelectorAll('.todo-chips button').forEach(function (x) { x.classList.toggle('on', x === b); });
+      document.querySelectorAll('.task').forEach(function (t) { t.hidden = t.dataset.state !== b.dataset.filter; });
+    });
+  });
+
+  // "now" line + scroll to the working day
+  var today = document.querySelector('.day-col[data-today]');
+  var scroll = $('calScroll');
+  if (today) {
+    var now = new Date(), mins = now.getHours() * 60 + now.getMinutes();
+    if (mins >= GRID_START && mins <= GRID_START + {{ grid_height }} / PX) {
+      var line = document.createElement('div'); line.className = 'now-line';
+      line.style.top = ((mins - GRID_START) * PX) + 'px'; today.appendChild(line);
+      scroll.scrollTop = Math.max(0, (mins - GRID_START) * PX - 140);
+    }
+  }
+
+  // keyboard shortcuts
+  document.addEventListener('keydown', function (e) {
+    if (typing(e) || e.ctrlKey || e.metaKey || e.altKey) return;
+    var k = e.key.toLowerCase();
+    if (e.key === 'ArrowLeft') $('navPrev').click();
+    else if (e.key === 'ArrowRight') $('navNext').click();
+    else if (k === 't') $('navToday').click();
+    else if (k === 'n') { e.preventDefault(); openModal('apptModal'); }
+    else if (k === '1' || k === '3' || k === '7') {
+      var p = new URLSearchParams(location.search); p.set('days', k); location.search = p.toString();
+    }
+  });
+
+  // patient search in the booking form (shared picker: blocks submit until a patient is chosen)
+  SajhyaUI.patientPicker($('patientSearch'), $('id_patient'), { url: "{% url 'accounts:appointment-patient-search' %}", hint: $('patientChosen') });
+
+  {% if open_new %}openModal('apptModal');{% endif %}
+})();
+</script>
+{% endblock %}

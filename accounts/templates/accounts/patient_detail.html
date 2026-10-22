@@ -1,0 +1,291 @@
+{% extends 'accounts/pro_base.html' %}
+{% load accounts_ui exercise_ui %}
+{% block title %}{{ patient.name }} | Sajhya Health{% endblock %}
+{% block extra_css %}
+{% include 'profiles/_styles.html' %}
+{% if tab == 'assessments' or tab == 'soap' %}{% include 'assessments/_styles.html' %}{% endif %}
+  .pd-head { display: flex; align-items: center; gap: 20px; padding: 22px 24px 18px; }
+  .pd-avatar-wrap { position: relative; flex-shrink: 0; }
+  .pd-cam { position: absolute; right: -2px; bottom: -2px; width: 28px; height: 28px; border-radius: 50%; border: 2px solid #fff; background: var(--green); color: #fff; cursor: pointer; font-size: 12px; padding: 0; }
+  .pd-avatar { width: 84px; height: 84px; border-radius: 50%; background: #d9eee2; color: var(--green-dark); display: grid; place-items: center; font-size: 28px; font-weight: 800; flex-shrink: 0; }
+  .pd-name { font-size: 22px; font-weight: 800; margin: 0 0 6px; }
+  .pd-meta { color: var(--muted); font-size: 12px; margin-bottom: 6px; }
+  .pd-meta b { color: var(--ink); font-weight: 600; }
+  .pd-grow { flex: 1; min-width: 0; }
+  .tabs { display: flex; gap: 26px; padding: 0 24px; border-bottom: 1px solid var(--line); overflow-x: auto; }
+  .tabs a { padding: 12px 2px; color: #5d7568; font-weight: 600; text-decoration: none; border-bottom: 2px solid transparent; white-space: nowrap; }
+  .tabs a.on { color: var(--green); border-bottom-color: var(--green); }
+  .info-cards { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; padding: 18px 24px; }
+  .info-card { border: 1px solid var(--line); border-radius: 10px; padding: 14px 16px; }
+  .info-card .k { font-size: 11px; color: var(--muted); margin-bottom: 8px; }
+  .info-card .v { font-weight: 700; font-size: 13px; }
+  .info-card .sub { font-size: 10px; color: #90a198; margin-top: 4px; }
+  .section-title { display: flex; align-items: center; justify-content: space-between; padding: 6px 24px 10px; font-weight: 800; font-size: 14px; }
+  .section-title .bar { border-left: 3px solid var(--green); padding-left: 8px; }
+  .status.improving { background: #d8f3e3; color: #16834f; }
+  .status.stable { background: #edf2ff; color: #526fc0; }
+  .status.declined { background: #fde8e8; color: #b83b3b; }
+  .qa-row { display: flex; flex-wrap: wrap; gap: 10px; padding: 4px 24px 24px; }
+  .qa-row .primary-btn, .qa-row .secondary-btn { height: 42px; padding: 0 16px; text-decoration: none; display: inline-flex; align-items: center; gap: 6px; font-weight: 700; color: var(--green-dark); }
+  .qa-row .primary-btn { color: #fff; }
+  .pane { padding: 18px 24px 24px; }
+  .pane textarea { width: 100%; border: 1px solid #dce8e0; border-radius: 8px; padding: 12px; outline: none; background: #fbfdfb; }
+  .pane textarea:focus { border-color: var(--green); box-shadow: 0 0 0 3px #16865318; }
+  .soon { padding: 40px 24px; text-align: center; color: var(--muted); }
+  @media (max-width: 900px) { .info-cards { grid-template-columns: repeat(2, 1fr); } .pd-head { flex-wrap: wrap; } }
+{% endblock %}
+{% block main %}
+<a class="back-link" href="{% url 'accounts:patients' %}">← Back to Patients</a>
+<section class="panel">
+  <div class="pd-head">
+    <div class="pd-avatar-wrap no-print">
+      {% patient_avatar patient 'big' %}
+      <button type="button" class="pd-cam" data-open="photoModal" title="Change picture" aria-label="Change picture">✎</button>
+    </div>
+    <div class="pd-grow">
+      <h1 class="pd-name">{{ patient.name }}</h1>
+      {% if patient.profile_info.allergies %}<div class="pd-meta" style="color:#b83b3b;font-weight:700">⚠ Allergies: {{ patient.profile_info.allergies|truncatechars:90 }}</div>{% endif %}
+      <div class="pd-meta"><b>{{ patient.patient_code }}</b>{% if patient.age != None %} &nbsp;•&nbsp; {{ patient.age }} years{% endif %}{% if patient.gender %} &nbsp;•&nbsp; {{ patient.get_gender_display }}{% endif %} &nbsp;•&nbsp; {{ session_count }} session{{ session_count|pluralize }} completed &nbsp;•&nbsp; <span class="status {% if patient.status == 'on_hold' %}hold{% elif patient.status == 'discharged' %}discharged{% endif %}">● {{ patient.get_status_display }}</span></div>
+      {% if patient.phone and show_contact %}<div class="pd-meta">☎ <b>{{ patient.phone }}</b>{% if patient.email %} &nbsp;•&nbsp; {{ patient.email }}{% endif %}</div>{% endif %}
+      {% if patient.address and show_contact %}<div class="pd-meta">⌖ {{ patient.address }}</div>{% endif %}
+      {% if not show_contact %}<div class="pd-meta">☎ Contact details are kept private by the clinic</div>{% endif %}
+      {% if patient.clinic %}<div class="pd-meta">✚ Clinic patient · registered at <b>{{ patient.clinic.name }}</b></div>{% endif %}
+    </div>
+    <a class="primary-btn" href="{% url 'accounts:patient-edit' patient.pk %}" style="text-decoration:none;display:inline-flex;align-items:center">✎ Edit</a>
+  </div>
+
+  <nav class="tabs">
+    <a href="?tab=overview" class="{% if tab == 'overview' %}on{% endif %}">Overview</a>
+    <a href="?tab=soap" class="{% if tab == 'soap' %}on{% endif %}">SOAP Notes</a>
+    <a href="?tab=plan" class="{% if tab == 'plan' %}on{% endif %}">Treatment Plan</a>
+    <a href="?tab=assessments" class="{% if tab == 'assessments' %}on{% endif %}">Assessments</a>
+    <a href="?tab=profile" class="{% if tab == 'profile' %}on{% endif %}">Profile</a>
+    <a href="?tab=exercises" class="{% if tab == 'exercises' %}on{% endif %}">Exercises</a>
+    <a href="?tab=visits" class="{% if tab == 'visits' %}on{% endif %}">Visits</a>
+    <a href="?tab=billing" class="{% if tab == 'billing' %}on{% endif %}">Billing</a>
+    <a href="?tab=notes" class="{% if tab == 'notes' %}on{% endif %}">Notes</a>
+    <a href="?tab=documents" class="{% if tab == 'documents' %}on{% endif %}">Documents</a>
+  </nav>
+
+  {% if tab == 'overview' %}
+  <div class="info-cards">
+    <div class="info-card"><div class="k">Diagnosis</div><div class="v">{{ patient.diagnosis|default:"Not recorded" }}</div>{% if patient.icd10_code %}<div class="sub">(ICD-10: {{ patient.icd10_code }})</div>{% endif %}</div>
+    <div class="info-card"><div class="k">Referred By</div><div class="v">{% if patient.referral_source %}{{ patient.get_referral_source_display }}{% else %}—{% endif %}</div></div>
+    <div class="info-card"><div class="k">Insurance</div><div class="v">{{ patient.insurance|default:"N/A" }}</div></div>
+    <div class="info-card"><div class="k">Next Appointment</div><div class="v">{% if patient.next_appointment %}▦ {{ patient.next_appointment|date:"Y-m-d" }}{% else %}Not booked{% endif %}</div></div>
+  </div>
+
+  <div class="section-title"><span class="bar">Recent Visits</span><a class="text-link" href="?tab=visits" style="text-decoration:none">View all</a></div>
+  <div class="table-wrap" style="padding:0 24px 16px">
+    <table>
+      <thead><tr><th>DATE</th><th>THERAPIST</th><th>SESSION TYPE</th><th>PROGRESS</th></tr></thead>
+      <tbody>
+      {% for v in recent_visits %}
+        <tr><td>{{ v.date|date:"Y-m-d" }}</td><td><b>{{ v.therapist }}</b></td><td>{{ v.get_session_type_display }}</td><td>{% if v.progress %}<span class="status {{ v.progress }}">{{ v.get_progress_display }}</span>{% else %}-{% endif %}</td></tr>
+      {% empty %}
+        <tr><td colspan="4" class="empty" style="padding:22px;text-align:center;color:var(--muted)">No visits recorded yet.</td></tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+
+  <div class="section-title"><span>Patient portal</span></div>
+  <div style="padding:0 24px 16px">
+    {% if portal_link %}
+      <span class="status">● Linked</span> since {{ portal_link.linked_at|date:"M j, Y" }}. The patient can see the published treatment plan, assigned exercises and do's &amp; don'ts{% if portal_link %}, and tick exercises off.{% endif %}
+      <form method="post" action="{% url 'portal:revoke' patient.pk %}" onsubmit="return confirm('Remove this patient\'s portal access?')" style="display:inline;margin-left:10px">{% csrf_token %}<button class="table-action" type="submit">Remove access</button></form>
+    {% else %}
+      <form method="post" action="{% url 'portal:invite' patient.pk %}" style="display:inline">{% csrf_token %}<button class="secondary-btn" type="submit">Create patient portal code</button></form>
+      <span style="color:var(--muted);font-size:12.5px;margin-left:8px">{% if portal_invite %}A code is open until {{ portal_invite.expires_at|date:"M j" }} (creating a new one replaces it).{% else %}Lets the patient see their plan and exercises on their phone.{% endif %}</span>
+    {% endif %}
+  </div>
+
+  <div class="section-title"><span>Quick Actions</span></div>
+  <div class="qa-row">
+    <button type="button" class="primary-btn" data-open="visitModal">▶ Start Treatment</button>
+    <a class="secondary-btn" href="?tab=notes">✎ Add Note</a>
+    <a class="secondary-btn" href="{% url 'soapnotes:new' patient.pk %}">✎ New SOAP Note</a>
+    <a class="secondary-btn" href="{% url 'accounts:plan-new' patient.pk %}">▤ Create Treatment Plan</a>
+    <a class="secondary-btn" href="{% url 'exercises:library' %}?patient={{ patient.pk }}">♧ Prescribe Exercises</a>
+    <button type="button" class="secondary-btn" data-open="nextModal">▦ Book Next Visit</button>
+  </div>
+
+  {% elif tab == 'soap' %}
+  {% include 'soapnotes/_tab.html' %}
+
+  {% elif tab == 'assessments' %}
+  {% include 'assessments/_tab.html' %}
+
+  {% elif tab == 'profile' %}
+  {% include 'profiles/_profile.html' %}
+
+  {% elif tab == 'exercises' %}
+  <div class="section-title" style="padding-top:18px"><span class="bar">Prescribed Exercises</span><a class="primary-btn" href="{% url 'exercises:library' %}?patient={{ patient.pk }}" style="height:34px;text-decoration:none;display:inline-flex;align-items:center">＋ Prescribe exercises</a></div>
+  <div style="padding:0 24px 20px">
+  {% for rx in prescriptions %}
+    <div style="border:1px solid var(--line);border-radius:10px;margin-bottom:14px;overflow:hidden">
+      <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;padding:12px 16px;background:#f6faf7">
+        <b>{{ rx.condition_label|default:"Exercise prescription" }}</b>
+        <span class="patient-id" style="display:inline">{{ rx.created_at|date:"M j, Y" }} · {{ rx.exercises.count }} exercise{{ rx.exercises.count|pluralize }} · {{ rx.completion_percentage }}% done</span>
+        <span class="status {% if rx.status == 'cancelled' %}hold{% elif rx.status == 'completed' or rx.status == 'superseded' %}scheduled{% endif %}">{{ rx.get_status_display }}</span>
+        <form method="post" action="{% url 'exercises:prescription-action' rx.pk %}" style="margin-left:auto;display:flex;gap:6px;flex-wrap:wrap">{% csrf_token %}
+          {% if rx.status == 'active' %}
+            <a class="table-action" href="{% url 'exercises:library' %}?patient={{ patient.pk }}&prescription={{ rx.pk }}" style="text-decoration:none">＋ Add exercises</a>
+            <button class="table-action" name="action" value="complete">Mark completed</button>
+            <button class="table-action" name="action" value="cancel" onclick="return confirm('Cancel this prescription?')">Cancel</button>
+          {% else %}
+            <button class="table-action" name="action" value="reassign">Re-assign as new</button>
+          {% endif %}
+        </form>
+      </div>
+      <table style="width:100%">
+        <thead><tr><th>EXERCISE</th><th>DOSE</th><th>WHEN</th><th>DONE</th><th></th></tr></thead>
+        <tbody>
+        {% for ex in rx.exercises.all %}
+          <tr>
+            <td class="ex-cell">{% exercise_thumb ex.exercise_name ex.cover %}<span><b>{{ ex.exercise_name }}</b>{% with fb=ex.feedback_logs.all|first %}{% if fb %}<div style="font-size:11px;color:{% if fb.feedback_type == 'painful' or fb.feedback_type == 'increased_symptom' %}#b83b3b{% else %}var(--muted){% endif %}">Patient: {{ fb.get_feedback_type_display }}{% if fb.note %} - {{ fb.note }}{% endif %} ({{ fb.logged_at|date:"M j" }})</div>{% endif %}{% endwith %}</span></td><td>{{ ex.dose_label }}</td><td>{{ ex.schedule_label }}</td>
+            <td><form method="post" action="{% url 'exercises:prescription-action' rx.pk %}" style="margin:0">{% csrf_token %}<input type="hidden" name="action" value="toggle"><input type="hidden" name="item" value="{{ ex.pk }}"><button class="table-action" type="submit">{% if ex.is_completed %}✓ Done{% else %}Mark done{% endif %}</button></form></td>
+            <td>{% if rx.status == 'active' %}<form method="post" action="{% url 'exercises:prescription-action' rx.pk %}" style="margin:0">{% csrf_token %}<input type="hidden" name="action" value="remove"><input type="hidden" name="item" value="{{ ex.pk }}"><button class="text-link" type="submit" title="Remove">✕</button></form>{% endif %}</td>
+          </tr>
+        {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  {% empty %}
+    <div style="padding:26px;text-align:center;color:var(--muted)">No exercises prescribed yet. Click <b>Prescribe exercises</b> to pick from the library.</div>
+  {% endfor %}
+  </div>
+
+  {% elif tab == 'visits' %}
+  <div class="section-title" style="padding-top:18px"><span class="bar">All Visits</span><button type="button" class="primary-btn" data-open="visitModal" style="height:34px">＋ Add Visit</button></div>
+  <div class="table-wrap" style="padding:0 24px 20px">
+    <table>
+      <thead><tr><th>DATE</th><th>THERAPIST</th><th>SESSION TYPE</th><th>PROGRESS</th><th>NOTES</th></tr></thead>
+      <tbody>
+      {% for v in visits %}
+        <tr><td>{{ v.date|date:"Y-m-d" }}</td><td><b>{{ v.therapist }}</b></td><td>{{ v.get_session_type_display }}</td><td>{% if v.progress %}<span class="status {{ v.progress }}">{{ v.get_progress_display }}</span>{% else %}-{% endif %}</td><td style="white-space:normal;max-width:300px">{{ v.notes|default:"-" }}</td></tr>
+      {% empty %}
+        <tr><td colspan="5" style="padding:22px;text-align:center;color:var(--muted)">No visits recorded yet.</td></tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+
+  {% elif tab == 'billing' %}
+  <div class="section-title" style="padding-top:18px"><span class="bar">Packages</span><a class="primary-btn" href="{% url 'billing:packages' %}?patient={{ patient.pk }}" style="height:34px;text-decoration:none;display:inline-flex;align-items:center">＋ Start package</a></div>
+  <div style="padding:0 24px 8px">
+  {% for pk in packages %}
+    <div style="border:1px solid var(--line);border-radius:10px;margin-bottom:12px;overflow:hidden">
+      <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;padding:11px 16px;background:#f6faf7">
+        <b>{{ pk.get_duration_display }} package</b>
+        <span class="patient-id" style="display:inline">{{ pk.start_date|date:"M j" }} – {{ pk.end_date|date:"M j, Y" }}</span>
+        <span class="status {% if pk.effective_status == 'cancelled' or pk.effective_status == 'expired' %}hold{% elif pk.effective_status == 'completed' %}scheduled{% endif %}">{{ pk.effective_status_display }}</span>
+        <div style="margin-left:auto;display:flex;gap:6px;flex-wrap:wrap">
+          {% if pk.status == 'active' %}<form method="post" action="{% url 'billing:package-cancel' pk.pk %}" style="margin:0" onsubmit="return confirm('Cancel this package?')">{% csrf_token %}<input type="hidden" name="next" value="patient"><button class="table-action" type="submit">Cancel</button></form>{% endif %}
+        </div>
+      </div>
+      <div style="display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px;padding:12px 16px">
+        <div><div class="patient-id">Sessions</div><b>{{ pk.sessions_used }} of {{ pk.total_sessions }}</b><div style="height:6px;background:#e8f1ec;border-radius:4px;margin-top:6px"><div style="height:100%;width:{{ pk.usage_pct }}%;background:var(--green);border-radius:4px"></div></div></div>
+        <div><div class="patient-id">Price</div><b>NPR {{ pk.total_amount }}</b></div>
+        <div><div class="patient-id">Paid</div><b style="color:#16834f">NPR {{ pk.amount_paid }}</b></div>
+        <div><div class="patient-id">Balance due</div><b style="color:{% if pk.is_fully_paid %}#16834f{% else %}#b78317{% endif %}">{% if pk.is_fully_paid %}Fully paid{% else %}NPR {{ pk.amount_due }}{% endif %}</b></div>
+      </div>
+      {% if not pk.is_fully_paid and pk.status != 'cancelled' %}
+      <form method="post" action="{% url 'billing:package-payment' pk.pk %}" style="display:flex;gap:6px;flex-wrap:wrap;padding:0 16px 12px;align-items:center">{% csrf_token %}<input type="hidden" name="next" value="patient">
+        <input type="number" name="amount" step="0.01" min="0.01" value="{{ pk.amount_due }}" style="width:110px;padding:6px 8px;border:1px solid #dce8e0;border-radius:6px">
+        <select name="payment_mode" style="padding:6px 8px;border:1px solid #dce8e0;border-radius:6px"><option value="cash">Cash</option><option value="card">Card</option><option value="online">Online</option><option value="other">Other</option></select>
+        <button class="table-action" type="submit">Record payment</button>
+      </form>{% endif %}
+    </div>
+  {% empty %}
+    <div style="padding:20px;text-align:center;color:var(--muted)">No packages yet. Start a 1, 2, 3 or 4 week package; each recorded visit uses up a session.</div>
+  {% endfor %}
+  </div>
+
+  <div class="section-title" style="padding-top:8px"><span class="bar">Billing history</span><a class="secondary-btn" href="{% url 'billing:billing' %}?new=1" style="height:34px;text-decoration:none;display:inline-flex;align-items:center">＋ New bill</a></div>
+  <div class="table-wrap" style="padding:0 24px 20px">
+    <table>
+      <thead><tr><th>DATE</th><th>INVOICE</th><th>SERVICE</th><th>PAYMENT</th><th style="text-align:right">AMOUNT</th></tr></thead>
+      <tbody>
+      {% for b in bill_entries %}
+        <tr><td>{{ b.entry_date|date:"Y-m-d" }}</td><td>{{ b.invoice_number }}</td><td>{{ b.service }}</td><td>{{ b.get_payment_mode_display }}</td><td style="text-align:right"><b>NPR {{ b.rate }}</b></td></tr>
+      {% empty %}
+        <tr><td colspan="5" style="padding:22px;text-align:center;color:var(--muted)">No bills recorded for this patient yet.</td></tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+
+  {% elif tab == 'notes' %}
+  <form method="post" action="{% url 'accounts:patient-notes' patient.pk %}" class="pane">
+    {% csrf_token %}
+    {{ notes_form.notes }}
+    <div style="margin-top:12px"><button type="submit" class="primary-btn">Save Notes</button></div>
+  </form>
+
+  {% elif tab == 'plan' %}
+  <div class="section-title" style="padding-top:18px"><span class="bar">Treatment Plans</span><a class="primary-btn" href="{% url 'accounts:plan-new' patient.pk %}" style="height:34px;text-decoration:none;display:inline-flex;align-items:center">＋ New plan</a></div>
+  <div class="table-wrap" style="padding:0 24px 20px">
+    <table>
+      <thead><tr><th>PLAN</th><th>DIAGNOSIS</th><th>PROGRESS</th><th>STATUS</th><th></th></tr></thead>
+      <tbody>
+      {% for pl in plans %}
+        <tr>
+          <td><b>{{ pl.title }}</b><div class="patient-id">Started {{ pl.start_date|date:"M j, Y" }}</div></td>
+          <td>{{ pl.diagnosis|default:"—" }}</td>
+          <td>{% if pl.total_weeks %}Week {{ pl.current_week }} of {{ pl.total_weeks }}{% else %}—{% endif %}</td>
+          <td><span class="status {% if pl.status == 'draft' %}scheduled{% elif pl.status == 'discontinued' %}hold{% endif %}">{{ pl.get_status_display }}</span></td>
+          <td><a class="table-action" href="{% url 'accounts:plan-detail' pl.pk %}" style="text-decoration:none">Open</a></td>
+        </tr>
+      {% empty %}
+        <tr><td colspan="5" style="padding:26px;text-align:center;color:var(--muted)">No treatment plan yet. Click <b>New plan</b> to build one with baseline metrics, goals and phased interventions.</td></tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}
+  <div class="soon"><strong>Documents</strong><p>Patient documents are not connected yet.</p></div>
+  {% endif %}
+</section>
+{% endblock %}
+
+{% block modals %}
+{% if tab == 'profile' %}{% include 'profiles/_modals.html' %}{% endif %}
+<div class="modal-backdrop" id="visitModal" role="dialog" aria-modal="true">
+  <div class="modal-card" style="max-width:460px">
+    <div class="modal-head"><h2>Record Visit</h2><button type="button" class="modal-x" data-close aria-label="Close">×</button></div>
+    <form method="post" action="{% url 'accounts:patient-visit-add' patient.pk %}" class="mini-form">
+      {% csrf_token %}
+      <label>Date {{ visit_form.date }}</label>
+      <label>Session type {{ visit_form.session_type }}</label>
+      <label>Progress {{ visit_form.progress }}</label>
+      <label>Notes {{ visit_form.notes }}</label>
+      <div class="pf-actions" style="padding:10px 0 0"><button type="button" class="secondary-btn" data-close>Cancel</button><button type="submit" class="primary-btn">Save Visit</button></div>
+    </form>
+  </div>
+</div>
+<div class="modal-backdrop" id="photoModal" role="dialog" aria-modal="true">
+  <div class="modal-card" style="max-width:400px">
+    <div class="modal-head"><h2>Profile picture</h2><button type="button" class="modal-x" data-close aria-label="Close">×</button></div>
+    <form method="post" action="{% url 'accounts:patient-photo-update' patient.pk %}" enctype="multipart/form-data" class="mini-form">
+      {% csrf_token %}
+      <div style="text-align:center">{% patient_avatar patient 'big' %}</div>
+      <label>Choose a picture (JPEG, PNG or WebP) <input type="file" name="photo" accept="image/jpeg,image/png,image/webp"></label>
+      <p class="patient-id" style="margin:0">Pictures are stored privately and shown only to you. They are resized automatically.</p>
+      {% if patient.photo %}<label style="display:flex;gap:8px;align-items:center"><input type="checkbox" name="remove" value="1" style="width:auto"> Remove the current picture instead</label>{% endif %}
+      <div class="pf-actions" style="padding:10px 0 0"><button type="button" class="secondary-btn" data-close>Cancel</button><button type="submit" class="primary-btn">Save picture</button></div>
+    </form>
+  </div>
+</div>
+<div class="modal-backdrop" id="nextModal" role="dialog" aria-modal="true">
+  <div class="modal-card" style="max-width:400px">
+    <div class="modal-head"><h2>Book Next Visit</h2><button type="button" class="modal-x" data-close aria-label="Close">×</button></div>
+    <form method="post" action="{% url 'accounts:patient-next-visit' patient.pk %}" class="mini-form">
+      {% csrf_token %}
+      <label>Date {{ next_form.date }}</label>
+      <label>Time {{ next_form.start_time }}</label>
+      <div class="pf-actions" style="padding:10px 0 0"><button type="button" class="secondary-btn" data-close>Cancel</button><button type="submit" class="primary-btn">Save</button></div>
+    </form>
+  </div>
+</div>
+{% endblock %}

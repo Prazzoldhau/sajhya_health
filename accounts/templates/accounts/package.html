@@ -1,0 +1,64 @@
+{% extends 'accounts/base.html' %}
+{% load static %}
+{% block title %}Choose your account type - Sajhya Health{% endblock %}
+{% block head_extra %}<link rel="stylesheet" href="{% static 'accounts/package.css' %}">{% endblock %}
+{% block wrap_class %}pk-page{% endblock %}
+{% block content %}
+<section class="pk-hero">
+    <span class="pk-eyebrow"><i class="fa-solid fa-leaf"></i> Plans &amp; accounts</span>
+    <h1>Choose the account that fits you</h1>
+    <p>Free for everyday users. Simple plans for clinicians, clinics and healthcare groups. Start in minutes.</p>
+</section>
+
+<section class="pk-grid" aria-label="Account types">
+    {% for plan in plans %}
+    <article class="pk-card {% if plan.code == 'professional' %}featured{% endif %}">
+        {% if plan.code == 'professional' %}<span class="pk-ribbon">Most popular</span>{% endif %}
+        <header class="pk-head {{ plan.code }}">
+            <span class="pk-icon"><i class="fa-solid fa-{{ plan.icon|default:'user' }}"></i></span>
+            <h2>{{ plan.name }}</h2>
+            <p>{{ plan.tagline }}</p>
+        </header>
+        <div class="pk-price">
+            {% if plan.is_free %}<span class="amount">Free</span><span class="per">always</span>
+            {% elif plan.is_custom %}<span class="amount small">Custom</span><span class="per">pricing</span>
+            {% else %}<span class="cur">NPR</span><span class="amount">{{ plan.price_monthly|floatformat:"0g" }}</span><span class="per">/ month</span>{% endif %}
+        </div>
+        {% if plan.price_note %}<p class="pk-note" style="margin:-4px 0 6px;padding:0 24px">{{ plan.price_note }}</p>{% endif %}
+        <ul class="pk-features">
+            {% for f in plan.features %}
+            <li class="{% if f.included %}yes{% else %}no{% endif %}"><i class="fa-solid fa-{% if f.included %}circle-check{% else %}circle-xmark{% endif %}"></i><span>{{ f.text }}</span></li>
+            {% endfor %}
+        </ul>
+        <div class="pk-cta">
+            {% if plan.code == 'client' %}
+            <a href="{% url 'accounts:signup-client' %}" class="pk-btn">Create free account <i class="fa-solid fa-arrow-right"></i></a>
+            {% elif plan.code == 'clinic' %}
+            <a href="{% url 'clinics:register' %}" class="pk-btn">Register a clinic <i class="fa-solid fa-arrow-right"></i></a>
+            <p class="pk-note">Sign in with your professional account to register a clinic.</p>
+            {% else %}
+            <a href="{% url 'accounts:select-type' plan.code %}" class="pk-btn {% if plan.code == 'professional' %}solid{% endif %}">Choose {{ plan.name }} <i class="fa-solid fa-arrow-right"></i></a>
+            {% endif %}
+        </div>
+    </article>
+    {% endfor %}
+</section>
+
+<section class="pk-compare">
+    <h2>Compare plans</h2>
+    <div class="pk-table-wrap">
+        <table>
+            <thead><tr><th>Feature</th><th>Professional</th><th>Clinic</th><th>Enterprise</th></tr></thead>
+            <tbody>
+                <tr><td>Appointment management</td><td><i class="fa-solid fa-check yes"></i></td><td><i class="fa-solid fa-check yes"></i></td><td><i class="fa-solid fa-check yes"></i></td></tr>
+                <tr><td>Patient records</td><td>10 free, then NPR 200 each</td><td><i class="fa-solid fa-infinity yes"></i></td><td><i class="fa-solid fa-infinity yes"></i></td></tr>
+                <tr><td>Staff management</td><td><i class="fa-solid fa-minus no"></i></td><td><i class="fa-solid fa-check yes"></i></td><td><i class="fa-solid fa-check yes"></i></td></tr>
+                <tr><td>Multi-branch support</td><td><i class="fa-solid fa-minus no"></i></td><td><i class="fa-solid fa-minus no"></i></td><td><i class="fa-solid fa-check yes"></i></td></tr>
+                <tr><td>API access</td><td><i class="fa-solid fa-minus no"></i></td><td><i class="fa-solid fa-minus no"></i></td><td><i class="fa-solid fa-check yes"></i></td></tr>
+                <tr><td>Support</td><td>Standard</td><td>Standard</td><td><span class="pk-pill">24/7 priority</span></td></tr>
+            </tbody>
+        </table>
+    </div>
+    <p class="pk-foot">Already have an account? <a href="{% url 'accounts:login' %}">Sign in</a> &nbsp;·&nbsp; <a href="{% url 'landing' %}">Back to home</a></p>
+</section>
+{% endblock %}

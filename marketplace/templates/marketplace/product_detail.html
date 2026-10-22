@@ -1,0 +1,152 @@
+{% extends 'marketplace/base.html' %}
+{% load static %}
+{% load marketplace_extras %}
+
+{% block title %}{{ product.name }} — Sajhya {{ catalog.label }}{% endblock %}
+{% block meta_description %}{% if product.description %}{{ product.description|truncatewords:30 }}{% else %}Buy {{ product.name }}{% if product.category_name %} from the {{ product.category_name }} range{% endif %} on the Sajhya {{ catalog.label }}, delivered across Nepal.{% endif %}{% endblock %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="{{ 'css/marketplace-store.css'|plain_static }}">
+{% endblock %}
+
+{% block content %}
+<div class="store">
+
+    {% include 'marketplace/_store_header.html' %}
+
+    <div class="store-wrap">
+
+        <!-- Breadcrumb -->
+        <div class="store-breadcrumb">
+            <a href="{% url catalog.urls.list %}">{{ catalog.label }}</a>
+            {% if product.category_name %}
+            <span>›</span>
+            {% if catalog.has_categories %}<a href="{% url catalog.urls.list %}?category={{ product.category.id }}">{{ product.category_name }}</a>{% else %}<span>{{ product.category_name }}</span>{% endif %}
+            {% endif %}
+            <span>›</span>
+            <span>{{ product.name }}</span>
+        </div>
+
+        <!-- Product Detail -->
+        <div class="store-detail">
+            <div class="store-detail-img">
+                {% if product.image_url_path %}
+                    <img src="{{ product.image_url_path }}" alt="{{ product.name }}">
+                {% else %}
+                    <div class="placeholder">
+                        <span>{{ product.category_icon|default:"📦" }}</span>
+                        <p>No image available</p>
+                    </div>
+                {% endif %}
+            </div>
+
+            <div>
+                {% if product.category_name %}
+                <span class="store-detail-cat">{{ product.category_name }}</span>
+                {% endif %}
+                {% if product.requires_prescription %}<span class="store-detail-cat" style="background:#fde8e8;color:#b83b3b">Prescription required</span>{% endif %}
+
+                <h1 class="store-detail-title">{{ product.name }}</h1>
+                {% if product.brand %}<p class="store-detail-brand">{{ product.brand }}</p>{% endif %}
+
+                <div class="store-detail-price">{{ product.price|npr }}</div>
+
+                <div class="store-stock {% if product.in_stock %}in-stock{% else %}out-stock{% endif %}">
+                    {% if product.in_stock %}✓ In Stock{% else %}✕ Out of Stock{% endif %}
+                </div>
+
+                {% if product.description %}
+                <div class="store-detail-desc">
+                    <h4>Description</h4>
+                    <p>{{ product.description }}</p>
+                </div>
+                {% endif %}
+
+                {% if product.in_stock %}
+                <div class="store-detail-actions">
+                    <a href="{% url catalog.urls.add product.id %}" class="store-btn-primary store-btn-add" data-goto="{% url catalog.urls.cart %}">
+                        Add to Cart
+                    </a>
+                    <a href="{% url catalog.urls.list %}" class="store-btn-outline">
+                        Continue Shopping
+                    </a>
+                </div>
+                {% else %}
+                <p class="store-out-of-stock-msg">This product is currently out of stock. Check back soon!</p>
+                {% endif %}
+            </div>
+        </div>
+
+        <!-- Related Products -->
+        {% if related %}
+        <section class="store-section">
+            <div class="store-section-head">
+                <h2>Related Products</h2>
+                <span class="store-sub">More from {{ product.category_name|default:"this category" }}</span>
+            </div>
+            <div class="store-grid">
+                {% for rp in related %}
+                <a href="{% url catalog.urls.detail rp.id %}" class="store-card">
+                    <div class="store-card-img">
+                        {% if rp.image_url_path %}
+                            <img src="{{ rp.image_url_path }}" alt="{{ rp.name }}">
+                        {% else %}
+                            <span class="placeholder">{{ rp.category_icon|default:"📦" }}</span>
+                        {% endif %}
+                    </div>
+                    <div class="store-card-body">
+                        <p class="store-card-name">{{ rp.name }}</p>
+                        <div class="store-card-price">{{ rp.price|npr }}</div>
+                    </div>
+                </a>
+                {% endfor %}
+            </div>
+        </section>
+        {% endif %}
+
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+(function () {
+    function updateBadge(count) {
+        var cartBtn = document.querySelector('.store-icon-btn[title="Cart"]');
+        if (!cartBtn) return;
+        var badge = cartBtn.querySelector('.store-icon-badge');
+        if (count > 0) {
+            if (!badge) {
+                badge = document.createElement('span');
+                badge.className = 'store-icon-badge';
+                cartBtn.appendChild(badge);
+            }
+            badge.textContent = count;
+        } else if (badge) {
+            badge.remove();
+        }
+    }
+
+    document.addEventListener('click', function (e) {
+        var btn = e.target.closest('.store-btn-add');
+        if (!btn) return;
+        e.preventDefault();
+        var goto = btn.dataset.goto || null;
+
+        fetch(btn.href, { headers: { 'X-Requested-With': 'XMLHttpRequest' } })
+            .then(function (r) { return r.json(); })
+            .then(function (data) {
+                if (!data.success) return;
+                updateBadge(data.cart_count);
+                if (goto) {
+                    window.location.href = goto;
+                } else {
+                    var orig = btn.textContent;
+                    btn.textContent = '✓ Added';
+                    setTimeout(function () { btn.textContent = orig; }, 1000);
+                }
+            });
+    });
+}());
+</script>
+{% endblock %}

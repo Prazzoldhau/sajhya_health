@@ -1,0 +1,31 @@
+{% extends 'accounts/base.html' %}
+{% block title %}Review - Professional onboarding{% endblock %}
+{% block content %}
+{% include 'accounts/_progress.html' %}
+<div class="text-center mb-4">
+    <h1 class="fw-bold page-title">Review &amp; submit</h1>
+    <p class="page-lead">Check your details. Our team verifies your credentials before your account goes live.</p>
+</div>
+<div class="form-panel" style="max-width:640px">
+    <h5>Account</h5>
+    <p>{{ profile.full_name }}, {{ profile.title }}<br>{{ profile.account.user.email }} &middot; {{ profile.mobile }}</p>
+    <h5>Licensing</h5>
+    <p>{{ profile.license_number }} &middot; {{ profile.issuing_authority }}<br>Expires {{ profile.license_expiry }}{% if profile.npi %}<br>NPI {{ profile.npi }}{% endif %}</p>
+    <h5>Documents</h5>
+    <ul>
+        {% if profile.id_document %}<li><a href="{% url 'accounts:professional-document' 'id_document' %}" target="_blank">Government ID</a></li>{% endif %}
+        {% if profile.license_document %}<li><a href="{% url 'accounts:professional-document' 'license_document' %}" target="_blank">Licence proof</a></li>{% endif %}
+        {% if profile.indemnity_document %}<li><a href="{% url 'accounts:professional-document' 'indemnity_document' %}" target="_blank">Indemnity insurance</a> (policy {{ profile.indemnity_policy_number }}, expires {{ profile.indemnity_expiry }})</li>{% endif %}
+        {% if profile.degree_document %}<li><a href="{% url 'accounts:professional-document' 'degree_document' %}" target="_blank">Degrees / certifications</a></li>{% endif %}
+    </ul>
+    <h5>Practice</h5>
+    <p>{{ profile.years_experience }} years of experience<br>
+       Focus: {% for f in profile.focus_areas.all %}{{ f }}{% if not forloop.last %}, {% endif %}{% endfor %}<br>
+       Services: {% for s in profile.services.all %}{{ s }}{% if not forloop.last %}, {% endif %}{% endfor %}</p>
+    <form method="post">
+        {% csrf_token %}
+        <button type="submit" class="btn btn-gradient">Submit for verification</button>
+    </form>
+    <p class="text-center mt-3 mb-0"><a href="{% url 'accounts:professional-step' 2 %}" class="page-lead">&larr; Edit details</a></p>
+</div>
+{% endblock %}

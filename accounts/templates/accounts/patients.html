@@ -1,0 +1,146 @@
+{% extends 'accounts/pro_base.html' %}
+{% load accounts_ui %}
+{% block title %}Patients | Sajhya Health{% endblock %}
+{% block extra_css %}
+  .patients-grid { display: grid; grid-template-columns: minmax(0, 1fr) 320px; gap: 14px; align-items: start; }
+  .filters { display: grid; grid-template-columns: minmax(0, 1fr) 150px 140px 160px; gap: 10px; padding: 0 18px 16px; }
+  .filters .filter { width: 100%; }
+  .filter-search { position: relative; }
+  .filter-search span { position: absolute; left: 12px; top: 9px; color: #82958b; }
+  .filter-search input { width: 100%; height: 39px; border: 1px solid #dce8e0; border-radius: 8px; padding: 0 12px 0 34px; outline: none; background: #fbfdfb; }
+  .filter-search input:focus { border-color: var(--green); box-shadow: 0 0 0 3px #16865318; }
+  .stat-row { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; padding: 0 18px 16px; }
+  .stat { display: flex; align-items: center; gap: 12px; padding: 14px; border: 1px solid var(--line); border-radius: 11px; }
+  .stat-icon { width: 40px; height: 40px; border-radius: 50%; display: grid; place-items: center; background: var(--green-soft); color: var(--green); font-size: 18px; flex-shrink: 0; }
+  .stat.hold .stat-icon { background: #fff3d6; color: #bd8614; }
+  .stat.disc .stat-icon { background: #edf2ff; color: #526fc0; }
+  .stat-label { font-size: 11px; color: var(--muted); }
+  .stat-value { font-size: 22px; font-weight: 800; }
+  .status.discharged { background: #edf2ff; color: #526fc0; }
+  .pager { display: flex; align-items: center; justify-content: space-between; padding: 6px 18px 18px; color: var(--muted); font-size: 11px; }
+  .pager nav { display: flex; gap: 6px; }
+  .pager a, .pager span.cur { min-width: 28px; height: 28px; display: grid; place-items: center; border: 1px solid #dce9e0; border-radius: 6px; color: var(--green); text-decoration: none; font-size: 11px; background: #fff; padding: 0 6px; }
+  .pager span.cur { background: var(--green); color: #fff; border-color: var(--green); }
+  .side-search { padding: 0 15px 12px; }
+  .side-search input { width: 100%; height: 40px; border: 1px solid var(--green-border); border-radius: 8px; padding: 0 12px; outline: none; background: #fbfdfb; }
+  .side-search input:focus { border-color: var(--green); box-shadow: 0 0 0 3px #16865318; }
+  .recent-item { display: flex; align-items: center; gap: 10px; padding: 10px 15px; border-top: 1px solid #edf2ee; text-decoration: none; color: inherit; }
+  .quick-grid.four { grid-template-columns: repeat(2, minmax(0, 1fr)); text-decoration: none; }
+  .quick-action { text-decoration: none; }
+  .empty { padding: 30px; text-align: center; color: var(--muted); }
+  @media (max-width: 1180px) { .patients-grid { grid-template-columns: 1fr; } .stat-row { grid-template-columns: repeat(2, 1fr); } }
+  @media (max-width: 700px) { .filters { grid-template-columns: 1fr 1fr; } .filter-search { grid-column: 1 / -1; } }
+{% endblock %}
+{% block main %}
+      {% if allowance and allowance.remaining <= 3 %}
+      <div class="notice-bar" style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;background:{% if allowance.can_add %}#fff8e6{% else %}#fde8e8{% endif %};border:1px solid {% if allowance.can_add %}#f0d58a{% else %}#f0b4b4{% endif %};color:#6b4e10;border-radius:10px;padding:10px 14px;margin-bottom:12px;font-size:13px">
+        <span>{% if allowance.can_add %}<b>{{ allowance.used }} of {{ allowance.allowed }}</b> patient slots used ({{ allowance.free_limit }} free).{% else %}<b>All {{ allowance.allowed }} patient slots are used.</b> Buy more to add patients.{% endif %} Each extra patient is NPR {{ allowance.rate|floatformat:"0" }}.</span>
+        <a class="primary-btn" href="{% url 'accounts:settings' %}?tab=plan" style="margin-left:auto;text-decoration:none;display:inline-flex;align-items:center;height:32px">Plan &amp; usage</a>
+      </div>
+      {% endif %}
+<div class="patients-grid">
+  <section class="panel">
+    <div class="panel-header" style="padding-bottom:6px">
+      <div><h1 style="font-size:22px;margin:0 0 4px">Patients</h1><p class="subtitle">Search, view and manage your patients</p></div>
+      <button type="button" class="primary-btn" data-open="patientModal">＋ Add Patient</button>
+    </div>
+
+    <form method="get" class="filters" id="filterForm">
+      <div class="filter-search"><span>⌕</span><input type="search" name="q" value="{{ q }}" placeholder="Search by name, phone, patient ID..."></div>
+      <select class="filter" name="status" onchange="this.form.submit()">
+        <option value="">All Status</option>
+        {% for value, label in status_choices %}<option value="{{ value }}" {% if status == value %}selected{% endif %}>{{ label }}</option>{% endfor %}
+      </select>
+      <select class="filter" name="age" onchange="this.form.submit()">
+        <option value="">All Ages</option>
+        <option value="child" {% if age == 'child' %}selected{% endif %}>Under 18</option>
+        <option value="adult" {% if age == 'adult' %}selected{% endif %}>18 – 40</option>
+        <option value="middle" {% if age == 'middle' %}selected{% endif %}>41 – 60</option>
+        <option value="senior" {% if age == 'senior' %}selected{% endif %}>Over 60</option>
+      </select>
+      <select class="filter" name="sort" onchange="this.form.submit()">
+        <option value="recent" {% if sort == 'recent' %}selected{% endif %}>Sort by: Recent</option>
+        <option value="name" {% if sort == 'name' %}selected{% endif %}>Sort by: Name</option>
+        <option value="visit" {% if sort == 'visit' %}selected{% endif %}>Sort by: Last visit</option>
+      </select>
+    </form>
+
+    <div class="stat-row">
+      <div class="stat"><div class="stat-icon">♙</div><div><div class="stat-label">Total Patients</div><div class="stat-value">{{ counts.total }}</div></div></div>
+      <div class="stat"><div class="stat-icon">✓</div><div><div class="stat-label">Active</div><div class="stat-value">{{ counts.active }}</div></div></div>
+      <div class="stat hold"><div class="stat-icon">◷</div><div><div class="stat-label">On Hold</div><div class="stat-value">{{ counts.on_hold }}</div></div></div>
+      <div class="stat disc"><div class="stat-icon">▤</div><div><div class="stat-label">Discharged</div><div class="stat-value">{{ counts.discharged }}</div></div></div>
+    </div>
+
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>PATIENT</th><th>PATIENT ID</th><th>PHONE</th><th>AGE / GENDER</th><th>LAST VISIT</th><th>STATUS</th><th>ACTION</th></tr></thead>
+        <tbody>
+        {% for p in page_obj %}
+          <tr>
+            <td>{% patient_cell p sub="diagnosis" %}</td>
+            <td>{{ p.patient_code }}</td>
+            <td>{% if p.pk in hidden_contact %}<span class="hint" title="Contact details of clinic patients are visible to the clinic owner only">Hidden</span>{% else %}{{ p.phone|default:"—" }}{% endif %}</td>
+            <td>{% if p.age != None %}{{ p.age }}{% else %}—{% endif %} / {{ p.gender|default:"—" }}</td>
+            <td>{{ p.last_visit|date:"Y-m-d"|default:"—" }}</td>
+            <td><span class="status {% if p.status == 'on_hold' %}hold{% elif p.status == 'discharged' %}discharged{% endif %}">● {{ p.get_status_display }}</span></td>
+            <td><a class="text-link" href="{% url 'accounts:patient-detail' p.pk %}" style="text-decoration:none">View</a></td>
+          </tr>
+        {% empty %}
+          <tr><td colspan="7" class="empty">{% if q or status or age %}No patients match these filters.{% else %}No patients yet. Click <strong>Add Patient</strong> to register your first one.{% endif %}</td></tr>
+        {% endfor %}
+        </tbody>
+      </table>
+    </div>
+
+    <div class="pager">
+      <span>Showing {{ page_obj.start_index }} – {{ page_obj.end_index }} of {{ page_obj.paginator.count }} patient{{ page_obj.paginator.count|pluralize }}</span>
+      {% if page_obj.paginator.num_pages > 1 %}
+      <nav>
+        {% if page_obj.has_previous %}<a href="?{{ querystring }}&page={{ page_obj.previous_page_number }}">‹</a>{% endif %}
+        {% for n in page_obj.paginator.page_range %}
+          {% if n == page_obj.number %}<span class="cur">{{ n }}</span>
+          {% elif n <= 3 or n > page_obj.paginator.num_pages|add:"-3" or n >= page_obj.number|add:"-1" and n <= page_obj.number|add:"1" %}<a href="?{{ querystring }}&page={{ n }}">{{ n }}</a>{% endif %}
+        {% endfor %}
+        {% if page_obj.has_next %}<a href="?{{ querystring }}&page={{ page_obj.next_page_number }}">›</a>{% endif %}
+      </nav>
+      {% endif %}
+    </div>
+  </section>
+
+  <div class="right-col" style="grid-template-columns:1fr">
+    <section class="panel">
+      <div class="panel-header" style="padding-bottom:4px"><div><div class="panel-title" style="font-size:17px">Quick Access</div><p class="subtitle" style="margin-top:4px">Find a patient and start your session</p></div></div>
+      <form method="get" action="{% url 'accounts:patients' %}" class="side-search"><input type="search" name="q" placeholder="Search by name, phone, or patient ID..."></form>
+      <div class="panel-header" style="padding-top:6px;padding-bottom:6px"><div class="panel-title">Recent Patients</div><a class="text-link" href="{% url 'accounts:patients' %}" style="text-decoration:none">View all</a></div>
+      {% for p in recent_patients %}
+      <a class="recent-item" href="{% url 'accounts:patient-detail' p.pk %}">{% patient_avatar p %}<div class="reminder-main"><div class="reminder-name">{{ p.name }}</div><div class="reminder-desc">{{ p.patient_code }}{% if p.phone and p.pk not in hidden_contact %} • {{ p.phone }}{% endif %}</div></div><span>›</span></a>
+      {% empty %}
+      <div class="empty" style="padding:16px">No recent patients yet. Add or open a patient and they appear here.</div>
+      {% endfor %}
+    </section>
+
+    <section class="panel">
+      <div class="panel-header"><div class="panel-title">Quick Actions</div></div>
+      <div class="quick-grid">
+        <button type="button" class="quick-action" data-open="patientModal"><span class="qa-icon">♙+</span><strong>New Patient</strong></button>
+        <button class="quick-action" onclick="notify('Appointments page is not connected yet.')"><span class="qa-icon">▦</span><strong>Appointments</strong></button>
+        <a class="quick-action" href="{% url 'exercises:library' %}"><span class="qa-icon">♧</span><strong>Exercise Library</strong></a>
+        <button class="quick-action" onclick="notify('Reports page is not connected yet.')"><span class="qa-icon">▥</span><strong>Reports</strong></button>
+      </div>
+    </section>
+  </div>
+</div>
+{% endblock %}
+{% block modals %}
+<div class="modal-backdrop" id="patientModal" role="dialog" aria-modal="true" aria-labelledby="pmTitle">
+  <div class="modal-card">
+    <div class="modal-head"><h2 id="pmTitle">Add New Patient</h2><button type="button" class="modal-x" data-close aria-label="Close">×</button></div>
+    {% include 'accounts/_patient_form.html' with modal=True %}
+  </div>
+</div>
+<script>
+  // the dashboard's "Add Patient" links here with ?add=1
+  if (location.search.indexOf('add=1') !== -1) SajhyaUI.openModal('patientModal');
+</script>
+{% endblock %}

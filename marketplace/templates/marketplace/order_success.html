@@ -1,0 +1,69 @@
+{% extends 'marketplace/base.html' %}
+{% load static %}
+{% load marketplace_extras %}
+
+{% block title %}Order Placed — Sajhya {{ catalog.label }}{% endblock %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="{{ 'css/marketplace-store.css'|plain_static }}">
+{% endblock %}
+
+{% block content %}
+<div class="store">
+
+    {% include 'marketplace/_store_header.html' %}
+
+    <div class="store-wrap">
+        <div class="store-success">
+            <div class="store-success-icon">✓</div>
+            <h1 class="store-success-title">Order Placed Successfully!</h1>
+            <p class="store-success-sub">Thank you for your order. Our team will be in touch with you shortly.</p>
+            {% if not user.is_authenticated %}<p class="store-success-sub" style="background:#f1faf5;border-radius:10px;padding:10px 14px"><b>Want to track this order?</b> <a href="{% url 'accounts:signup-client' %}">Create a free account</a> or <a href="{% url 'accounts:login' %}">sign in</a> in this browser and it is added to your dashboard automatically.</p>{% elif user.is_authenticated %}<p class="store-success-sub"><a href="{% url 'portal:orders' %}">See all my orders in my dashboard</a></p>{% endif %}
+
+            <div class="store-order-details">
+                <div class="store-order-detail-row">
+                    <span class="store-detail-label">Order Number</span>
+                    <span class="store-detail-val store-order-num">#{{ order.order_number }}</span>
+                </div>
+                <div class="store-order-detail-row">
+                    <span class="store-detail-label">Customer</span>
+                    <span class="store-detail-val">{{ order.customer_name }}</span>
+                </div>
+                <div class="store-order-detail-row">
+                    <span class="store-detail-label">Phone</span>
+                    <span class="store-detail-val">{{ order.customer_phone }}</span>
+                </div>
+                <div class="store-order-detail-row">
+                    <span class="store-detail-label">Total</span>
+                    <span class="store-detail-val store-order-num">{% if order.total_amount %}NPR {{ order.total_amount }}{% else %}To be quoted{% endif %}</span>
+                </div>
+                <div class="store-order-detail-row">
+                    <span class="store-detail-label">Delivery To</span>
+                    <span class="store-detail-val">{{ order.delivery_address }}</span>
+                </div>
+                <div class="store-order-detail-row">
+                    <span class="store-detail-label">Status</span>
+                    <span class="store-status-badge">{{ order.get_status_display }}</span>
+                </div>
+            </div>
+
+            <!-- Items Ordered -->
+            <div class="store-ordered-items">
+                <h3>Items Ordered</h3>
+                {% for item in order.items.all %}
+                <div class="store-ordered-row">
+                    <span>{{ item.product_name }} <span class="store-qty-tag">×{{ item.quantity }}</span></span>
+                    <span>{{ item.total_price|npr }}</span>
+                </div>
+                {% endfor %}
+            </div>
+
+            <a href="{% url catalog.urls.list %}" class="store-btn-primary">Continue Shopping</a>
+
+            <p class="store-contact-note">
+                Questions? Contact us at <strong>sajhya.com</strong>
+            </p>
+        </div>
+    </div>
+</div>
+{% endblock %}

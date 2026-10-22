@@ -1,0 +1,4 @@
+# Development / test-only tools (pip install -r requirements-dev.txt)
+-r requirements.txt
+esprima==4.0.1
+pyflakes==4.0.3

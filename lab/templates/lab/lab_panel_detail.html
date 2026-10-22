@@ -1,0 +1,60 @@
+{% extends 'marketplace/base.html' %}
+{% load static %}
+{% load marketplace_extras %}
+
+{% block title %}{{ panel.name }} — Sajhya Lab Tests{% endblock %}
+{% block meta_description %}{{ panel.description|default:panel.name }} — NPR {{ panel.price }} at Sajhya.{% endblock %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="{{ 'css/marketplace-store.css'|plain_static }}">
+{% endblock %}
+
+{% block content %}
+<div class="store">
+
+    {% include 'lab/_lab_header.html' %}
+
+    <div class="store-wrap">
+
+        <div class="store-breadcrumb">
+            <a href="{% url 'lab:tests' %}">Lab Tests</a>
+            <span>›</span>
+            <span>{{ panel.name }}</span>
+        </div>
+
+        <div class="store-lab-single-col">
+            <span class="store-detail-cat">Test Panel</span>
+
+            <h1 class="store-detail-title">{{ panel.name }}</h1>
+
+            <div class="store-detail-price">
+                NPR {{ panel.price }}
+                {% if panel.savings > 0 %}<span class="store-lab-savings-inline">Save NPR {{ panel.savings }} vs. individually</span>{% endif %}
+            </div>
+
+            {% if panel.description %}
+            <div class="store-detail-desc">
+                <p>{{ panel.description }}</p>
+            </div>
+            {% endif %}
+
+            <div class="store-detail-desc">
+                <h4>{{ panel.tests.count }} Tests Included</h4>
+                <ul class="vacancy-requirements">
+                    {% for t in panel.tests.all %}<li>{{ t.name }} <span class="store-lab-line-price">NPR {{ t.price }}</span></li>{% endfor %}
+                </ul>
+            </div>
+
+            <div class="store-detail-actions">
+                <a href="{% url 'lab:tests' %}?add=panel-{{ panel.id }}#request" class="store-btn-primary">
+                    Select This Panel →
+                </a>
+                <a href="{% url 'lab:tests' %}" class="store-btn-outline">
+                    Browse More Tests
+                </a>
+            </div>
+        </div>
+
+    </div>
+</div>
+{% endblock %}

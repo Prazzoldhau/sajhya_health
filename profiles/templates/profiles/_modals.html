@@ -1,0 +1,152 @@
+{% comment %}Add / result modals for the Profile tab. Included inside patient_detail's modals block.{% endcomment %}
+{% if section == 'medicine' %}
+<div class="modal-backdrop" id="medModal" role="dialog" aria-modal="true">
+  <div class="modal-card" style="max-width:520px">
+    <div class="modal-head"><h2>Add medicine</h2><button type="button" class="modal-x" data-close aria-label="Close">×</button></div>
+    <form method="post" action="{% url 'profiles:add' patient.pk 'medicine' %}" class="mini-form" id="medForm">
+      {% csrf_token %}
+      <label>Medicine <span style="position:relative;display:block">{{ form.custom_name }}</span><span class="hint" id="medHint">Pick from the pharmacy catalogue, or just type a name.</span></label>
+      {{ form.pharmacy_product }}
+      <div class="two"><label>Dose {{ form.dosage }}</label><label>Instructions {{ form.instructions }}</label></div>
+      <div><div class="hint" style="margin-bottom:6px;font-weight:700;color:#426052">When</div>
+        <div class="chk-row"><label class="chk-inline">{{ form.morning }} Morning</label><label class="chk-inline">{{ form.afternoon }} Afternoon</label><label class="chk-inline">{{ form.evening }} Evening</label><label class="chk-inline">{{ form.night }} Night</label></div></div>
+      <label>Prescribed by {{ form.prescribed_by }}</label>
+      <div class="two"><label>Start date {{ form.start_date }}</label><label>End date (optional) {{ form.end_date }}</label></div>
+      <div class="pf-actions" style="padding:10px 0 0"><button type="button" class="secondary-btn" data-close>Cancel</button><button type="submit" class="primary-btn">Save medicine</button></div>
+    </form>
+  </div>
+</div>
+
+{% elif section == 'nursing' %}
+<div class="modal-backdrop" id="nurseModal" role="dialog" aria-modal="true">
+  <div class="modal-card" style="max-width:560px">
+    <div class="modal-head"><h2>Add nursing entry</h2><button type="button" class="modal-x" data-close aria-label="Close">×</button></div>
+    <form method="post" action="{% url 'profiles:add' patient.pk 'nursing' %}" class="mini-form">
+      {% csrf_token %}
+      <div class="two"><label>Type {{ form.category }}</label><label>When {{ form.recorded_at }}</label></div>
+      <div class="three"><label>{{ form.bp_systolic.label }} {{ form.bp_systolic }}</label><label>{{ form.bp_diastolic.label }} {{ form.bp_diastolic }}</label><label>Pulse {{ form.pulse }}</label></div>
+      <div class="three"><label>{{ form.temperature_c.label }} {{ form.temperature_c }}</label><label>{{ form.spo2.label }} {{ form.spo2 }}</label><label>{{ form.respiratory_rate.label }} {{ form.respiratory_rate }}</label></div>
+      <label>{{ form.weight_kg.label }} {{ form.weight_kg }}</label>
+      <label>Notes {{ form.notes }}</label>
+      <div class="pf-actions" style="padding:10px 0 0"><button type="button" class="secondary-btn" data-close>Cancel</button><button type="submit" class="primary-btn">Save entry</button></div>
+    </form>
+  </div>
+</div>
+
+{% elif section == 'aids' %}
+<div class="modal-backdrop" id="aidModal" role="dialog" aria-modal="true">
+  <div class="modal-card" style="max-width:480px">
+    <div class="modal-head"><h2>Add aid</h2><button type="button" class="modal-x" data-close aria-label="Close">×</button></div>
+    <form method="post" action="{% url 'profiles:add' patient.pk 'aids' %}" class="mini-form" id="aidForm">
+      {% csrf_token %}
+      <label>Aid <span style="position:relative;display:block">{{ form.custom_name }}</span><span class="hint" id="aidHint">Pick from the marketplace, or just type a name.</span></label>
+      {{ form.product }}
+      <div class="two"><label>Type {{ form.category }}</label><label>Side {{ form.side }}</label></div>
+      <div class="two"><label>Size {{ form.size }}</label><label>Issued on {{ form.issued_on }}</label></div>
+      <label>Notes {{ form.notes }}</label>
+      <div class="pf-actions" style="padding:10px 0 0"><button type="button" class="secondary-btn" data-close>Cancel</button><button type="submit" class="primary-btn">Save aid</button></div>
+    </form>
+  </div>
+</div>
+
+{% elif section == 'rehab' and therapy != 'physio' %}
+<div class="modal-backdrop" id="therapyModal" role="dialog" aria-modal="true">
+  <div class="modal-card" style="max-width:520px">
+    <div class="modal-head"><h2>{{ therapy_label }} note</h2><button type="button" class="modal-x" data-close aria-label="Close">×</button></div>
+    <form method="post" action="{% url 'profiles:add' patient.pk 'therapy' %}" class="mini-form">
+      {% csrf_token %}
+      <input type="hidden" name="therapy" value="{{ therapy }}">
+      <label>Session date {{ form.session_date }}</label>
+      <label>Goal {{ form.goal }}</label>
+      <label>What was done {{ form.intervention }}</label>
+      <label>Response / progress {{ form.response }}</label>
+      <label>Plan / home advice {{ form.plan }}</label>
+      <div class="pf-actions" style="padding:10px 0 0"><button type="button" class="secondary-btn" data-close>Cancel</button><button type="submit" class="primary-btn">Save note</button></div>
+    </form>
+  </div>
+</div>
+
+{% elif section == 'labs' %}
+<div class="modal-backdrop" id="labModal" role="dialog" aria-modal="true">
+  <div class="modal-card" style="max-width:500px">
+    <div class="modal-head"><h2>Add lab test</h2><button type="button" class="modal-x" data-close aria-label="Close">×</button></div>
+    <form method="post" action="{% url 'profiles:add' patient.pk 'labs' %}" class="mini-form" id="labForm">
+      {% csrf_token %}
+      <label>Test <span style="position:relative;display:block">{{ form.custom_name }}</span><span class="hint" id="labHint">Pick a test or panel from the lab catalogue, or type a name.</span></label>
+      {{ form.lab_test }}{{ form.lab_panel }}
+      <div class="two"><label>Ordered on {{ form.ordered_on }}</label><label>Status {{ form.status }}</label></div>
+      <label>Notes {{ form.notes }}</label>
+      <div class="pf-actions" style="padding:10px 0 0"><button type="button" class="secondary-btn" data-close>Cancel</button><button type="submit" class="primary-btn">Save</button></div>
+    </form>
+  </div>
+</div>
+<div class="modal-backdrop" id="resultModal" role="dialog" aria-modal="true">
+  <div class="modal-card" style="max-width:480px">
+    <div class="modal-head"><h2 id="resultTitle">Result</h2><button type="button" class="modal-x" data-close aria-label="Close">×</button></div>
+    <form method="post" action="#" enctype="multipart/form-data" class="mini-form" id="resultForm">
+      {% csrf_token %}
+      <div class="two"><label>Result {{ result_form.result_value }}</label><label>Unit {{ result_form.result_unit }}</label></div>
+      <div class="two"><label>Reference range {{ result_form.reference_range }}</label><label>Rating {{ result_form.flag }}</label></div>
+      <label>Result date {{ result_form.resulted_on }}</label>
+      <label>Report file (PDF, JPEG or PNG, up to 5 MB) {{ result_form.report }}</label>
+      <p class="hint" style="margin:0">Reports are stored privately and shown only to you.</p>
+      <div class="pf-actions" style="padding:10px 0 0"><button type="button" class="secondary-btn" data-close>Cancel</button><button type="submit" class="primary-btn">Save result</button></div>
+    </form>
+  </div>
+</div>
+{% endif %}
+
+<script>
+(function () {
+  if (!window.SajhyaUI) return;
+  var UI = window.SajhyaUI;
+  function $(id) { return document.getElementById(id); }
+
+  // medicine: search the pharmacy catalogue; picking one fills the name and remembers the catalogue id
+  var med = $('id_custom_name');
+  if (med && $('medForm')) {
+    var medId = $('medForm').querySelector('input[name=pharmacy_product]');
+    UI.picker(med, {
+      url: "{% url 'profiles:medicine-search' %}",
+      render: function (m) { return '<b>' + UI.esc(m.name) + '</b> <span style="color:#7c9186">' + UI.esc(m.detail) + '</span>'; },
+      onPick: function (m) { med.value = m.name; medId.value = m.id; $('medHint').textContent = 'From the pharmacy catalogue.'; },
+      onType: function () { medId.value = ''; $('medHint').textContent = 'Pick from the pharmacy catalogue, or just type a name.'; },
+    });
+  }
+
+  // aids: search marketplace products (not the pharmacy)
+  var aid = $('aidForm') && $('aidForm').querySelector('input[name=custom_name]');
+  if (aid) {
+    var aidId = $('aidForm').querySelector('input[name=product]');
+    UI.picker(aid, {
+      url: "{% url 'profiles:aid-search' %}",
+      render: function (m) { return '<b>' + UI.esc(m.name) + '</b> <span style="color:#7c9186">' + UI.esc(m.detail) + '</span>'; },
+      onPick: function (m) { aid.value = m.name; aidId.value = m.id; $('aidHint').textContent = 'From the marketplace.'; },
+      onType: function () { aidId.value = ''; $('aidHint').textContent = 'Pick from the marketplace, or just type a name.'; },
+    });
+  }
+
+  // lab: search tests and panels from the lab catalogue
+  var lab = $('labForm') && $('labForm').querySelector('input[name=custom_name]');
+  if (lab) {
+    var testId = $('labForm').querySelector('input[name=lab_test]'), panelId = $('labForm').querySelector('input[name=lab_panel]');
+    UI.picker(lab, {
+      url: "{% url 'lab:search' %}",
+      render: function (t) { return '<b>' + UI.esc(t.name) + '</b> <span style="color:#7c9186">' + UI.esc(t.detail) + '</span>'; },
+      onPick: function (t) { lab.value = t.name; testId.value = t.kind === 'test' ? t.id : ''; panelId.value = t.kind === 'panel' ? t.id : ''; $('labHint').textContent = 'From the lab catalogue.'; },
+      onType: function () { testId.value = ''; panelId.value = ''; $('labHint').textContent = 'Pick a test or panel from the lab catalogue, or type a name.'; },
+    });
+  }
+
+  // lab results: one modal reused for every row
+  document.querySelectorAll('[data-result]').forEach(function (button) {
+    button.addEventListener('click', function () {
+      var f = $('resultForm'), d = button.dataset;
+      f.action = d.result; $('resultTitle').textContent = 'Result: ' + d.name;
+      f.elements['result_value'].value = d.value; f.elements['result_unit'].value = d.unit;
+      f.elements['reference_range'].value = d.range; f.elements['flag'].value = d.flag;
+      UI.openModal('resultModal');
+    });
+  });
+})();
+</script>

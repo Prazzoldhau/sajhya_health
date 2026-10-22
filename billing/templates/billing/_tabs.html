@@ -1,0 +1,4 @@
+<div class="tabs2 no-print">
+  <a href="{% url 'billing:billing' %}" class="{% if billing_tab == 'book' %}on{% endif %}">Daily billing book</a>
+  <a href="{% url 'billing:packages' %}" class="{% if billing_tab == 'packages' %}on{% endif %}">Patient packages</a>
+</div>

@@ -1,0 +1,36 @@
+{% extends 'accounts/base.html' %}
+{% block title %}Review applications - Sajhya Health{% endblock %}
+{% block content %}
+<div class="text-center mb-4">
+    <h1 class="fw-bold page-title">Professional applications</h1>
+    <p class="page-lead"><a href="{% url 'accounts:welcome' %}" class="page-lead">&larr; Back</a></p>
+</div>
+{% if messages %}{% for m in messages %}<div class="alert alert-success">{{ m }}</div>{% endfor %}{% endif %}
+<div class="mb-3 d-flex gap-2 flex-wrap justify-content-center">
+    {% for value, label in status_choices %}
+    <a href="?status={{ value }}" class="btn btn-sm {% if status == value %}btn-gradient{% else %}btn-outline-success{% endif %}" style="width:auto">{{ label }}</a>
+    {% endfor %}
+    <a href="?status=all" class="btn btn-sm {% if status == 'all' %}btn-gradient{% else %}btn-outline-success{% endif %}" style="width:auto">All</a>
+</div>
+<div class="comparison-section mt-0">
+    <div class="table-responsive">
+        <table class="table table-hover align-middle">
+            <thead><tr><th>Name</th><th>Profession</th><th>Licence</th><th>Submitted</th><th>Status</th><th></th></tr></thead>
+            <tbody>
+            {% for p in profiles %}
+                <tr>
+                    <td>{{ p.full_name }}, {{ p.title }}</td>
+                    <td>{{ p.account.profession|default:"-" }}</td>
+                    <td>{{ p.license_number|default:"-" }}</td>
+                    <td>{{ p.submitted_at|date:"d M Y"|default:"-" }}</td>
+                    <td>{{ p.get_status_display }}</td>
+                    <td><a href="{% url 'accounts:review-detail' p.pk %}" class="page-lead">Review &rarr;</a></td>
+                </tr>
+            {% empty %}
+                <tr><td colspan="6" class="text-center text-muted">No applications here.</td></tr>
+            {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endblock %}

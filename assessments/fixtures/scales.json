@@ -1,0 +1,2279 @@
+{
+ "scales": [
+  {
+   "code": "barthel",
+   "name": "Barthel Index of ADL",
+   "abbreviation": "Barthel",
+   "category": "functional",
+   "scoring": "sum",
+   "description": "Independence in 10 basic activities of daily living. Widely used after stroke and in rehabilitation.",
+   "instructions": "Score what the patient actually does, not what they could do. Maximum 100.",
+   "unit": "points",
+   "higher_is_better": true,
+   "mcid": null,
+   "reference": "Mahoney & Barthel, 1965 (Maryland State Medical Journal)",
+   "items": [
+    {
+     "label": "Feeding",
+     "input_type": "choice",
+     "options_text": "0|Unable\n5|Needs help cutting, spreading butter, etc.\n10|Independent",
+     "section": "",
+     "help_text": "",
+     "order": 1,
+     "code": "feeding",
+     "required": true
+    },
+    {
+     "label": "Bathing",
+     "input_type": "choice",
+     "options_text": "0|Dependent\n5|Independent",
+     "section": "",
+     "help_text": "",
+     "order": 2,
+     "code": "bathing",
+     "required": true
+    },
+    {
+     "label": "Grooming",
+     "input_type": "choice",
+     "options_text": "0|Needs help with personal care\n5|Independent (face, hair, teeth, shaving)",
+     "section": "",
+     "help_text": "",
+     "order": 3,
+     "code": "grooming",
+     "required": true
+    },
+    {
+     "label": "Dressing",
+     "input_type": "choice",
+     "options_text": "0|Dependent\n5|Needs help but does about half unaided\n10|Independent (incl. buttons, zips, laces)",
+     "section": "",
+     "help_text": "",
+     "order": 4,
+     "code": "dressing",
+     "required": true
+    },
+    {
+     "label": "Bowels",
+     "input_type": "choice",
+     "options_text": "0|Incontinent (or needs enemas)\n5|Occasional accident\n10|Continent",
+     "section": "",
+     "help_text": "",
+     "order": 5,
+     "code": "bowels",
+     "required": true
+    },
+    {
+     "label": "Bladder",
+     "input_type": "choice",
+     "options_text": "0|Incontinent, or catheterised and unable to manage alone\n5|Occasional accident\n10|Continent",
+     "section": "",
+     "help_text": "",
+     "order": 6,
+     "code": "bladder",
+     "required": true
+    },
+    {
+     "label": "Toilet use",
+     "input_type": "choice",
+     "options_text": "0|Dependent\n5|Needs some help, can do something alone\n10|Independent (on and off, dressing, wiping)",
+     "section": "",
+     "help_text": "",
+     "order": 7,
+     "code": "toilet-use",
+     "required": true
+    },
+    {
+     "label": "Transfers (bed to chair and back)",
+     "input_type": "choice",
+     "options_text": "0|Unable, no sitting balance\n5|Major help (one or two people), can sit\n10|Minor help (verbal or physical)\n15|Independent",
+     "section": "",
+     "help_text": "",
+     "order": 8,
+     "code": "transfers-bed-to-chair-and-back",
+     "required": true
+    },
+    {
+     "label": "Mobility on level surfaces",
+     "input_type": "choice",
+     "options_text": "0|Immobile or < 50 yards\n5|Wheelchair independent, incl. corners, > 50 yards\n10|Walks with help of one person > 50 yards\n15|Independent (may use any aid) > 50 yards",
+     "section": "",
+     "help_text": "",
+     "order": 9,
+     "code": "mobility-on-level-surfaces",
+     "required": true
+    },
+    {
+     "label": "Stairs",
+     "input_type": "choice",
+     "options_text": "0|Unable\n5|Needs help (verbal, physical, carrying aid)\n10|Independent up and down",
+     "section": "",
+     "help_text": "",
+     "order": 10,
+     "code": "stairs",
+     "required": true
+    }
+   ],
+   "bands": [
+    {
+     "min_score": 0,
+     "max_score": 20,
+     "label": "Total dependence",
+     "tone": "bad"
+    },
+    {
+     "min_score": 21,
+     "max_score": 60,
+     "label": "Severe dependence",
+     "tone": "bad"
+    },
+    {
+     "min_score": 61,
+     "max_score": 90,
+     "label": "Moderate dependence",
+     "tone": "warn"
+    },
+    {
+     "min_score": 91,
+     "max_score": 99,
+     "label": "Slight dependence",
+     "tone": "ok"
+    },
+    {
+     "min_score": 100,
+     "max_score": 100,
+     "label": "Independent",
+     "tone": "good"
+    }
+   ]
+  },
+  {
+   "code": "fim",
+   "name": "Functional Independence Measure",
+   "abbreviation": "FIM",
+   "category": "functional",
+   "scoring": "sum",
+   "description": "18 items covering self-care, continence, transfers, locomotion, communication and social cognition. Each is graded 1-7.",
+   "instructions": "Grade the lowest level the patient performs on most occasions. Total 18-126.",
+   "unit": "points",
+   "higher_is_better": true,
+   "mcid": null,
+   "reference": "FIM is a trademark of Uniform Data System for Medical Rehabilitation; confirm your clinic holds the licence required to use it.",
+   "items": [
+    {
+     "label": "Eating",
+     "input_type": "choice",
+     "options_text": "7|Complete independence\n6|Modified independence (device / extra time)\n5|Supervision or set-up\n4|Minimal contact assistance (patient does 75%+)\n3|Moderate assistance (patient does 50-74%)\n2|Maximal assistance (patient does 25-49%)\n1|Total assistance (patient does < 25%)",
+     "section": "Self-care",
+     "help_text": "",
+     "order": 1,
+     "code": "eating",
+     "required": true
+    },
+    {
+     "label": "Grooming",
+     "input_type": "choice",
+     "options_text": "7|Complete independence\n6|Modified independence (device / extra time)\n5|Supervision or set-up\n4|Minimal contact assistance (patient does 75%+)\n3|Moderate assistance (patient does 50-74%)\n2|Maximal assistance (patient does 25-49%)\n1|Total assistance (patient does < 25%)",
+     "section": "",
+     "help_text": "",
+     "order": 2,
+     "code": "grooming",
+     "required": true
+    },
+    {
+     "label": "Bathing",
+     "input_type": "choice",
+     "options_text": "7|Complete independence\n6|Modified independence (device / extra time)\n5|Supervision or set-up\n4|Minimal contact assistance (patient does 75%+)\n3|Moderate assistance (patient does 50-74%)\n2|Maximal assistance (patient does 25-49%)\n1|Total assistance (patient does < 25%)",
+     "section": "",
+     "help_text": "",
+     "order": 3,
+     "code": "bathing",
+     "required": true
+    },
+    {
+     "label": "Dressing - upper body",
+     "input_type": "choice",
+     "options_text": "7|Complete independence\n6|Modified independence (device / extra time)\n5|Supervision or set-up\n4|Minimal contact assistance (patient does 75%+)\n3|Moderate assistance (patient does 50-74%)\n2|Maximal assistance (patient does 25-49%)\n1|Total assistance (patient does < 25%)",
+     "section": "",
+     "help_text": "",
+     "order": 4,
+     "code": "dressing-upper-body",
+     "required": true
+    },
+    {
+     "label": "Dressing - lower body",
+     "input_type": "choice",
+     "options_text": "7|Complete independence\n6|Modified independence (device / extra time)\n5|Supervision or set-up\n4|Minimal contact assistance (patient does 75%+)\n3|Moderate assistance (patient does 50-74%)\n2|Maximal assistance (patient does 25-49%)\n1|Total assistance (patient does < 25%)",
+     "section": "",
+     "help_text": "",
+     "order": 5,
+     "code": "dressing-lower-body",
+     "required": true
+    },
+    {
+     "label": "Toileting",
+     "input_type": "choice",
+     "options_text": "7|Complete independence\n6|Modified independence (device / extra time)\n5|Supervision or set-up\n4|Minimal contact assistance (patient does 75%+)\n3|Moderate assistance (patient does 50-74%)\n2|Maximal assistance (patient does 25-49%)\n1|Total assistance (patient does < 25%)",
+     "section": "",
+     "help_text": "",
+     "order": 6,
+     "code": "toileting",
+     "required": true
+    },
+    {
+     "label": "Bladder management",
+     "input_type": "choice",
+     "options_text": "7|Complete independence\n6|Modified independence (device / extra time)\n5|Supervision or set-up\n4|Minimal contact assistance (patient does 75%+)\n3|Moderate assistance (patient does 50-74%)\n2|Maximal assistance (patient does 25-49%)\n1|Total assistance (patient does < 25%)",
+     "section": "Sphincter control",
+     "help_text": "",
+     "order": 7,
+     "code": "bladder-management",
+     "required": true
+    },
+    {
+     "label": "Bowel management",
+     "input_type": "choice",
+     "options_text": "7|Complete independence\n6|Modified independence (device / extra time)\n5|Supervision or set-up\n4|Minimal contact assistance (patient does 75%+)\n3|Moderate assistance (patient does 50-74%)\n2|Maximal assistance (patient does 25-49%)\n1|Total assistance (patient does < 25%)",
+     "section": "",
+     "help_text": "",
+     "order": 8,
+     "code": "bowel-management",
+     "required": true
+    },
+    {
+     "label": "Transfer: bed, chair, wheelchair",
+     "input_type": "choice",
+     "options_text": "7|Complete independence\n6|Modified independence (device / extra time)\n5|Supervision or set-up\n4|Minimal contact assistance (patient does 75%+)\n3|Moderate assistance (patient does 50-74%)\n2|Maximal assistance (patient does 25-49%)\n1|Total assistance (patient does < 25%)",
+     "section": "Transfers",
+     "help_text": "",
+     "order": 9,
+     "code": "transfer-bed-chair-wheelchair",
+     "required": true
+    },
+    {
+     "label": "Transfer: toilet",
+     "input_type": "choice",
+     "options_text": "7|Complete independence\n6|Modified independence (device / extra time)\n5|Supervision or set-up\n4|Minimal contact assistance (patient does 75%+)\n3|Moderate assistance (patient does 50-74%)\n2|Maximal assistance (patient does 25-49%)\n1|Total assistance (patient does < 25%)",
+     "section": "",
+     "help_text": "",
+     "order": 10,
+     "code": "transfer-toilet",
+     "required": true
+    },
+    {
+     "label": "Transfer: tub or shower",
+     "input_type": "choice",
+     "options_text": "7|Complete independence\n6|Modified independence (device / extra time)\n5|Supervision or set-up\n4|Minimal contact assistance (patient does 75%+)\n3|Moderate assistance (patient does 50-74%)\n2|Maximal assistance (patient does 25-49%)\n1|Total assistance (patient does < 25%)",
+     "section": "",
+     "help_text": "",
+     "order": 11,
+     "code": "transfer-tub-or-shower",
+     "required": true
+    },
+    {
+     "label": "Walk / wheelchair",
+     "input_type": "choice",
+     "options_text": "7|Complete independence\n6|Modified independence (device / extra time)\n5|Supervision or set-up\n4|Minimal contact assistance (patient does 75%+)\n3|Moderate assistance (patient does 50-74%)\n2|Maximal assistance (patient does 25-49%)\n1|Total assistance (patient does < 25%)",
+     "section": "Locomotion",
+     "help_text": "",
+     "order": 12,
+     "code": "walk-wheelchair",
+     "required": true
+    },
+    {
+     "label": "Stairs",
+     "input_type": "choice",
+     "options_text": "7|Complete independence\n6|Modified independence (device / extra time)\n5|Supervision or set-up\n4|Minimal contact assistance (patient does 75%+)\n3|Moderate assistance (patient does 50-74%)\n2|Maximal assistance (patient does 25-49%)\n1|Total assistance (patient does < 25%)",
+     "section": "",
+     "help_text": "",
+     "order": 13,
+     "code": "stairs",
+     "required": true
+    },
+    {
+     "label": "Comprehension",
+     "input_type": "choice",
+     "options_text": "7|Complete independence\n6|Modified independence (device / extra time)\n5|Supervision or set-up\n4|Minimal contact assistance (patient does 75%+)\n3|Moderate assistance (patient does 50-74%)\n2|Maximal assistance (patient does 25-49%)\n1|Total assistance (patient does < 25%)",
+     "section": "Communication",
+     "help_text": "",
+     "order": 14,
+     "code": "comprehension",
+     "required": true
+    },
+    {
+     "label": "Expression",
+     "input_type": "choice",
+     "options_text": "7|Complete independence\n6|Modified independence (device / extra time)\n5|Supervision or set-up\n4|Minimal contact assistance (patient does 75%+)\n3|Moderate assistance (patient does 50-74%)\n2|Maximal assistance (patient does 25-49%)\n1|Total assistance (patient does < 25%)",
+     "section": "",
+     "help_text": "",
+     "order": 15,
+     "code": "expression",
+     "required": true
+    },
+    {
+     "label": "Social interaction",
+     "input_type": "choice",
+     "options_text": "7|Complete independence\n6|Modified independence (device / extra time)\n5|Supervision or set-up\n4|Minimal contact assistance (patient does 75%+)\n3|Moderate assistance (patient does 50-74%)\n2|Maximal assistance (patient does 25-49%)\n1|Total assistance (patient does < 25%)",
+     "section": "Social cognition",
+     "help_text": "",
+     "order": 16,
+     "code": "social-interaction",
+     "required": true
+    },
+    {
+     "label": "Problem solving",
+     "input_type": "choice",
+     "options_text": "7|Complete independence\n6|Modified independence (device / extra time)\n5|Supervision or set-up\n4|Minimal contact assistance (patient does 75%+)\n3|Moderate assistance (patient does 50-74%)\n2|Maximal assistance (patient does 25-49%)\n1|Total assistance (patient does < 25%)",
+     "section": "",
+     "help_text": "",
+     "order": 17,
+     "code": "problem-solving",
+     "required": true
+    },
+    {
+     "label": "Memory",
+     "input_type": "choice",
+     "options_text": "7|Complete independence\n6|Modified independence (device / extra time)\n5|Supervision or set-up\n4|Minimal contact assistance (patient does 75%+)\n3|Moderate assistance (patient does 50-74%)\n2|Maximal assistance (patient does 25-49%)\n1|Total assistance (patient does < 25%)",
+     "section": "",
+     "help_text": "",
+     "order": 18,
+     "code": "memory",
+     "required": true
+    }
+   ],
+   "bands": [
+    {
+     "min_score": 18,
+     "max_score": 53,
+     "label": "Needs significant assistance",
+     "tone": "bad"
+    },
+    {
+     "min_score": 54,
+     "max_score": 89,
+     "label": "Needs moderate assistance",
+     "tone": "warn"
+    },
+    {
+     "min_score": 90,
+     "max_score": 125,
+     "label": "Minimal assistance / supervision",
+     "tone": "ok"
+    },
+    {
+     "min_score": 126,
+     "max_score": 126,
+     "label": "Complete independence",
+     "tone": "good"
+    }
+   ]
+  },
+  {
+   "code": "mrs",
+   "name": "Modified Rankin Scale",
+   "abbreviation": "mRS",
+   "category": "neuro",
+   "scoring": "single",
+   "description": "Global disability after stroke or other neurological injury (0-6).",
+   "instructions": "",
+   "unit": "points",
+   "higher_is_better": false,
+   "mcid": null,
+   "reference": "van Swieten et al., Stroke 1988",
+   "items": [
+    {
+     "label": "Degree of disability",
+     "input_type": "choice",
+     "options_text": "0|No symptoms\n1|No significant disability despite symptoms; able to carry out all usual activities\n2|Slight disability; unable to carry out all previous activities but looks after own affairs without help\n3|Moderate disability; needs some help but walks without assistance\n4|Moderately severe disability; unable to walk or attend to bodily needs without assistance\n5|Severe disability; bedridden, incontinent, needs constant nursing care\n6|Dead",
+     "section": "",
+     "help_text": "",
+     "order": 1,
+     "code": "degree-of-disability",
+     "required": true
+    }
+   ],
+   "bands": []
+  },
+  {
+   "code": "berg",
+   "name": "Berg Balance Scale",
+   "abbreviation": "Berg",
+   "category": "balance",
+   "scoring": "sum",
+   "description": "14 balance tasks graded 0-4. Predicts fall risk in older adults and neurological patients.",
+   "instructions": "The options here are the general 0-4 grading anchors; each task has its own exact criteria (times and distances) in the published scale - grade against those. Total 0-56.",
+   "unit": "points",
+   "higher_is_better": true,
+   "mcid": 4,
+   "reference": "Berg et al., Can J Public Health 1992",
+   "items": [
+    {
+     "label": "Sitting to standing",
+     "input_type": "choice",
+     "options_text": "4|Able to do the task safely and independently\n3|Able, but with minor difficulty or slightly below the time/distance criteria\n2|Able only with supervision, guidance or well below the criteria\n1|Needs help to attempt\n0|Unable / needs assistance",
+     "section": "",
+     "help_text": "",
+     "order": 1,
+     "code": "sitting-to-standing",
+     "required": true
+    },
+    {
+     "label": "Standing unsupported",
+     "input_type": "choice",
+     "options_text": "4|Able to do the task safely and independently\n3|Able, but with minor difficulty or slightly below the time/distance criteria\n2|Able only with supervision, guidance or well below the criteria\n1|Needs help to attempt\n0|Unable / needs assistance",
+     "section": "",
+     "help_text": "",
+     "order": 2,
+     "code": "standing-unsupported",
+     "required": true
+    },
+    {
+     "label": "Sitting unsupported (back unsupported, feet on floor)",
+     "input_type": "choice",
+     "options_text": "4|Able to do the task safely and independently\n3|Able, but with minor difficulty or slightly below the time/distance criteria\n2|Able only with supervision, guidance or well below the criteria\n1|Needs help to attempt\n0|Unable / needs assistance",
+     "section": "",
+     "help_text": "",
+     "order": 3,
+     "code": "sitting-unsupported-back-unsupported-fee",
+     "required": true
+    },
+    {
+     "label": "Standing to sitting",
+     "input_type": "choice",
+     "options_text": "4|Able to do the task safely and independently\n3|Able, but with minor difficulty or slightly below the time/distance criteria\n2|Able only with supervision, guidance or well below the criteria\n1|Needs help to attempt\n0|Unable / needs assistance",
+     "section": "",
+     "help_text": "",
+     "order": 4,
+     "code": "standing-to-sitting",
+     "required": true
+    },
+    {
+     "label": "Transfers",
+     "input_type": "choice",
+     "options_text": "4|Able to do the task safely and independently\n3|Able, but with minor difficulty or slightly below the time/distance criteria\n2|Able only with supervision, guidance or well below the criteria\n1|Needs help to attempt\n0|Unable / needs assistance",
+     "section": "",
+     "help_text": "",
+     "order": 5,
+     "code": "transfers",
+     "required": true
+    },
+    {
+     "label": "Standing with eyes closed",
+     "input_type": "choice",
+     "options_text": "4|Able to do the task safely and independently\n3|Able, but with minor difficulty or slightly below the time/distance criteria\n2|Able only with supervision, guidance or well below the criteria\n1|Needs help to attempt\n0|Unable / needs assistance",
+     "section": "",
+     "help_text": "",
+     "order": 6,
+     "code": "standing-with-eyes-closed",
+     "required": true
+    },
+    {
+     "label": "Standing with feet together",
+     "input_type": "choice",
+     "options_text": "4|Able to do the task safely and independently\n3|Able, but with minor difficulty or slightly below the time/distance criteria\n2|Able only with supervision, guidance or well below the criteria\n1|Needs help to attempt\n0|Unable / needs assistance",
+     "section": "",
+     "help_text": "",
+     "order": 7,
+     "code": "standing-with-feet-together",
+     "required": true
+    },
+    {
+     "label": "Reaching forward with outstretched arm",
+     "input_type": "choice",
+     "options_text": "4|Able to do the task safely and independently\n3|Able, but with minor difficulty or slightly below the time/distance criteria\n2|Able only with supervision, guidance or well below the criteria\n1|Needs help to attempt\n0|Unable / needs assistance",
+     "section": "",
+     "help_text": "",
+     "order": 8,
+     "code": "reaching-forward-with-outstretched-arm",
+     "required": true
+    },
+    {
+     "label": "Retrieving object from floor",
+     "input_type": "choice",
+     "options_text": "4|Able to do the task safely and independently\n3|Able, but with minor difficulty or slightly below the time/distance criteria\n2|Able only with supervision, guidance or well below the criteria\n1|Needs help to attempt\n0|Unable / needs assistance",
+     "section": "",
+     "help_text": "",
+     "order": 9,
+     "code": "retrieving-object-from-floor",
+     "required": true
+    },
+    {
+     "label": "Turning to look behind",
+     "input_type": "choice",
+     "options_text": "4|Able to do the task safely and independently\n3|Able, but with minor difficulty or slightly below the time/distance criteria\n2|Able only with supervision, guidance or well below the criteria\n1|Needs help to attempt\n0|Unable / needs assistance",
+     "section": "",
+     "help_text": "",
+     "order": 10,
+     "code": "turning-to-look-behind",
+     "required": true
+    },
+    {
+     "label": "Turning 360 degrees",
+     "input_type": "choice",
+     "options_text": "4|Able to do the task safely and independently\n3|Able, but with minor difficulty or slightly below the time/distance criteria\n2|Able only with supervision, guidance or well below the criteria\n1|Needs help to attempt\n0|Unable / needs assistance",
+     "section": "",
+     "help_text": "",
+     "order": 11,
+     "code": "turning-360-degrees",
+     "required": true
+    },
+    {
+     "label": "Placing alternate foot on stool or step",
+     "input_type": "choice",
+     "options_text": "4|Able to do the task safely and independently\n3|Able, but with minor difficulty or slightly below the time/distance criteria\n2|Able only with supervision, guidance or well below the criteria\n1|Needs help to attempt\n0|Unable / needs assistance",
+     "section": "",
+     "help_text": "",
+     "order": 12,
+     "code": "placing-alternate-foot-on-stool-or-step",
+     "required": true
+    },
+    {
+     "label": "Standing with one foot in front (tandem)",
+     "input_type": "choice",
+     "options_text": "4|Able to do the task safely and independently\n3|Able, but with minor difficulty or slightly below the time/distance criteria\n2|Able only with supervision, guidance or well below the criteria\n1|Needs help to attempt\n0|Unable / needs assistance",
+     "section": "",
+     "help_text": "",
+     "order": 13,
+     "code": "standing-with-one-foot-in-front-tandem",
+     "required": true
+    },
+    {
+     "label": "Standing on one leg",
+     "input_type": "choice",
+     "options_text": "4|Able to do the task safely and independently\n3|Able, but with minor difficulty or slightly below the time/distance criteria\n2|Able only with supervision, guidance or well below the criteria\n1|Needs help to attempt\n0|Unable / needs assistance",
+     "section": "",
+     "help_text": "",
+     "order": 14,
+     "code": "standing-on-one-leg",
+     "required": true
+    }
+   ],
+   "bands": [
+    {
+     "min_score": 0,
+     "max_score": 20,
+     "label": "High fall risk (wheelchair-level balance)",
+     "tone": "bad"
+    },
+    {
+     "min_score": 21,
+     "max_score": 40,
+     "label": "Medium fall risk",
+     "tone": "warn"
+    },
+    {
+     "min_score": 41,
+     "max_score": 56,
+     "label": "Low fall risk",
+     "tone": "good"
+    }
+   ]
+  },
+  {
+   "code": "pbs",
+   "name": "Paediatric Balance Scale",
+   "abbreviation": "PBS",
+   "category": "pedia",
+   "scoring": "sum",
+   "description": "Modification of the Berg for school-age children with mild to moderate motor impairment. 14 tasks graded 0-4.",
+   "instructions": "Anchors shown are general; use the exact criteria of the published scale. Total 0-56.",
+   "unit": "points",
+   "higher_is_better": true,
+   "mcid": null,
+   "reference": "Franjoine et al., Pediatr Phys Ther 2003",
+   "items": [
+    {
+     "label": "Sitting to standing",
+     "input_type": "choice",
+     "options_text": "4|Able to do the task safely and independently\n3|Able, but with minor difficulty or slightly below the time/distance criteria\n2|Able only with supervision, guidance or well below the criteria\n1|Needs help to attempt\n0|Unable / needs assistance",
+     "section": "",
+     "help_text": "",
+     "order": 1,
+     "code": "sitting-to-standing",
+     "required": true
+    },
+    {
+     "label": "Standing to sitting",
+     "input_type": "choice",
+     "options_text": "4|Able to do the task safely and independently\n3|Able, but with minor difficulty or slightly below the time/distance criteria\n2|Able only with supervision, guidance or well below the criteria\n1|Needs help to attempt\n0|Unable / needs assistance",
+     "section": "",
+     "help_text": "",
+     "order": 2,
+     "code": "standing-to-sitting",
+     "required": true
+    },
+    {
+     "label": "Transfers",
+     "input_type": "choice",
+     "options_text": "4|Able to do the task safely and independently\n3|Able, but with minor difficulty or slightly below the time/distance criteria\n2|Able only with supervision, guidance or well below the criteria\n1|Needs help to attempt\n0|Unable / needs assistance",
+     "section": "",
+     "help_text": "",
+     "order": 3,
+     "code": "transfers",
+     "required": true
+    },
+    {
+     "label": "Standing unsupported",
+     "input_type": "choice",
+     "options_text": "4|Able to do the task safely and independently\n3|Able, but with minor difficulty or slightly below the time/distance criteria\n2|Able only with supervision, guidance or well below the criteria\n1|Needs help to attempt\n0|Unable / needs assistance",
+     "section": "",
+     "help_text": "",
+     "order": 4,
+     "code": "standing-unsupported",
+     "required": true
+    },
+    {
+     "label": "Sitting unsupported",
+     "input_type": "choice",
+     "options_text": "4|Able to do the task safely and independently\n3|Able, but with minor difficulty or slightly below the time/distance criteria\n2|Able only with supervision, guidance or well below the criteria\n1|Needs help to attempt\n0|Unable / needs assistance",
+     "section": "",
+     "help_text": "",
+     "order": 5,
+     "code": "sitting-unsupported",
+     "required": true
+    },
+    {
+     "label": "Standing with eyes closed",
+     "input_type": "choice",
+     "options_text": "4|Able to do the task safely and independently\n3|Able, but with minor difficulty or slightly below the time/distance criteria\n2|Able only with supervision, guidance or well below the criteria\n1|Needs help to attempt\n0|Unable / needs assistance",
+     "section": "",
+     "help_text": "",
+     "order": 6,
+     "code": "standing-with-eyes-closed",
+     "required": true
+    },
+    {
+     "label": "Standing with feet together",
+     "input_type": "choice",
+     "options_text": "4|Able to do the task safely and independently\n3|Able, but with minor difficulty or slightly below the time/distance criteria\n2|Able only with supervision, guidance or well below the criteria\n1|Needs help to attempt\n0|Unable / needs assistance",
+     "section": "",
+     "help_text": "",
+     "order": 7,
+     "code": "standing-with-feet-together",
+     "required": true
+    },
+    {
+     "label": "Standing with one foot in front",
+     "input_type": "choice",
+     "options_text": "4|Able to do the task safely and independently\n3|Able, but with minor difficulty or slightly below the time/distance criteria\n2|Able only with supervision, guidance or well below the criteria\n1|Needs help to attempt\n0|Unable / needs assistance",
+     "section": "",
+     "help_text": "",
+     "order": 8,
+     "code": "standing-with-one-foot-in-front",
+     "required": true
+    },
+    {
+     "label": "Standing on one foot",
+     "input_type": "choice",
+     "options_text": "4|Able to do the task safely and independently\n3|Able, but with minor difficulty or slightly below the time/distance criteria\n2|Able only with supervision, guidance or well below the criteria\n1|Needs help to attempt\n0|Unable / needs assistance",
+     "section": "",
+     "help_text": "",
+     "order": 9,
+     "code": "standing-on-one-foot",
+     "required": true
+    },
+    {
+     "label": "Turning 360 degrees",
+     "input_type": "choice",
+     "options_text": "4|Able to do the task safely and independently\n3|Able, but with minor difficulty or slightly below the time/distance criteria\n2|Able only with supervision, guidance or well below the criteria\n1|Needs help to attempt\n0|Unable / needs assistance",
+     "section": "",
+     "help_text": "",
+     "order": 10,
+     "code": "turning-360-degrees",
+     "required": true
+    },
+    {
+     "label": "Turning to look behind",
+     "input_type": "choice",
+     "options_text": "4|Able to do the task safely and independently\n3|Able, but with minor difficulty or slightly below the time/distance criteria\n2|Able only with supervision, guidance or well below the criteria\n1|Needs help to attempt\n0|Unable / needs assistance",
+     "section": "",
+     "help_text": "",
+     "order": 11,
+     "code": "turning-to-look-behind",
+     "required": true
+    },
+    {
+     "label": "Retrieving object from floor",
+     "input_type": "choice",
+     "options_text": "4|Able to do the task safely and independently\n3|Able, but with minor difficulty or slightly below the time/distance criteria\n2|Able only with supervision, guidance or well below the criteria\n1|Needs help to attempt\n0|Unable / needs assistance",
+     "section": "",
+     "help_text": "",
+     "order": 12,
+     "code": "retrieving-object-from-floor",
+     "required": true
+    },
+    {
+     "label": "Placing alternate foot on stool",
+     "input_type": "choice",
+     "options_text": "4|Able to do the task safely and independently\n3|Able, but with minor difficulty or slightly below the time/distance criteria\n2|Able only with supervision, guidance or well below the criteria\n1|Needs help to attempt\n0|Unable / needs assistance",
+     "section": "",
+     "help_text": "",
+     "order": 13,
+     "code": "placing-alternate-foot-on-stool",
+     "required": true
+    },
+    {
+     "label": "Reaching forward with outstretched arm",
+     "input_type": "choice",
+     "options_text": "4|Able to do the task safely and independently\n3|Able, but with minor difficulty or slightly below the time/distance criteria\n2|Able only with supervision, guidance or well below the criteria\n1|Needs help to attempt\n0|Unable / needs assistance",
+     "section": "",
+     "help_text": "",
+     "order": 14,
+     "code": "reaching-forward-with-outstretched-arm",
+     "required": true
+    }
+   ],
+   "bands": []
+  },
+  {
+   "code": "tug",
+   "name": "Timed Up and Go",
+   "abbreviation": "TUG",
+   "category": "balance",
+   "scoring": "single",
+   "description": "Mobility and fall risk; a simple timed test.",
+   "instructions": "Record the time in seconds, with the aid used in the notes.",
+   "unit": "seconds",
+   "higher_is_better": false,
+   "mcid": null,
+   "reference": "Podsiadlo & Richardson, J Am Geriatr Soc 1991",
+   "items": [
+    {
+     "label": "Time taken (seconds)",
+     "input_type": "number",
+     "min_value": 0,
+     "max_value": 300,
+     "help_text": "Stand from a chair, walk 3 m, turn, return and sit. Usual pace, usual walking aid.",
+     "order": 1,
+     "code": "time-taken-seconds",
+     "required": true
+    }
+   ],
+   "bands": [
+    {
+     "min_score": 0,
+     "max_score": 9.99,
+     "label": "Freely mobile",
+     "tone": "good"
+    },
+    {
+     "min_score": 10,
+     "max_score": 19.99,
+     "label": "Mostly independent",
+     "tone": "ok"
+    },
+    {
+     "min_score": 20,
+     "max_score": 29.99,
+     "label": "Variable mobility - may need an aid",
+     "tone": "warn"
+    },
+    {
+     "min_score": 30,
+     "max_score": 300,
+     "label": "Impaired mobility - high fall risk",
+     "tone": "bad"
+    }
+   ]
+  },
+  {
+   "code": "functional-reach",
+   "name": "Functional Reach Test",
+   "abbreviation": "FRT",
+   "category": "balance",
+   "scoring": "single",
+   "description": "Dynamic balance: how far the patient can reach forward without stepping.",
+   "instructions": "",
+   "unit": "cm",
+   "higher_is_better": true,
+   "mcid": null,
+   "reference": "Duncan et al., J Gerontol 1990",
+   "items": [
+    {
+     "label": "Reach distance (cm)",
+     "input_type": "number",
+     "min_value": 0,
+     "max_value": 100,
+     "help_text": "Furthest forward reach along a wall-mounted ruler, feet fixed, arm at 90 degrees.",
+     "order": 1,
+     "code": "reach-distance-cm",
+     "required": true
+    }
+   ],
+   "bands": [
+    {
+     "min_score": 0,
+     "max_score": 15.2,
+     "label": "High fall risk",
+     "tone": "bad"
+    },
+    {
+     "min_score": 15.21,
+     "max_score": 25.4,
+     "label": "Moderate fall risk",
+     "tone": "warn"
+    },
+    {
+     "min_score": 25.41,
+     "max_score": 100,
+     "label": "Low fall risk",
+     "tone": "good"
+    }
+   ]
+  },
+  {
+   "code": "sts30",
+   "name": "30-Second Chair Stand",
+   "abbreviation": "30s STS",
+   "category": "balance",
+   "scoring": "single",
+   "description": "Lower-limb strength and endurance in older adults.",
+   "instructions": "Count full stands in 30 seconds, arms crossed on chest.",
+   "unit": "stands",
+   "higher_is_better": true,
+   "mcid": null,
+   "reference": "Jones, Rikli & Beam, Res Q Exerc Sport 1999",
+   "items": [
+    {
+     "label": "Stands completed in 30 seconds",
+     "input_type": "number",
+     "min_value": 0,
+     "max_value": 60,
+     "help_text": "",
+     "order": 1,
+     "code": "stands-completed-in-30-seconds",
+     "required": true
+    }
+   ],
+   "bands": []
+  },
+  {
+   "code": "sara",
+   "name": "Scale for the Assessment and Rating of Ataxia",
+   "abbreviation": "SARA",
+   "category": "coordination",
+   "scoring": "sum",
+   "description": "Severity of cerebellar ataxia across 8 items (0 = no ataxia, 40 = most severe).",
+   "instructions": "",
+   "unit": "points",
+   "higher_is_better": false,
+   "mcid": null,
+   "reference": "Schmitz-Hubsch et al., Neurology 2006",
+   "items": [
+    {
+     "label": "Gait",
+     "input_type": "choice",
+     "options_text": "0|Normal\n1|Grade 1\n2|Grade 2\n3|Grade 3\n4|Grade 4\n5|Grade 5\n6|Grade 6\n7|Grade 7\n8|Most severe",
+     "section": "",
+     "help_text": "Use the item definitions of the published scale to choose the grade.",
+     "order": 1,
+     "code": "gait",
+     "required": true
+    },
+    {
+     "label": "Stance",
+     "input_type": "choice",
+     "options_text": "0|Normal\n1|Grade 1\n2|Grade 2\n3|Grade 3\n4|Grade 4\n5|Grade 5\n6|Most severe",
+     "section": "",
+     "help_text": "Use the item definitions of the published scale to choose the grade.",
+     "order": 2,
+     "code": "stance",
+     "required": true
+    },
+    {
+     "label": "Sitting",
+     "input_type": "choice",
+     "options_text": "0|Normal\n1|Grade 1\n2|Grade 2\n3|Grade 3\n4|Most severe",
+     "section": "",
+     "help_text": "Use the item definitions of the published scale to choose the grade.",
+     "order": 3,
+     "code": "sitting",
+     "required": true
+    },
+    {
+     "label": "Speech disturbance",
+     "input_type": "choice",
+     "options_text": "0|Normal\n1|Grade 1\n2|Grade 2\n3|Grade 3\n4|Grade 4\n5|Grade 5\n6|Most severe",
+     "section": "",
+     "help_text": "Use the item definitions of the published scale to choose the grade.",
+     "order": 4,
+     "code": "speech-disturbance",
+     "required": true
+    },
+    {
+     "label": "Finger chase",
+     "input_type": "choice",
+     "options_text": "0|Normal\n1|Grade 1\n2|Grade 2\n3|Grade 3\n4|Most severe",
+     "section": "",
+     "help_text": "Use the item definitions of the published scale to choose the grade.",
+     "order": 5,
+     "code": "finger-chase",
+     "required": true
+    },
+    {
+     "label": "Nose-finger test",
+     "input_type": "choice",
+     "options_text": "0|Normal\n1|Grade 1\n2|Grade 2\n3|Grade 3\n4|Most severe",
+     "section": "",
+     "help_text": "Use the item definitions of the published scale to choose the grade.",
+     "order": 6,
+     "code": "nose-finger-test",
+     "required": true
+    },
+    {
+     "label": "Fast alternating hand movements",
+     "input_type": "choice",
+     "options_text": "0|Normal\n1|Grade 1\n2|Grade 2\n3|Grade 3\n4|Most severe",
+     "section": "",
+     "help_text": "Use the item definitions of the published scale to choose the grade.",
+     "order": 7,
+     "code": "fast-alternating-hand-movements",
+     "required": true
+    },
+    {
+     "label": "Heel-shin slide",
+     "input_type": "choice",
+     "options_text": "0|Normal\n1|Grade 1\n2|Grade 2\n3|Grade 3\n4|Most severe",
+     "section": "",
+     "help_text": "Use the item definitions of the published scale to choose the grade.",
+     "order": 8,
+     "code": "heel-shin-slide",
+     "required": true
+    }
+   ],
+   "bands": []
+  },
+  {
+   "code": "nhpt-right",
+   "name": "Nine-Hole Peg Test (Right hand)",
+   "abbreviation": "9HPT R",
+   "category": "coordination",
+   "scoring": "single",
+   "description": "Fine finger dexterity.",
+   "instructions": "",
+   "unit": "seconds",
+   "higher_is_better": false,
+   "mcid": null,
+   "reference": "Mathiowetz et al., Am J Occup Ther 1985",
+   "items": [
+    {
+     "label": "Time to place and remove all 9 pegs (seconds)",
+     "input_type": "number",
+     "min_value": 0,
+     "max_value": 600,
+     "help_text": "",
+     "order": 1,
+     "code": "time-to-place-and-remove-all-9-pegs-seco",
+     "required": true
+    }
+   ],
+   "bands": []
+  },
+  {
+   "code": "nhpt-left",
+   "name": "Nine-Hole Peg Test (Left hand)",
+   "abbreviation": "9HPT L",
+   "category": "coordination",
+   "scoring": "single",
+   "description": "Fine finger dexterity.",
+   "instructions": "",
+   "unit": "seconds",
+   "higher_is_better": false,
+   "mcid": null,
+   "reference": "Mathiowetz et al., Am J Occup Ther 1985",
+   "items": [
+    {
+     "label": "Time to place and remove all 9 pegs (seconds)",
+     "input_type": "number",
+     "min_value": 0,
+     "max_value": 600,
+     "help_text": "",
+     "order": 1,
+     "code": "time-to-place-and-remove-all-9-pegs-seco",
+     "required": true
+    }
+   ],
+   "bands": []
+  },
+  {
+   "code": "gcs",
+   "name": "Glasgow Coma Scale",
+   "abbreviation": "GCS",
+   "category": "neuro",
+   "scoring": "sum",
+   "description": "Level of consciousness after brain injury (3-15).",
+   "instructions": "",
+   "unit": "points",
+   "higher_is_better": true,
+   "mcid": null,
+   "reference": "Teasdale & Jennett, Lancet 1974",
+   "items": [
+    {
+     "label": "Eye opening",
+     "input_type": "choice",
+     "options_text": "4|Spontaneous\n3|To speech\n2|To pain\n1|None",
+     "section": "",
+     "help_text": "",
+     "order": 1,
+     "code": "eye-opening",
+     "required": true
+    },
+    {
+     "label": "Verbal response",
+     "input_type": "choice",
+     "options_text": "5|Oriented\n4|Confused\n3|Inappropriate words\n2|Incomprehensible sounds\n1|None",
+     "section": "",
+     "help_text": "",
+     "order": 2,
+     "code": "verbal-response",
+     "required": true
+    },
+    {
+     "label": "Motor response",
+     "input_type": "choice",
+     "options_text": "6|Obeys commands\n5|Localises pain\n4|Withdraws from pain\n3|Abnormal flexion\n2|Extension\n1|None",
+     "section": "",
+     "help_text": "",
+     "order": 3,
+     "code": "motor-response",
+     "required": true
+    }
+   ],
+   "bands": [
+    {
+     "min_score": 3,
+     "max_score": 8,
+     "label": "Severe",
+     "tone": "bad"
+    },
+    {
+     "min_score": 9,
+     "max_score": 12,
+     "label": "Moderate",
+     "tone": "warn"
+    },
+    {
+     "min_score": 13,
+     "max_score": 15,
+     "label": "Mild",
+     "tone": "good"
+    }
+   ]
+  },
+  {
+   "code": "nihss",
+   "name": "NIH Stroke Scale",
+   "abbreviation": "NIHSS",
+   "category": "neuro",
+   "scoring": "sum",
+   "description": "Stroke severity across 15 items (0-42). Higher means more severe.",
+   "instructions": "If an item cannot be tested (e.g. amputation), follow the official instructions and score it as the manual directs.",
+   "unit": "points",
+   "higher_is_better": false,
+   "mcid": 4,
+   "reference": "Brott et al., Stroke 1989 (US National Institutes of Health)",
+   "items": [
+    {
+     "label": "1a. Level of consciousness",
+     "input_type": "choice",
+     "options_text": "0|Alert\n1|Not alert, arousable by minor stimulation\n2|Not alert, needs repeated stimulation\n3|Unresponsive / reflex responses only",
+     "section": "",
+     "help_text": "",
+     "order": 1,
+     "code": "1a-level-of-consciousness",
+     "required": true
+    },
+    {
+     "label": "1b. LOC questions (month, age)",
+     "input_type": "choice",
+     "options_text": "0|Answers both correctly\n1|Answers one correctly\n2|Answers neither",
+     "section": "",
+     "help_text": "",
+     "order": 2,
+     "code": "1b-loc-questions-month-age",
+     "required": true
+    },
+    {
+     "label": "1c. LOC commands (open/close eyes, grip)",
+     "input_type": "choice",
+     "options_text": "0|Performs both\n1|Performs one\n2|Performs neither",
+     "section": "",
+     "help_text": "",
+     "order": 3,
+     "code": "1c-loc-commands-open-close-eyes-grip",
+     "required": true
+    },
+    {
+     "label": "2. Best gaze",
+     "input_type": "choice",
+     "options_text": "0|Normal\n1|Partial gaze palsy\n2|Forced deviation / total gaze paresis",
+     "section": "",
+     "help_text": "",
+     "order": 4,
+     "code": "2-best-gaze",
+     "required": true
+    },
+    {
+     "label": "3. Visual fields",
+     "input_type": "choice",
+     "options_text": "0|No visual loss\n1|Partial hemianopia\n2|Complete hemianopia\n3|Bilateral hemianopia / blind",
+     "section": "",
+     "help_text": "",
+     "order": 5,
+     "code": "3-visual-fields",
+     "required": true
+    },
+    {
+     "label": "4. Facial palsy",
+     "input_type": "choice",
+     "options_text": "0|Normal\n1|Minor\n2|Partial\n3|Complete",
+     "section": "",
+     "help_text": "",
+     "order": 6,
+     "code": "4-facial-palsy",
+     "required": true
+    },
+    {
+     "label": "5a. Motor - left arm",
+     "input_type": "choice",
+     "options_text": "0|No drift - holds position for 10 seconds\n1|Drift - limb drifts but does not hit the bed\n2|Some effort against gravity\n3|No effort against gravity\n4|No movement",
+     "section": "",
+     "help_text": "",
+     "order": 7,
+     "code": "5a-motor-left-arm",
+     "required": true
+    },
+    {
+     "label": "5b. Motor - right arm",
+     "input_type": "choice",
+     "options_text": "0|No drift - holds position for 10 seconds\n1|Drift - limb drifts but does not hit the bed\n2|Some effort against gravity\n3|No effort against gravity\n4|No movement",
+     "section": "",
+     "help_text": "",
+     "order": 8,
+     "code": "5b-motor-right-arm",
+     "required": true
+    },
+    {
+     "label": "6a. Motor - left leg",
+     "input_type": "choice",
+     "options_text": "0|No drift - holds for 5 seconds\n1|Drift - falls by end of 5 seconds, not to the bed\n2|Some effort against gravity\n3|No effort against gravity\n4|No movement",
+     "section": "",
+     "help_text": "",
+     "order": 9,
+     "code": "6a-motor-left-leg",
+     "required": true
+    },
+    {
+     "label": "6b. Motor - right leg",
+     "input_type": "choice",
+     "options_text": "0|No drift - holds for 5 seconds\n1|Drift - falls by end of 5 seconds, not to the bed\n2|Some effort against gravity\n3|No effort against gravity\n4|No movement",
+     "section": "",
+     "help_text": "",
+     "order": 10,
+     "code": "6b-motor-right-leg",
+     "required": true
+    },
+    {
+     "label": "7. Limb ataxia",
+     "input_type": "choice",
+     "options_text": "0|Absent\n1|Present in one limb\n2|Present in two limbs",
+     "section": "",
+     "help_text": "",
+     "order": 11,
+     "code": "7-limb-ataxia",
+     "required": true
+    },
+    {
+     "label": "8. Sensory",
+     "input_type": "choice",
+     "options_text": "0|Normal\n1|Mild to moderate loss\n2|Severe or total loss",
+     "section": "",
+     "help_text": "",
+     "order": 12,
+     "code": "8-sensory",
+     "required": true
+    },
+    {
+     "label": "9. Best language",
+     "input_type": "choice",
+     "options_text": "0|No aphasia\n1|Mild to moderate aphasia\n2|Severe aphasia\n3|Mute / global aphasia",
+     "section": "",
+     "help_text": "",
+     "order": 13,
+     "code": "9-best-language",
+     "required": true
+    },
+    {
+     "label": "10. Dysarthria",
+     "input_type": "choice",
+     "options_text": "0|Normal\n1|Mild to moderate\n2|Severe / unintelligible",
+     "section": "",
+     "help_text": "",
+     "order": 14,
+     "code": "10-dysarthria",
+     "required": true
+    },
+    {
+     "label": "11. Extinction and inattention",
+     "input_type": "choice",
+     "options_text": "0|No abnormality\n1|Inattention to one sensory modality\n2|Profound hemi-inattention / more than one modality",
+     "section": "",
+     "help_text": "",
+     "order": 15,
+     "code": "11-extinction-and-inattention",
+     "required": true
+    }
+   ],
+   "bands": [
+    {
+     "min_score": 0,
+     "max_score": 0,
+     "label": "No stroke symptoms",
+     "tone": "good"
+    },
+    {
+     "min_score": 1,
+     "max_score": 4,
+     "label": "Minor stroke",
+     "tone": "ok"
+    },
+    {
+     "min_score": 5,
+     "max_score": 15,
+     "label": "Moderate stroke",
+     "tone": "warn"
+    },
+    {
+     "min_score": 16,
+     "max_score": 20,
+     "label": "Moderate to severe stroke",
+     "tone": "bad"
+    },
+    {
+     "min_score": 21,
+     "max_score": 42,
+     "label": "Severe stroke",
+     "tone": "bad"
+    }
+   ]
+  },
+  {
+   "code": "mas",
+   "name": "Modified Ashworth Scale",
+   "abbreviation": "MAS",
+   "category": "neuro",
+   "scoring": "single",
+   "description": "Spasticity grade for one muscle group.",
+   "instructions": "Assess one muscle group at a time (name it in the notes) and add another assessment for each extra muscle group.",
+   "unit": "points",
+   "higher_is_better": false,
+   "mcid": null,
+   "reference": "Bohannon & Smith, Phys Ther 1987",
+   "items": [
+    {
+     "label": "Muscle tone grade",
+     "input_type": "choice",
+     "options_text": "0|0 - No increase in muscle tone\n1|1 - Slight increase: catch and release, or minimal resistance at end of range\n1.5|1+ - Slight increase: catch followed by minimal resistance through less than half of the range\n2|2 - More marked increase through most of the range; part easily moved\n3|3 - Considerable increase; passive movement difficult\n4|4 - Affected part rigid in flexion or extension",
+     "section": "",
+     "help_text": "",
+     "order": 1,
+     "code": "muscle-tone-grade",
+     "required": true
+    }
+   ],
+   "bands": []
+  },
+  {
+   "code": "mrc",
+   "name": "Muscle Strength (MRC / Oxford grade)",
+   "abbreviation": "MRC",
+   "category": "neuro",
+   "scoring": "single",
+   "description": "Manual muscle test grade (0-5) for one muscle group.",
+   "instructions": "Name the muscle and side in the notes; add another assessment for each muscle you test.",
+   "unit": "points",
+   "higher_is_better": true,
+   "mcid": null,
+   "reference": "Medical Research Council, 1943 / Oxford scale",
+   "items": [
+    {
+     "label": "Manual muscle test grade",
+     "input_type": "choice",
+     "options_text": "0|0 - No contraction\n1|1 - Flicker or trace of contraction\n2|2 - Active movement with gravity eliminated\n3|3 - Active movement against gravity\n4|4 - Active movement against gravity and some resistance\n5|5 - Normal power",
+     "section": "",
+     "help_text": "",
+     "order": 1,
+     "code": "manual-muscle-test-grade",
+     "required": true
+    }
+   ],
+   "bands": []
+  },
+  {
+   "code": "odi",
+   "name": "Oswestry Disability Index",
+   "abbreviation": "ODI",
+   "category": "ortho",
+   "scoring": "percent",
+   "description": "Low back pain disability across 10 sections, expressed as a percentage.",
+   "instructions": "Each section has its own five statements in the published questionnaire; record the grade 0-5 the patient chose. One section may be skipped; the score is a percentage of the sections answered.",
+   "unit": "%",
+   "higher_is_better": false,
+   "mcid": 10,
+   "reference": "Fairbank & Pynsent, Spine 2000 (ODI v2.1a)",
+   "items": [
+    {
+     "label": "Pain intensity",
+     "input_type": "choice",
+     "options_text": "0|0 - No limitation\n1|1 - Very mild limitation\n2|2 - Mild limitation\n3|3 - Moderate limitation\n4|4 - Severe limitation\n5|5 - Cannot do / maximum limitation",
+     "section": "",
+     "help_text": "",
+     "required": false,
+     "order": 1,
+     "code": "pain-intensity"
+    },
+    {
+     "label": "Personal care",
+     "input_type": "choice",
+     "options_text": "0|0 - No limitation\n1|1 - Very mild limitation\n2|2 - Mild limitation\n3|3 - Moderate limitation\n4|4 - Severe limitation\n5|5 - Cannot do / maximum limitation",
+     "section": "",
+     "help_text": "",
+     "required": false,
+     "order": 2,
+     "code": "personal-care"
+    },
+    {
+     "label": "Lifting",
+     "input_type": "choice",
+     "options_text": "0|0 - No limitation\n1|1 - Very mild limitation\n2|2 - Mild limitation\n3|3 - Moderate limitation\n4|4 - Severe limitation\n5|5 - Cannot do / maximum limitation",
+     "section": "",
+     "help_text": "",
+     "required": false,
+     "order": 3,
+     "code": "lifting"
+    },
+    {
+     "label": "Walking",
+     "input_type": "choice",
+     "options_text": "0|0 - No limitation\n1|1 - Very mild limitation\n2|2 - Mild limitation\n3|3 - Moderate limitation\n4|4 - Severe limitation\n5|5 - Cannot do / maximum limitation",
+     "section": "",
+     "help_text": "",
+     "required": false,
+     "order": 4,
+     "code": "walking"
+    },
+    {
+     "label": "Sitting",
+     "input_type": "choice",
+     "options_text": "0|0 - No limitation\n1|1 - Very mild limitation\n2|2 - Mild limitation\n3|3 - Moderate limitation\n4|4 - Severe limitation\n5|5 - Cannot do / maximum limitation",
+     "section": "",
+     "help_text": "",
+     "required": false,
+     "order": 5,
+     "code": "sitting"
+    },
+    {
+     "label": "Standing",
+     "input_type": "choice",
+     "options_text": "0|0 - No limitation\n1|1 - Very mild limitation\n2|2 - Mild limitation\n3|3 - Moderate limitation\n4|4 - Severe limitation\n5|5 - Cannot do / maximum limitation",
+     "section": "",
+     "help_text": "",
+     "required": false,
+     "order": 6,
+     "code": "standing"
+    },
+    {
+     "label": "Sleeping",
+     "input_type": "choice",
+     "options_text": "0|0 - No limitation\n1|1 - Very mild limitation\n2|2 - Mild limitation\n3|3 - Moderate limitation\n4|4 - Severe limitation\n5|5 - Cannot do / maximum limitation",
+     "section": "",
+     "help_text": "",
+     "required": false,
+     "order": 7,
+     "code": "sleeping"
+    },
+    {
+     "label": "Social life",
+     "input_type": "choice",
+     "options_text": "0|0 - No limitation\n1|1 - Very mild limitation\n2|2 - Mild limitation\n3|3 - Moderate limitation\n4|4 - Severe limitation\n5|5 - Cannot do / maximum limitation",
+     "section": "",
+     "help_text": "",
+     "required": false,
+     "order": 8,
+     "code": "social-life"
+    },
+    {
+     "label": "Travelling",
+     "input_type": "choice",
+     "options_text": "0|0 - No limitation\n1|1 - Very mild limitation\n2|2 - Mild limitation\n3|3 - Moderate limitation\n4|4 - Severe limitation\n5|5 - Cannot do / maximum limitation",
+     "section": "",
+     "help_text": "",
+     "required": false,
+     "order": 9,
+     "code": "travelling"
+    },
+    {
+     "label": "Employment / homemaking",
+     "input_type": "choice",
+     "options_text": "0|0 - No limitation\n1|1 - Very mild limitation\n2|2 - Mild limitation\n3|3 - Moderate limitation\n4|4 - Severe limitation\n5|5 - Cannot do / maximum limitation",
+     "section": "",
+     "help_text": "",
+     "required": false,
+     "order": 10,
+     "code": "employment-homemaking"
+    }
+   ],
+   "bands": [
+    {
+     "min_score": 0,
+     "max_score": 20,
+     "label": "Minimal disability",
+     "tone": "good"
+    },
+    {
+     "min_score": 20.1,
+     "max_score": 40,
+     "label": "Moderate disability",
+     "tone": "ok"
+    },
+    {
+     "min_score": 40.1,
+     "max_score": 60,
+     "label": "Severe disability",
+     "tone": "warn"
+    },
+    {
+     "min_score": 60.1,
+     "max_score": 80,
+     "label": "Crippled",
+     "tone": "bad"
+    },
+    {
+     "min_score": 80.1,
+     "max_score": 100,
+     "label": "Bed-bound or exaggerating",
+     "tone": "bad"
+    }
+   ]
+  },
+  {
+   "code": "ndi",
+   "name": "Neck Disability Index",
+   "abbreviation": "NDI",
+   "category": "ortho",
+   "scoring": "percent",
+   "description": "Neck pain disability across 10 sections, expressed as a percentage.",
+   "instructions": "Record the grade 0-5 the patient chose for each section.",
+   "unit": "%",
+   "higher_is_better": false,
+   "mcid": null,
+   "reference": "Vernon & Mior, J Manipulative Physiol Ther 1991",
+   "items": [
+    {
+     "label": "Pain intensity",
+     "input_type": "choice",
+     "options_text": "0|0 - No limitation\n1|1 - Very mild limitation\n2|2 - Mild limitation\n3|3 - Moderate limitation\n4|4 - Severe limitation\n5|5 - Cannot do / maximum limitation",
+     "section": "",
+     "help_text": "",
+     "required": false,
+     "order": 1,
+     "code": "pain-intensity"
+    },
+    {
+     "label": "Personal care",
+     "input_type": "choice",
+     "options_text": "0|0 - No limitation\n1|1 - Very mild limitation\n2|2 - Mild limitation\n3|3 - Moderate limitation\n4|4 - Severe limitation\n5|5 - Cannot do / maximum limitation",
+     "section": "",
+     "help_text": "",
+     "required": false,
+     "order": 2,
+     "code": "personal-care"
+    },
+    {
+     "label": "Lifting",
+     "input_type": "choice",
+     "options_text": "0|0 - No limitation\n1|1 - Very mild limitation\n2|2 - Mild limitation\n3|3 - Moderate limitation\n4|4 - Severe limitation\n5|5 - Cannot do / maximum limitation",
+     "section": "",
+     "help_text": "",
+     "required": false,
+     "order": 3,
+     "code": "lifting"
+    },
+    {
+     "label": "Reading",
+     "input_type": "choice",
+     "options_text": "0|0 - No limitation\n1|1 - Very mild limitation\n2|2 - Mild limitation\n3|3 - Moderate limitation\n4|4 - Severe limitation\n5|5 - Cannot do / maximum limitation",
+     "section": "",
+     "help_text": "",
+     "required": false,
+     "order": 4,
+     "code": "reading"
+    },
+    {
+     "label": "Headaches",
+     "input_type": "choice",
+     "options_text": "0|0 - No limitation\n1|1 - Very mild limitation\n2|2 - Mild limitation\n3|3 - Moderate limitation\n4|4 - Severe limitation\n5|5 - Cannot do / maximum limitation",
+     "section": "",
+     "help_text": "",
+     "required": false,
+     "order": 5,
+     "code": "headaches"
+    },
+    {
+     "label": "Concentration",
+     "input_type": "choice",
+     "options_text": "0|0 - No limitation\n1|1 - Very mild limitation\n2|2 - Mild limitation\n3|3 - Moderate limitation\n4|4 - Severe limitation\n5|5 - Cannot do / maximum limitation",
+     "section": "",
+     "help_text": "",
+     "required": false,
+     "order": 6,
+     "code": "concentration"
+    },
+    {
+     "label": "Work",
+     "input_type": "choice",
+     "options_text": "0|0 - No limitation\n1|1 - Very mild limitation\n2|2 - Mild limitation\n3|3 - Moderate limitation\n4|4 - Severe limitation\n5|5 - Cannot do / maximum limitation",
+     "section": "",
+     "help_text": "",
+     "required": false,
+     "order": 7,
+     "code": "work"
+    },
+    {
+     "label": "Driving",
+     "input_type": "choice",
+     "options_text": "0|0 - No limitation\n1|1 - Very mild limitation\n2|2 - Mild limitation\n3|3 - Moderate limitation\n4|4 - Severe limitation\n5|5 - Cannot do / maximum limitation",
+     "section": "",
+     "help_text": "",
+     "required": false,
+     "order": 8,
+     "code": "driving"
+    },
+    {
+     "label": "Sleeping",
+     "input_type": "choice",
+     "options_text": "0|0 - No limitation\n1|1 - Very mild limitation\n2|2 - Mild limitation\n3|3 - Moderate limitation\n4|4 - Severe limitation\n5|5 - Cannot do / maximum limitation",
+     "section": "",
+     "help_text": "",
+     "required": false,
+     "order": 9,
+     "code": "sleeping"
+    },
+    {
+     "label": "Recreation",
+     "input_type": "choice",
+     "options_text": "0|0 - No limitation\n1|1 - Very mild limitation\n2|2 - Mild limitation\n3|3 - Moderate limitation\n4|4 - Severe limitation\n5|5 - Cannot do / maximum limitation",
+     "section": "",
+     "help_text": "",
+     "required": false,
+     "order": 10,
+     "code": "recreation"
+    }
+   ],
+   "bands": [
+    {
+     "min_score": 0,
+     "max_score": 8,
+     "label": "No disability",
+     "tone": "good"
+    },
+    {
+     "min_score": 8.1,
+     "max_score": 28,
+     "label": "Mild",
+     "tone": "ok"
+    },
+    {
+     "min_score": 28.1,
+     "max_score": 48,
+     "label": "Moderate",
+     "tone": "warn"
+    },
+    {
+     "min_score": 48.1,
+     "max_score": 68,
+     "label": "Severe",
+     "tone": "bad"
+    },
+    {
+     "min_score": 68.1,
+     "max_score": 100,
+     "label": "Complete",
+     "tone": "bad"
+    }
+   ]
+  },
+  {
+   "code": "lefs",
+   "name": "Lower Extremity Functional Scale",
+   "abbreviation": "LEFS",
+   "category": "ortho",
+   "scoring": "sum",
+   "description": "Function of any lower-limb condition across 20 activities (0-80). Higher is better.",
+   "instructions": "Ask: \"Today, do you or would you have any difficulty at all with...\".",
+   "unit": "points",
+   "higher_is_better": true,
+   "mcid": 9,
+   "reference": "Binkley et al., Phys Ther 1999",
+   "items": [
+    {
+     "label": "Any of your usual work, housework or school activities",
+     "input_type": "choice",
+     "options_text": "4|No difficulty\n3|A little bit of difficulty\n2|Moderate difficulty\n1|Quite a bit of difficulty\n0|Extreme difficulty / unable",
+     "section": "",
+     "help_text": "",
+     "order": 1,
+     "code": "any-of-your-usual-work-housework-or-scho",
+     "required": true
+    },
+    {
+     "label": "Your usual hobbies, recreational or sporting activities",
+     "input_type": "choice",
+     "options_text": "4|No difficulty\n3|A little bit of difficulty\n2|Moderate difficulty\n1|Quite a bit of difficulty\n0|Extreme difficulty / unable",
+     "section": "",
+     "help_text": "",
+     "order": 2,
+     "code": "your-usual-hobbies-recreational-or-sport",
+     "required": true
+    },
+    {
+     "label": "Getting into or out of the bath",
+     "input_type": "choice",
+     "options_text": "4|No difficulty\n3|A little bit of difficulty\n2|Moderate difficulty\n1|Quite a bit of difficulty\n0|Extreme difficulty / unable",
+     "section": "",
+     "help_text": "",
+     "order": 3,
+     "code": "getting-into-or-out-of-the-bath",
+     "required": true
+    },
+    {
+     "label": "Walking between rooms",
+     "input_type": "choice",
+     "options_text": "4|No difficulty\n3|A little bit of difficulty\n2|Moderate difficulty\n1|Quite a bit of difficulty\n0|Extreme difficulty / unable",
+     "section": "",
+     "help_text": "",
+     "order": 4,
+     "code": "walking-between-rooms",
+     "required": true
+    },
+    {
+     "label": "Putting on your shoes or socks",
+     "input_type": "choice",
+     "options_text": "4|No difficulty\n3|A little bit of difficulty\n2|Moderate difficulty\n1|Quite a bit of difficulty\n0|Extreme difficulty / unable",
+     "section": "",
+     "help_text": "",
+     "order": 5,
+     "code": "putting-on-your-shoes-or-socks",
+     "required": true
+    },
+    {
+     "label": "Squatting",
+     "input_type": "choice",
+     "options_text": "4|No difficulty\n3|A little bit of difficulty\n2|Moderate difficulty\n1|Quite a bit of difficulty\n0|Extreme difficulty / unable",
+     "section": "",
+     "help_text": "",
+     "order": 6,
+     "code": "squatting",
+     "required": true
+    },
+    {
+     "label": "Lifting an object, like a bag of groceries, from the floor",
+     "input_type": "choice",
+     "options_text": "4|No difficulty\n3|A little bit of difficulty\n2|Moderate difficulty\n1|Quite a bit of difficulty\n0|Extreme difficulty / unable",
+     "section": "",
+     "help_text": "",
+     "order": 7,
+     "code": "lifting-an-object-like-a-bag-of-grocerie",
+     "required": true
+    },
+    {
+     "label": "Performing light activities around your home",
+     "input_type": "choice",
+     "options_text": "4|No difficulty\n3|A little bit of difficulty\n2|Moderate difficulty\n1|Quite a bit of difficulty\n0|Extreme difficulty / unable",
+     "section": "",
+     "help_text": "",
+     "order": 8,
+     "code": "performing-light-activities-around-your-",
+     "required": true
+    },
+    {
+     "label": "Performing heavy activities around your home",
+     "input_type": "choice",
+     "options_text": "4|No difficulty\n3|A little bit of difficulty\n2|Moderate difficulty\n1|Quite a bit of difficulty\n0|Extreme difficulty / unable",
+     "section": "",
+     "help_text": "",
+     "order": 9,
+     "code": "performing-heavy-activities-around-your-",
+     "required": true
+    },
+    {
+     "label": "Getting into or out of a car",
+     "input_type": "choice",
+     "options_text": "4|No difficulty\n3|A little bit of difficulty\n2|Moderate difficulty\n1|Quite a bit of difficulty\n0|Extreme difficulty / unable",
+     "section": "",
+     "help_text": "",
+     "order": 10,
+     "code": "getting-into-or-out-of-a-car",
+     "required": true
+    },
+    {
+     "label": "Walking 2 blocks",
+     "input_type": "choice",
+     "options_text": "4|No difficulty\n3|A little bit of difficulty\n2|Moderate difficulty\n1|Quite a bit of difficulty\n0|Extreme difficulty / unable",
+     "section": "",
+     "help_text": "",
+     "order": 11,
+     "code": "walking-2-blocks",
+     "required": true
+    },
+    {
+     "label": "Walking a mile",
+     "input_type": "choice",
+     "options_text": "4|No difficulty\n3|A little bit of difficulty\n2|Moderate difficulty\n1|Quite a bit of difficulty\n0|Extreme difficulty / unable",
+     "section": "",
+     "help_text": "",
+     "order": 12,
+     "code": "walking-a-mile",
+     "required": true
+    },
+    {
+     "label": "Going up or down 10 stairs (about 1 flight)",
+     "input_type": "choice",
+     "options_text": "4|No difficulty\n3|A little bit of difficulty\n2|Moderate difficulty\n1|Quite a bit of difficulty\n0|Extreme difficulty / unable",
+     "section": "",
+     "help_text": "",
+     "order": 13,
+     "code": "going-up-or-down-10-stairs-about-1-fligh",
+     "required": true
+    },
+    {
+     "label": "Standing for 1 hour",
+     "input_type": "choice",
+     "options_text": "4|No difficulty\n3|A little bit of difficulty\n2|Moderate difficulty\n1|Quite a bit of difficulty\n0|Extreme difficulty / unable",
+     "section": "",
+     "help_text": "",
+     "order": 14,
+     "code": "standing-for-1-hour",
+     "required": true
+    },
+    {
+     "label": "Sitting for 1 hour",
+     "input_type": "choice",
+     "options_text": "4|No difficulty\n3|A little bit of difficulty\n2|Moderate difficulty\n1|Quite a bit of difficulty\n0|Extreme difficulty / unable",
+     "section": "",
+     "help_text": "",
+     "order": 15,
+     "code": "sitting-for-1-hour",
+     "required": true
+    },
+    {
+     "label": "Running on even ground",
+     "input_type": "choice",
+     "options_text": "4|No difficulty\n3|A little bit of difficulty\n2|Moderate difficulty\n1|Quite a bit of difficulty\n0|Extreme difficulty / unable",
+     "section": "",
+     "help_text": "",
+     "order": 16,
+     "code": "running-on-even-ground",
+     "required": true
+    },
+    {
+     "label": "Running on uneven ground",
+     "input_type": "choice",
+     "options_text": "4|No difficulty\n3|A little bit of difficulty\n2|Moderate difficulty\n1|Quite a bit of difficulty\n0|Extreme difficulty / unable",
+     "section": "",
+     "help_text": "",
+     "order": 17,
+     "code": "running-on-uneven-ground",
+     "required": true
+    },
+    {
+     "label": "Making sharp turns while running fast",
+     "input_type": "choice",
+     "options_text": "4|No difficulty\n3|A little bit of difficulty\n2|Moderate difficulty\n1|Quite a bit of difficulty\n0|Extreme difficulty / unable",
+     "section": "",
+     "help_text": "",
+     "order": 18,
+     "code": "making-sharp-turns-while-running-fast",
+     "required": true
+    },
+    {
+     "label": "Hopping",
+     "input_type": "choice",
+     "options_text": "4|No difficulty\n3|A little bit of difficulty\n2|Moderate difficulty\n1|Quite a bit of difficulty\n0|Extreme difficulty / unable",
+     "section": "",
+     "help_text": "",
+     "order": 19,
+     "code": "hopping",
+     "required": true
+    },
+    {
+     "label": "Rolling over in bed",
+     "input_type": "choice",
+     "options_text": "4|No difficulty\n3|A little bit of difficulty\n2|Moderate difficulty\n1|Quite a bit of difficulty\n0|Extreme difficulty / unable",
+     "section": "",
+     "help_text": "",
+     "order": 20,
+     "code": "rolling-over-in-bed",
+     "required": true
+    }
+   ],
+   "bands": [
+    {
+     "min_score": 0,
+     "max_score": 20,
+     "label": "Very severe limitation",
+     "tone": "bad"
+    },
+    {
+     "min_score": 21,
+     "max_score": 40,
+     "label": "Severe limitation",
+     "tone": "warn"
+    },
+    {
+     "min_score": 41,
+     "max_score": 60,
+     "label": "Moderate limitation",
+     "tone": "ok"
+    },
+    {
+     "min_score": 61,
+     "max_score": 79,
+     "label": "Mild limitation",
+     "tone": "ok"
+    },
+    {
+     "min_score": 80,
+     "max_score": 80,
+     "label": "No limitation",
+     "tone": "good"
+    }
+   ]
+  },
+  {
+   "code": "nprs",
+   "name": "Numeric Pain Rating Scale",
+   "abbreviation": "NPRS",
+   "category": "pain",
+   "scoring": "single",
+   "description": "Self-reported pain intensity.",
+   "instructions": "Ask for current pain, or worst/average over the last 24 hours, and say which in the notes.",
+   "unit": "/10",
+   "higher_is_better": false,
+   "mcid": 2,
+   "reference": "Farrar et al., Pain 2001",
+   "items": [
+    {
+     "label": "Pain right now (0 = no pain, 10 = worst imaginable)",
+     "input_type": "number",
+     "min_value": 0,
+     "max_value": 10,
+     "help_text": "",
+     "order": 1,
+     "code": "pain-right-now-0-no-pain-10-worst-imagin",
+     "required": true
+    }
+   ],
+   "bands": [
+    {
+     "min_score": 0,
+     "max_score": 0,
+     "label": "No pain",
+     "tone": "good"
+    },
+    {
+     "min_score": 1,
+     "max_score": 3,
+     "label": "Mild",
+     "tone": "ok"
+    },
+    {
+     "min_score": 4,
+     "max_score": 6,
+     "label": "Moderate",
+     "tone": "warn"
+    },
+    {
+     "min_score": 7,
+     "max_score": 10,
+     "label": "Severe",
+     "tone": "bad"
+    }
+   ]
+  },
+  {
+   "code": "sixmwt",
+   "name": "Six-Minute Walk Test",
+   "abbreviation": "6MWT",
+   "category": "cardio",
+   "scoring": "single",
+   "description": "Functional exercise capacity.",
+   "instructions": "Record any rest stops, the walking aid and oxygen use in the notes.",
+   "unit": "m",
+   "higher_is_better": true,
+   "mcid": 30,
+   "reference": "ATS statement, Am J Respir Crit Care Med 2002",
+   "items": [
+    {
+     "label": "Distance walked in 6 minutes (metres)",
+     "input_type": "number",
+     "min_value": 0,
+     "max_value": 1000,
+     "help_text": "",
+     "order": 1,
+     "code": "distance-walked-in-6-minutes-metres",
+     "required": true
+    }
+   ],
+   "bands": []
+  },
+  {
+   "code": "tenmwt",
+   "name": "10-Metre Walk Test",
+   "abbreviation": "10MWT",
+   "category": "cardio",
+   "scoring": "single",
+   "description": "Walking speed.",
+   "instructions": "Speed in m/s is 10 divided by the time.",
+   "unit": "seconds",
+   "higher_is_better": false,
+   "mcid": null,
+   "reference": "Perry et al., Stroke 1995",
+   "items": [
+    {
+     "label": "Time to walk 10 metres (seconds)",
+     "input_type": "number",
+     "min_value": 0,
+     "max_value": 300,
+     "help_text": "Time the middle 10 m of a 14 m walkway at comfortable speed.",
+     "order": 1,
+     "code": "time-to-walk-10-metres-seconds",
+     "required": true
+    }
+   ],
+   "bands": []
+  },
+  {
+   "code": "borg",
+   "name": "Borg Rating of Perceived Exertion",
+   "abbreviation": "Borg RPE",
+   "category": "cardio",
+   "scoring": "single",
+   "description": "How hard the patient feels they are working.",
+   "instructions": "",
+   "unit": "",
+   "higher_is_better": false,
+   "mcid": null,
+   "reference": "Borg, Scand J Rehabil Med 1970",
+   "items": [
+    {
+     "label": "Perceived exertion (6 = none, 20 = maximal)",
+     "input_type": "number",
+     "min_value": 6,
+     "max_value": 20,
+     "help_text": "",
+     "order": 1,
+     "code": "perceived-exertion-6-none-20-maximal",
+     "required": true
+    }
+   ],
+   "bands": []
+  },
+  {
+   "code": "grip",
+   "name": "Hand Grip Strength",
+   "abbreviation": "Grip",
+   "category": "other",
+   "scoring": "single",
+   "description": "Upper-limb strength and general frailty marker.",
+   "instructions": "",
+   "unit": "kg",
+   "higher_is_better": true,
+   "mcid": null,
+   "reference": "",
+   "items": [
+    {
+     "label": "Grip strength (kg)",
+     "input_type": "number",
+     "min_value": 0,
+     "max_value": 100,
+     "help_text": "Dynamometer, elbow at 90 degrees, best of three. Name the hand in the notes.",
+     "order": 1,
+     "code": "grip-strength-kg",
+     "required": true
+    }
+   ],
+   "bands": []
+  },
+  {
+   "code": "gmfcs",
+   "name": "Gross Motor Function Classification System",
+   "abbreviation": "GMFCS",
+   "category": "pedia",
+   "scoring": "single",
+   "description": "Classifies gross motor ability of children with cerebral palsy (I = most able, V = least).",
+   "instructions": "The official descriptors differ by age band (under 2, 2-4, 4-6, 6-12, 12-18); classify using the band that matches the child.",
+   "unit": "points",
+   "higher_is_better": false,
+   "mcid": null,
+   "reference": "Palisano et al., Dev Med Child Neurol 1997",
+   "items": [
+    {
+     "label": "GMFCS level",
+     "input_type": "choice",
+     "options_text": "1|Level I - Walks without limitations\n2|Level II - Walks with limitations\n3|Level III - Walks using a hand-held mobility device\n4|Level IV - Self-mobility with limitations; may use powered mobility\n5|Level V - Transported in a manual wheelchair",
+     "section": "",
+     "help_text": "",
+     "order": 1,
+     "code": "gmfcs-level",
+     "required": true
+    }
+   ],
+   "bands": []
+  },
+  {
+   "code": "milestones",
+   "name": "Gross motor milestones checklist",
+   "abbreviation": "Milestones",
+   "category": "pedia",
+   "scoring": "sum",
+   "description": "Quick screen of gross motor development against typical ages.",
+   "instructions": "Typical ages are approximate. Delay in several milestones calls for a formal developmental assessment.",
+   "unit": "points",
+   "higher_is_better": true,
+   "mcid": null,
+   "reference": "Typical-age ranges after WHO Motor Development Study",
+   "items": [
+    {
+     "label": "Holds head steady (typically 3 months)",
+     "input_type": "choice",
+     "options_text": "1|Achieved\n0|Not yet",
+     "section": "",
+     "help_text": "Approximate typical ages; there is a wide normal range.",
+     "code": "holds-head-steady",
+     "order": 1,
+     "required": true
+    },
+    {
+     "label": "Rolls over (typically 4-6 months)",
+     "input_type": "choice",
+     "options_text": "1|Achieved\n0|Not yet",
+     "section": "",
+     "help_text": "Approximate typical ages; there is a wide normal range.",
+     "code": "rolls-over",
+     "order": 2,
+     "required": true
+    },
+    {
+     "label": "Sits without support (typically 6-8 months)",
+     "input_type": "choice",
+     "options_text": "1|Achieved\n0|Not yet",
+     "section": "",
+     "help_text": "Approximate typical ages; there is a wide normal range.",
+     "code": "sits-without-support",
+     "order": 3,
+     "required": true
+    },
+    {
+     "label": "Crawls (typically 8-10 months)",
+     "input_type": "choice",
+     "options_text": "1|Achieved\n0|Not yet",
+     "section": "",
+     "help_text": "Approximate typical ages; there is a wide normal range.",
+     "code": "crawls",
+     "order": 4,
+     "required": true
+    },
+    {
+     "label": "Pulls to stand (typically 9-11 months)",
+     "input_type": "choice",
+     "options_text": "1|Achieved\n0|Not yet",
+     "section": "",
+     "help_text": "Approximate typical ages; there is a wide normal range.",
+     "code": "pulls-to-stand",
+     "order": 5,
+     "required": true
+    },
+    {
+     "label": "Walks holding on (cruising) (typically 9-12 months)",
+     "input_type": "choice",
+     "options_text": "1|Achieved\n0|Not yet",
+     "section": "",
+     "help_text": "Approximate typical ages; there is a wide normal range.",
+     "code": "walks-holding-on-cruising",
+     "order": 6,
+     "required": true
+    },
+    {
+     "label": "Walks alone (typically 12-15 months)",
+     "input_type": "choice",
+     "options_text": "1|Achieved\n0|Not yet",
+     "section": "",
+     "help_text": "Approximate typical ages; there is a wide normal range.",
+     "code": "walks-alone",
+     "order": 7,
+     "required": true
+    },
+    {
+     "label": "Runs (typically 18-24 months)",
+     "input_type": "choice",
+     "options_text": "1|Achieved\n0|Not yet",
+     "section": "",
+     "help_text": "Approximate typical ages; there is a wide normal range.",
+     "code": "runs",
+     "order": 8,
+     "required": true
+    },
+    {
+     "label": "Climbs stairs holding a rail (typically 2 years)",
+     "input_type": "choice",
+     "options_text": "1|Achieved\n0|Not yet",
+     "section": "",
+     "help_text": "Approximate typical ages; there is a wide normal range.",
+     "code": "climbs-stairs-holding-a-rail",
+     "order": 9,
+     "required": true
+    },
+    {
+     "label": "Jumps with both feet (typically 2-3 years)",
+     "input_type": "choice",
+     "options_text": "1|Achieved\n0|Not yet",
+     "section": "",
+     "help_text": "Approximate typical ages; there is a wide normal range.",
+     "code": "jumps-with-both-feet",
+     "order": 10,
+     "required": true
+    },
+    {
+     "label": "Pedals a tricycle (typically 3 years)",
+     "input_type": "choice",
+     "options_text": "1|Achieved\n0|Not yet",
+     "section": "",
+     "help_text": "Approximate typical ages; there is a wide normal range.",
+     "code": "pedals-a-tricycle",
+     "order": 11,
+     "required": true
+    },
+    {
+     "label": "Hops on one foot (typically 4-5 years)",
+     "input_type": "choice",
+     "options_text": "1|Achieved\n0|Not yet",
+     "section": "",
+     "help_text": "Approximate typical ages; there is a wide normal range.",
+     "code": "hops-on-one-foot",
+     "order": 12,
+     "required": true
+    }
+   ],
+   "bands": []
+  }
+ ],
+ "forms": [
+  {
+   "name": "Stroke / neurology - initial",
+   "category": "neuro",
+   "description": "Severity, disability, ADL, balance and tone",
+   "scales": [
+    "nihss",
+    "mrs",
+    "barthel",
+    "fim",
+    "berg",
+    "tug",
+    "mas",
+    "mrc"
+   ]
+  },
+  {
+   "name": "Neurology - follow-up",
+   "category": "neuro",
+   "description": "Quick repeat to track recovery",
+   "scales": [
+    "barthel",
+    "berg",
+    "tug"
+   ]
+  },
+  {
+   "name": "Brain injury",
+   "category": "neuro",
+   "description": "Consciousness and function",
+   "scales": [
+    "gcs",
+    "mrs",
+    "fim",
+    "barthel"
+   ]
+  },
+  {
+   "name": "Low back pain",
+   "category": "ortho",
+   "description": "Pain and disability",
+   "scales": [
+    "nprs",
+    "odi"
+   ]
+  },
+  {
+   "name": "Neck pain",
+   "category": "ortho",
+   "description": "Pain and disability",
+   "scales": [
+    "nprs",
+    "ndi"
+   ]
+  },
+  {
+   "name": "Lower limb (knee / hip / ankle)",
+   "category": "ortho",
+   "description": "Pain, function and mobility",
+   "scales": [
+    "nprs",
+    "lefs",
+    "tug"
+   ]
+  },
+  {
+   "name": "Balance and falls risk",
+   "category": "balance",
+   "description": "Balance, mobility and leg strength",
+   "scales": [
+    "berg",
+    "tug",
+    "functional-reach",
+    "sts30"
+   ]
+  },
+  {
+   "name": "Coordination / ataxia",
+   "category": "coordination",
+   "description": "Ataxia and dexterity",
+   "scales": [
+    "sara",
+    "nhpt-right",
+    "nhpt-left"
+   ]
+  },
+  {
+   "name": "Paediatric motor",
+   "category": "pedia",
+   "description": "Gross motor level, balance, tone and milestones",
+   "scales": [
+    "gmfcs",
+    "pbs",
+    "mas",
+    "milestones"
+   ]
+  },
+  {
+   "name": "Endurance and walking",
+   "category": "cardio",
+   "description": "Capacity, speed and exertion",
+   "scales": [
+    "sixmwt",
+    "tenmwt",
+    "borg"
+   ]
+  }
+ ]
+}

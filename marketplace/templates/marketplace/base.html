@@ -1,0 +1,26 @@
+{% load static %}<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}Sajhya Marketplace{% endblock %}</title>
+    <link rel="icon" type="image/png" href="{% static 'images/favicon.png' %}">
+    <meta name="description" content="{% block meta_description %}Shop braces, supports, therapy equipment and rehab supplies on the Sajhya Marketplace.{% endblock %}">
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    {% block extra_css %}{% endblock %}
+</head>
+<body style="margin:0;font-family:'Poppins',sans-serif">
+    {% if user.is_authenticated and user.account.account_type == 'client' %}
+    <div style="background:#f1faf5;border-bottom:1px solid #cfe6d8;padding:8px 16px;font-size:14px"><a href="{% url 'portal:home' %}" style="color:#116b43;font-weight:600;text-decoration:none">&larr; My dashboard</a></div>
+    {% endif %}
+    {% if messages %}
+    <div style="max-width:1180px;margin:12px auto;padding:0 16px">
+        {% for message in messages %}
+        <div style="padding:10px 14px;border-radius:10px;background:#ecfdf5;color:#065f46;margin-bottom:6px">{{ message }}</div>
+        {% endfor %}
+    </div>
+    {% endif %}
+    <main>{% block content %}{% endblock %}</main>
+    {% block extra_js %}{% endblock %}
+</body>
+</html>

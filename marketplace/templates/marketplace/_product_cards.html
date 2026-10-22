@@ -1,0 +1,18 @@
+{% load marketplace_extras %}
+{% for product in products %}
+<a href="{% url catalog.urls.detail product.id %}" class="store-card">
+    <div class="store-card-img">
+        {% if product.image_url_path %}
+            <img src="{{ product.image_url_path }}" alt="{{ product.name }}" loading="lazy" decoding="async">
+        {% else %}
+            <span class="placeholder">{{ product.category_icon|default:"📦" }}</span>
+        {% endif %}
+    </div>
+    <div class="store-card-body">
+        <p class="store-card-name">{{ product.name }}</p>
+        {% if product.brand %}<p class="store-card-brand">{{ product.brand }}</p>{% endif %}
+        {% if product.requires_prescription %}<p class="store-card-brand" style="color:#b83b3b">Rx required</p>{% endif %}
+        <div class="store-card-price">{{ product.price|npr }}</div>
+    </div>
+</a>
+{% endfor %}

@@ -1,0 +1,40 @@
+<form method="post" action="{% url 'accounts:patient-add' %}" class="pf" enctype="multipart/form-data" novalidate>
+  {% csrf_token %}
+  {% if form.non_field_errors %}<ul class="errorlist">{% for e in form.non_field_errors %}<li>{{ e }}</li>{% endfor %}</ul>{% endif %}
+
+  <h3 class="pf-section">Personal Information</h3>
+  <div class="pf-field"><label for="{{ form.photo.id_for_label }}">Profile picture <span style="font-weight:500;color:#7c9186">(optional)</span></label>{{ form.photo }}{{ form.photo.errors }}</div>
+  <div class="pf-row">
+    <div class="pf-field"><label for="{{ form.name.id_for_label }}">Full Name <i>*</i></label>{{ form.name }}{{ form.name.errors }}</div>
+    <div class="pf-field"><label for="{{ form.date_of_birth.id_for_label }}">Date of Birth <i>*</i></label>{{ form.date_of_birth }}{{ form.date_of_birth.errors }}</div>
+  </div>
+  <div class="pf-row">
+    <div class="pf-field"><label for="{{ form.gender.id_for_label }}">Gender <i>*</i></label>{{ form.gender }}{{ form.gender.errors }}</div>
+  </div>
+
+  <h3 class="pf-section">Contact Information</h3>
+  <div class="pf-row">
+    <div class="pf-field"><label for="{{ form.phone.id_for_label }}">Phone Number <i>*</i></label>{{ form.phone }}{{ form.phone.errors }}</div>
+    <div class="pf-field"><label for="{{ form.email.id_for_label }}">Email</label>{{ form.email }}{{ form.email.errors }}</div>
+  </div>
+  <div class="pf-field"><label for="{{ form.address.id_for_label }}">Address</label>{{ form.address }}{{ form.address.errors }}</div>
+
+  <h3 class="pf-section">Additional Information</h3>
+  <div class="pf-row">
+    <div class="pf-field"><label for="{{ form.occupation.id_for_label }}">Occupation</label>{{ form.occupation }}{{ form.occupation.errors }}</div>
+    <div class="pf-field"><label for="{{ form.referral_source.id_for_label }}">How did you hear about us?</label>{{ form.referral_source }}{{ form.referral_source.errors }}</div>
+  </div>
+  <div class="pf-row">
+    <div class="pf-field"><label for="{{ form.diagnosis.id_for_label }}">Diagnosis</label>{{ form.diagnosis }}{{ form.diagnosis.errors }}</div>
+    <div class="pf-field"><label for="{{ form.icd10_code.id_for_label }}">ICD-10 Code</label>{{ form.icd10_code }}{{ form.icd10_code.errors }}</div>
+  </div>
+  {% if clinic %}<div class="pf-field"><label>Clinic</label><div class="pf-fixed"><b>{{ clinic.name }}</b></div><input type="hidden" name="clinic" value="{{ clinic.pk }}"><span class="hint">This patient is being registered inside the clinic, so the clinic cannot be changed here.</span></div>{% endif %}
+  <div class="pf-field"><label for="{{ form.notes.id_for_label }}">Notes</label>{{ form.notes }}{{ form.notes.errors }}</div>
+
+  <div class="pf-actions">
+    {% if modal %}<button type="button" class="secondary-btn" data-close>Cancel</button>
+    {% else %}<a href="{% url 'accounts:patients' %}" class="secondary-btn" style="text-decoration:none;display:inline-flex;align-items:center">Cancel</a>{% endif %}
+    <button type="submit" class="primary-btn">Save Patient</button>
+  </div>
+</form>
+{% include 'accounts/_icd_picker.html' %}

@@ -1,22 +1,29 @@
-"""
-URL configuration for sajhya_health project.
-
-The `urlpatterns` list routes URLs to views. For more information please see:
-    https://docs.djangoproject.com/en/5.2/topics/http/urls/
-Examples:
-Function views
-    1. Add an import:  from my_app import views
-    2. Add a URL to urlpatterns:  path('', views.home, name='home')
-Class-based views
-    1. Add an import:  from other_app.views import Home
-    2. Add a URL to urlpatterns:  path('', Home.as_view(), name='home')
-Including another URLconf
-    1. Import the include() function: from django.urls import include, path
-    2. Add a URL to urlpatterns:  path('blog/', include('blog.urls'))
-"""
+from django.conf import settings
 from django.contrib import admin
-from django.urls import path
+from django.urls import include, path, re_path
+from django.views.static import serve
+
+from . import views
+
+handler403 = 'sajhya_health.views.permission_denied'
+handler404 = 'sajhya_health.views.page_not_found'
+handler500 = 'sajhya_health.views.server_error'
 
 urlpatterns = [
-    path('admin/', admin.site.urls),
+    path(settings.ADMIN_URL, admin.site.urls),
+    path('', views.landing_page, name='landing'),
+    path('healthz/', views.healthz, name='healthz'),
+    path('accounts/', include('accounts.urls')),
+    path('marketplace/', include('marketplace.urls')),
+    path('exercises/', include('exercises.urls')),
+    path('billing/', include('billing.urls')),
+    path('lab-tests/', include('lab.urls')),
+    path('profiles/', include('profiles.urls')),
+    path('assessments/', include('assessments.urls')),
+    path('clinics/', include('clinics.urls')),
+    path('soapnotes/', include('soapnotes.urls')),
+    path('portal/', include('portal.urls')),
 ]
+
+if settings.SERVE_MEDIA:
+    urlpatterns += [re_path(r'^media/(?P<path>.*)$', serve, {'document_root': settings.MEDIA_ROOT})]

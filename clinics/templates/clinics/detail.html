@@ -1,0 +1,175 @@
+{% extends 'accounts/pro_base.html' %}
+{% block title %}{{ clinic.name }} | Sajhya Health{% endblock %}
+{% block extra_css %}
+{% include 'clinics/_styles.html' %}
+{% endblock %}
+{% block main %}
+<p style="margin:0 0 4px"><a class="text-link" href="{% url 'clinics:hub' %}" style="text-decoration:none">← Clinic Connect</a></p>
+{% if clinic.banner %}<div class="cl-banner" style="background-image:url('{{ clinic.banner.url }}')"></div>{% endif %}
+<div class="cl-head">
+  {% if clinic.logo %}<img class="logo" src="{{ clinic.logo.url }}" alt="">{% else %}<span class="logo">{{ clinic.name|slice:":1"|upper }}</span>{% endif %}
+  <div><h1 style="font-size:20px;margin:0">{{ clinic.name }}</h1>
+  <span class="hint">{{ clinic.address }} · {{ clinic.phone }}</span></div>
+  <span class="tone">{{ clinic.code }}</span>
+  {% if not is_owner %}
+  <form method="post" action="{% url 'clinics:leave' clinic.pk %}" onsubmit="return confirm('Leave this clinic? Patients you registered under it stay yours but are no longer tagged to it.')" style="margin-left:auto">{% csrf_token %}<button class="secondary-btn" type="submit">Leave clinic</button></form>
+  {% endif %}
+</div>
+<div class="chipbar">{% for key, label in tabs %}<a href="?tab={{ key }}" class="{% if tab == key %}on{% endif %}">{{ label }}</a>{% endfor %}</div>
+
+{% if not usable and tab != 'overview' and tab != 'settings' %}
+  <div class="cl-notice"><b>Waiting for plan activation.</b> This section unlocks when our team activates your Clinic plan. Meanwhile you can complete the clinic profile in <a href="?tab=settings">Clinic details</a>.</div>
+{% elif tab == 'overview' %}
+  {% if not usable %}<div class="cl-notice"><b>Registration received.</b> Our team will contact you to arrange and activate the Clinic plan. Team, patients and queue unlock then. You can complete your clinic profile now.</div>{% endif %}
+  {% if is_owner and percent < 100 %}
+  <section class="panel cl-box" style="margin-bottom:14px"><b>Clinic profile {{ percent }}% complete</b>
+    <div class="cl-meter"><i style="width:{{ percent }}%"></i></div>
+    <span class="hint">Still to add: {{ missing|join:", " }}.</span> <a class="text-link" href="?tab=settings" style="text-decoration:none">Complete profile →</a></section>
+  {% endif %}
+  <section class="panel cl-box" style="margin-bottom:14px">
+    <div style="display:flex;align-items:baseline;gap:12px;flex-wrap:wrap"><b>New patients enrolled this month</b>
+      <span style="font-size:22px;font-weight:800">{{ usage.current.enrolled }}</span><span class="hint">of {{ usage.current.cap }} included</span>
+      {% if usage.over_cap %}<span class="tone bad">{{ usage.current.overage }} over the cap</span>{% elif usage.near_cap %}<span class="tone warn">Close to the cap</span>{% endif %}</div>
+    <div class="cl-meter" style="{% if usage.over_cap %}background:#f6d4d4{% endif %}"><i style="width:{{ usage.percent }}%;{% if usage.over_cap %}background:#b83b3b{% elif usage.near_cap %}background:#e0a62a{% endif %}"></i></div>
+    {% if usage.over_cap %}<span class="hint">Each patient above {{ usage.current.cap }} is NPR {{ usage.current.rate|floatformat:"0" }}: <b>NPR {{ usage.current.amount_due|floatformat:"0" }}</b> so far this month, added to what is due before your next billing.</span>
+    {% else %}<span class="hint">{{ usage.current.cap|add:"0" }} new patients a month are included. Patients registered inside this clinic count; extra ones are NPR {{ usage.current.rate|floatformat:"0" }} each, due before the next billing.</span>{% endif %}
+    {% if is_owner %}
+    <div style="margin-top:10px"><b>Due before next billing: NPR {{ usage.total_due|floatformat:"0" }}</b></div>
+    <table class="cl-table" style="margin-top:6px"><thead><tr><th>MONTH</th><th>ENROLLED</th><th>OVER CAP</th><th>AMOUNT</th><th>STATUS</th></tr></thead><tbody>
+      {% for u in usage.rows %}<tr><td>{{ u.month|date:"F Y" }}{% if u.is_current %} <span class="hint">(so far)</span>{% endif %}</td><td>{{ u.enrolled }} / {{ u.cap }}</td><td>{{ u.overage }}</td><td>{% if u.amount_due %}NPR {{ u.amount_due|floatformat:"0" }}{% else %}-{% endif %}</td>
+        <td>{% if u.status == 'paid' %}<span class="tone good">Paid</span>{% elif u.status == 'due' %}<span class="tone warn">Due</span>{% else %}<span class="tone">Within cap</span>{% endif %}</td></tr>{% endfor %}
+    </tbody></table>
+    {% endif %}
+  </section>
+  <div class="kpis">
+    <div class="kpi"><div class="k">Team members</div><div class="v">{{ team_count }}</div></div>
+    <div class="kpi"><div class="k">Patients registered here (all physios)</div><div class="v">{{ patient_total }}</div></div>
+    <div class="kpi"><div class="k">In queue today</div><div class="v">{{ queue_counts.waiting }} waiting</div><div class="n">{{ queue_counts.called }} in session · {{ queue_counts.completed }} done</div></div>
+    <div class="kpi"><div class="k">Visits in {{ month_label }}</div><div class="v">{{ month_visits }}</div></div>
+  </div>
+  <section class="panel"><div class="panel-header"><div class="panel-title">Activity by physio - {{ month_label }}</div></div>
+    <div class="table-wrap"><table class="cl-table">
+      <thead><tr><th>PHYSIO</th><th>VISITS</th><th>PATIENTS SEEN</th></tr></thead>
+      <tbody>{% for a in activity %}<tr><td><b>{{ a.name }}</b></td><td>{{ a.visits }}</td><td>{{ a.patients }}</td></tr>
+      {% empty %}<tr><td colspan="3" style="padding:20px;text-align:center;color:var(--muted)">No visits yet this month for patients registered under this clinic.</td></tr>{% endfor %}</tbody>
+    </table></div>
+    <div class="cl-box hint" style="padding-top:0">Counts only. Each physio's patients stay private to that physio; register patients under this clinic (Patients tab) for them to be counted here.</div>
+  </section>
+
+  <div class="cl-grid" style="margin-top:14px">
+    {% if clinic.short_bio %}<section class="panel cl-box"><div class="cl-h" style="margin-top:0">About</div>{{ clinic.short_bio }}</section>{% endif %}
+    <section class="panel cl-box"><div class="cl-h" style="margin-top:0">Opening hours</div>
+      <table class="cl-table"><tbody>{% for label, row in clinic.hours_rows %}<tr><td>{{ label }}</td><td>{% if row %}{{ row.0 }} - {{ row.1 }}{% else %}<span class="hint">Closed</span>{% endif %}</td></tr>{% endfor %}</tbody></table>
+      <div class="hint">Default slot {{ clinic.slot_minutes }} minutes</div></section>
+    {% if clinic.specialization_labels or clinic.amenity_labels %}<section class="panel cl-box">
+      {% if clinic.specialization_labels %}<div class="cl-h" style="margin-top:0">Specialisations</div>{{ clinic.specialization_labels|join:", " }}{% endif %}
+      {% if clinic.amenity_labels %}<div class="cl-h">Amenities</div>{{ clinic.amenity_labels|join:", " }}{% endif %}</section>{% endif %}
+  </div>
+
+{% elif tab == 'team' %}
+  <section class="panel"><div class="panel-header"><div class="panel-title">Team</div></div>
+    <div class="table-wrap"><table class="cl-table">
+      <thead><tr><th>NAME</th><th>ROLE</th><th>STATUS</th><th>CONTACT</th><th></th></tr></thead>
+      <tbody>
+        <tr><td><b>{{ clinic.owner.full_name }}</b></td><td>Owner / physiotherapist</td><td><span class="tone good">Owner</span></td><td>{{ clinic.owner.mobile }}</td><td></td></tr>
+        {% for m in members %}
+        <tr>
+          <td><b>{{ m.display_name }}</b>{% if m.physio %}<div class="hint">{{ m.physio.title }} · verified</div>{% endif %}</td>
+          <td>{{ m.get_role_display }}</td>
+          <td>{% if m.status == 'invited' %}<span class="tone warn">Invitation sent</span>{% else %}<span class="tone good">Active</span>{% endif %}</td>
+          <td>{% if m.physio %}{{ m.physio.mobile }}{% else %}{{ m.phone }}{% if m.email %}<div class="hint">{{ m.email }}</div>{% endif %}{% endif %}</td>
+          <td>{% if is_owner %}<form method="post" action="{% url 'clinics:member-remove' clinic.pk m.pk %}" onsubmit="return confirm('Remove {{ m.display_name|escapejs }} from the team?')">{% csrf_token %}<button class="text-link" title="Remove">✕ Remove</button></form>{% endif %}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table></div>
+  </section>
+  {% if is_owner %}
+  <div class="cl-grid" style="margin-top:14px">
+    <section class="panel cl-box">
+      <div class="cl-h" style="margin-top:0">Add a physiotherapist</div>
+      <p class="hint" style="margin-top:0">Only physios with verified Sajhya credentials can be added. They receive an invitation and join when they accept.</p>
+      <form method="post" action="{% url 'clinics:invite' clinic.pk %}" class="cl-form" id="inviteForm">{% csrf_token %}
+        <div class="cl-search"><input type="text" id="physioSearch" placeholder="Search by name, username or licence number..." autocomplete="off"></div>
+        <input type="hidden" name="physio_id" id="physioId"><span class="hint" id="physioChosen"></span>
+        <button class="primary-btn" type="submit" style="width:fit-content">Send invitation</button>
+      </form>
+    </section>
+    <section class="panel cl-box">
+      <div class="cl-h" style="margin-top:0">Add staff</div>
+      <p class="hint" style="margin-top:0">Receptionists, assistants and managers are kept as records (they do not sign in).</p>
+      <form method="post" action="{% url 'clinics:staff-add' clinic.pk %}" class="cl-form">{% csrf_token %}
+        <label>Name{{ staff_form.name }}</label><label>Role{{ staff_form.role }}</label><label>Phone{{ staff_form.phone }}</label><label>Email{{ staff_form.email }}</label>
+        <button class="primary-btn" type="submit" style="width:fit-content">Add staff member</button>
+      </form>
+    </section>
+  </div>
+  {% if past %}<p class="hint" style="margin-top:12px">Former / declined: {% for m in past %}{{ m.display_name }} ({{ m.get_status_display|lower }}){% if not forloop.last %}, {% endif %}{% endfor %}</p>{% endif %}
+  <script>
+  (function () {
+    var input = document.getElementById('physioSearch'); if (!input || !window.SajhyaUI) return;
+    SajhyaUI.picker(input, {
+      url: "{% url 'clinics:physio-search' %}", params: function () { return { clinic: {{ clinic.pk }} }; }, emptyText: 'No verified physio found',
+      render: function (p) { return '<b>' + SajhyaUI.esc(p.name) + '</b> <span style="color:#7c9186">' + SajhyaUI.esc(p.title) + ' · @' + SajhyaUI.esc(p.username) + (p.licence ? ' · licence ' + SajhyaUI.esc(p.licence) : '') + '</span>'; },
+      onPick: function (p) { document.getElementById('physioId').value = p.id; input.value = p.name; document.getElementById('physioChosen').textContent = 'Selected: ' + p.name + ' (@' + p.username + ')'; },
+      onType: function () { document.getElementById('physioId').value = ''; document.getElementById('physioChosen').textContent = ''; },
+    });
+    document.getElementById('inviteForm').addEventListener('submit', function (e) {
+      if (!document.getElementById('physioId').value) { e.preventDefault(); input.focus(); }
+    });
+  })();
+  </script>
+  {% endif %}
+
+{% elif tab == 'patients' %}
+  <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px;flex-wrap:wrap">
+    <form method="get" style="display:flex;gap:8px"><input type="hidden" name="tab" value="patients"><input type="search" name="q" value="{{ q }}" placeholder="Search name or ID..." style="height:36px;border:1px solid var(--line);border-radius:8px;padding:0 10px"><button class="secondary-btn" type="submit">Search</button></form>
+    <span class="hint">{{ patient_total }} patient{{ patient_total|pluralize }} at this clinic. {% if not is_owner %}Contact details are visible to the clinic owner only.{% endif %}</span>
+    <a class="primary-btn" href="{% url 'accounts:patient-add' %}?clinic={{ clinic.pk }}" style="margin-left:auto;text-decoration:none;display:inline-flex;align-items:center">＋ Add patient to {{ clinic.name }}</a>
+  </div>
+  <section class="panel"><div class="table-wrap"><table class="cl-table">
+    <thead><tr><th>PATIENT</th><th>ID</th><th>CONTACT</th><th>REGISTERED BY</th><th>LAST VISIT</th><th></th></tr></thead>
+    <tbody>{% for p in patients %}<tr><td><b>{{ p.name }}</b></td><td>{{ p.patient_code }}</td>
+      <td>{% if is_owner %}{{ p.phone|default:"-" }}{% else %}<span class="hint">Hidden</span>{% endif %}</td>
+      <td>{{ p.professional.full_name }}</td><td>{{ p.last_visit|date:"Y-m-d"|default:"-" }}</td><td><a class="text-link" href="{% url 'accounts:patient-detail' p.pk %}" style="text-decoration:none">Open &amp; treat</a></td></tr>
+    {% empty %}<tr><td colspan="6" style="padding:22px;text-align:center;color:var(--muted)">No patients at this clinic yet. Use <b>Add patient</b> to register the first one.</td></tr>{% endfor %}</tbody>
+  </table></div></section>
+
+{% elif tab == 'queue' %}
+  <section class="panel cl-box">
+    <form method="post" action="{% url 'clinics:queue-add' clinic.pk %}" style="display:flex;gap:10px;flex-wrap:wrap;align-items:center" id="queueForm">{% csrf_token %}
+      <div class="cl-search" style="flex:1;min-width:240px"><input type="text" id="queueSearch" placeholder="Search the clinic's patients to add to today's queue..." autocomplete="off"></div>
+      <input type="hidden" name="patient_id" id="queuePatient"><span class="hint" id="queueChosen"></span>
+      <button class="primary-btn" type="submit">＋ Add to queue</button>
+    </form>
+  </section>
+  <div class="cl-h">Today's queue</div>
+  <div class="cl-queue">
+    {% for e in entries %}
+    <div class="cl-q {% if e.status == 'called' %}called{% elif e.status == 'completed' %}done{% endif %}">
+      <span class="no">{{ forloop.counter }}</span>
+      <div><b>{{ e.patient.name }}</b> <span class="hint">{{ e.patient.patient_code }}</span><div class="hint">Joined {{ e.joined_at|time:"H:i" }} · physio {{ e.patient.professional.full_name }}</div></div>
+      <span class="tone {% if e.status == 'called' %}good{% elif e.status == 'waiting' %}warn{% endif %}">{{ e.get_status_display }}</span>
+      {% if e.status == 'waiting' or e.status == 'called' %}
+      <div class="acts">
+        {% if e.status == 'waiting' %}<form method="post" action="{% url 'clinics:queue-action' clinic.pk e.pk %}">{% csrf_token %}<button class="primary-btn" name="action" value="call" style="height:32px">Call in</button></form>{% endif %}
+        <form method="post" action="{% url 'clinics:queue-action' clinic.pk e.pk %}">{% csrf_token %}<button class="secondary-btn" name="action" value="complete" style="height:32px">Done</button></form>
+        <form method="post" action="{% url 'clinics:queue-action' clinic.pk e.pk %}">{% csrf_token %}<button class="text-link" name="action" value="cancel">Cancel</button></form>
+      </div>
+      {% endif %}
+    </div>
+    {% empty %}<div class="cl-box hint">Nobody in the queue yet today.</div>{% endfor %}
+  </div>
+  <script>
+  (function () {
+    if (!window.SajhyaUI) return;
+    SajhyaUI.patientPicker(document.getElementById('queueSearch'), document.getElementById('queuePatient'), { url: "{% url 'clinics:patient-search' clinic.pk %}", hint: document.getElementById('queueChosen') });
+  })();
+  </script>
+
+{% elif tab == 'settings' %}
+  <form method="post" action="{% url 'clinics:update' clinic.pk %}" enctype="multipart/form-data">{% csrf_token %}
+    {% include 'clinics/_profile_form.html' with submit_label='Save clinic details' %}
+  </form>
+{% endif %}
+{% endblock %}

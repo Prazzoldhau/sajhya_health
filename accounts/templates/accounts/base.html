@@ -1,0 +1,26 @@
+{% load static %}<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}Sajhya Health{% endblock %}</title>
+    <link rel="icon" type="image/png" href="{% static 'images/favicon.png' %}">
+    <link rel="stylesheet" href="{% static 'vendor/bootstrap/bootstrap.min.css' %}">
+    <link rel="stylesheet" href="{% static 'vendor/fontawesome/css/all.min.css' %}">
+    <link rel="stylesheet" href="{% static 'accounts/accounts.css' %}">
+    {% block head_extra %}{% endblock %}
+</head>
+<body>
+<header class="site-bar">
+    <a href="{% url 'landing' %}" class="site-brand"><img src="{% static 'images/logo-64.png' %}" alt="" width="36" height="36"><span>Sajhya Health</span></a>
+    <nav>
+        <a href="{% url 'landing' %}"><i class="fa-solid fa-house"></i> Home</a>
+        {% if user.is_authenticated %}<a href="{% url 'accounts:welcome' %}"><i class="fa-solid fa-user"></i> My account</a>
+        {% else %}<a href="{% url 'accounts:login' %}" class="site-cta"><i class="fa-solid fa-right-to-bracket"></i> Sign in</a>{% endif %}
+    </nav>
+</header>
+<div class="{% block wrap_class %}container{% endblock %}">
+{% block content %}{% endblock %}
+</div>
+</body>
+</html>

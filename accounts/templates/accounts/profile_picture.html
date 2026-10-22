@@ -1,0 +1,17 @@
+{% extends 'accounts/base.html' %}
+{% block title %}Profile photo - Sajhya Health{% endblock %}
+{% block content %}
+<div class="text-center mb-4">
+    <h1 class="fw-bold page-title">Profile photo</h1>
+    <p class="page-lead">A clear, professional headshot helps clients trust your profile.</p>
+</div>
+<form method="post" enctype="multipart/form-data" class="form-panel">
+    {% csrf_token %}
+    {% if profile.profile_picture %}
+    <div class="text-center mb-3"><img src="{{ profile.profile_picture.url }}" alt="Current photo" style="width:120px;height:120px;border-radius:50%;object-fit:cover"></div>
+    {% endif %}
+    {{ form.as_p }}
+    <button type="submit" class="btn btn-gradient">Save photo</button>
+    <p class="text-center mt-3 mb-0"><a href="{% url 'accounts:welcome' %}" class="page-lead">&larr; Back</a></p>
+</form>
+{% endblock %}

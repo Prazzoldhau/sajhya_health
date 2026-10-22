@@ -1,0 +1,11 @@
+{% comment %}One labelled input with a leading icon. Args: field, icon, label (optional), toggle (show/hide button), help (show the field's help text).{% endcomment %}
+<div class="field">
+    <label for="{{ field.id_for_label }}">{{ label|default:field.label }}</label>
+    <div class="input-wrap {% if field.errors %}invalid{% endif %}">
+        <i class="fa-solid fa-{{ icon }} lead-icon"></i>
+        {{ field }}
+        {% if toggle %}<button type="button" class="pw-toggle" data-pw-toggle aria-label="Show password" title="Show password"><i class="fa-regular fa-eye"></i></button>{% endif %}
+    </div>
+    {% if help and field.help_text %}<div class="field-hint">{{ field.help_text|safe }}</div>{% endif %}
+    {% for error in field.errors %}<div class="field-error">{{ error }}</div>{% endfor %}
+</div>

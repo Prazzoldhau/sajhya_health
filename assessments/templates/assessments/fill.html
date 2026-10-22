@@ -1,0 +1,81 @@
+{% extends 'accounts/pro_base.html' %}
+{% block title %}Assessment | Sajhya Health{% endblock %}
+{% block extra_css %}
+  main { padding-top: 18px; }
+{% include 'assessments/_styles.html' %}
+{% endblock %}
+{% block main %}
+<p style="margin:0 0 4px"><a class="text-link" href="{% url 'assessments:choose' patient.pk %}" style="text-decoration:none">← Change scales</a></p>
+<h1 style="font-size:20px;margin:0 0 12px">{{ form_obj.name|default:"Assessment" }} · {{ patient.name }}</h1>
+
+{% if errors %}<div class="as-error"><b>Please fix the following:</b><ul style="margin:6px 0 0;padding:0">{% for e in errors %}<li>{{ e }}</li>{% endfor %}</ul></div>{% endif %}
+
+<form method="post" action="{% url 'assessments:fill' patient.pk %}">
+  {% csrf_token %}
+  <input type="hidden" name="scales" value="{{ scale_ids }}">
+  {% if form_obj %}<input type="hidden" name="form" value="{{ form_obj.pk }}">{% endif %}
+  <div class="as-meta">
+    <label>Date<input type="date" name="assessed_on" value="{{ assessed_on }}" max="{{ today }}" required></label>
+    <label>Assessed by<input type="text" name="assessor" value="{{ assessor }}" maxlength="200"></label>
+  </div>
+
+  {% for b in blocks %}
+  <section class="as-q" data-scoring="{{ b.scale.scoring }}" data-max="{{ b.max|default_if_none:'' }}" data-unit="{{ b.scale.unit }}">
+    <header>
+      <h3>{{ b.scale.name }}{% if b.scale.abbreviation %} ({{ b.scale.abbreviation }}){% endif %}</h3>
+      <span class="tone">{{ b.scale.get_category_display }}</span>
+      <span class="total">Score: <span data-total>-</span></span>
+    </header>
+    {% if b.scale.description or b.scale.instructions %}<div class="instr">{{ b.scale.description }} {{ b.scale.instructions }}</div>{% endif %}
+    {% for row in b.items %}
+    <div class="as-item">
+      {% if row.item.section %}<div class="sec">{{ row.item.section }}</div>{% endif %}
+      <div class="q">{{ row.item.label }}{% if not row.item.required %} <span style="font-weight:400;color:var(--muted)">(optional)</span>{% endif %}</div>
+      {% if row.item.help_text %}<div class="hlp">{{ row.item.help_text }}</div>{% endif %}
+      {% if row.item.input_type == 'choice' %}
+        {% for o in row.options %}
+        <label class="as-opt"><input type="radio" name="i_{{ row.item.pk }}" value="{{ o.value }}" data-v="{{ o.value }}" {% if o.checked %}checked{% endif %}><span class="v">{{ o.value }}</span><span>{{ o.label }}</span></label>
+        {% endfor %}
+        {% if not row.item.required %}<label class="as-opt"><input type="radio" name="i_{{ row.item.pk }}" value="" {% if not row.value %}checked{% endif %}><span class="v">-</span><span style="color:var(--muted)">Not answered</span></label>{% endif %}
+      {% else %}
+        <input type="number" step="any" name="i_{{ row.item.pk }}" value="{{ row.value }}" data-v-input {% if row.item.min_value is not None %}min="{{ row.item.min_value }}"{% endif %} {% if row.item.max_value is not None %}max="{{ row.item.max_value }}"{% endif %}> <span style="font-size:12px;color:var(--muted)">{{ b.scale.unit }}</span>
+      {% endif %}
+    </div>
+    {% endfor %}
+    <input class="as-notes" type="text" name="n_{{ b.scale.pk }}" value="{{ b.notes }}" maxlength="500" placeholder="Notes for this scale (side, muscle, aid used...)">
+  </section>
+  {% endfor %}
+
+  <div class="as-meta"><label style="flex:1;min-width:260px">Overall notes<input type="text" name="notes" value="{{ notes }}" style="width:100%"></label></div>
+  <p class="hint">Leave a scale completely blank to skip it. A scale that is started must be completed.</p>
+  <div style="margin:10px 0 30px;display:flex;gap:10px">
+    <button class="primary-btn" type="submit">Save assessment</button>
+    <a class="secondary-btn" href="{% url 'accounts:patient-detail' patient.pk %}?tab=assessments" style="text-decoration:none;display:inline-flex;align-items:center">Cancel</a>
+  </div>
+</form>
+<script>
+(function () {
+  // a running total only; the server recalculates the real score when you save
+  function update(section) {
+    var scoring = section.dataset.scoring, max = parseFloat(section.dataset.max), vals = [], possible = 0;
+    section.querySelectorAll('.as-item').forEach(function (row) {
+      var radios = row.querySelectorAll('input[type=radio][data-v]'), num = row.querySelector('input[data-v-input]'), v = null;
+      if (radios.length) {
+        var on = row.querySelector('input[type=radio]:checked');
+        if (on && on.dataset.v !== undefined && on.value !== '') { v = parseFloat(on.dataset.v); possible += Math.max.apply(null, Array.prototype.map.call(radios, function (r) { return parseFloat(r.dataset.v); })); }
+      } else if (num && num.value !== '') { v = parseFloat(num.value); possible += parseFloat(num.max) || 0; }
+      if (v !== null && !isNaN(v)) vals.push(v);
+    });
+    var out = section.querySelector('[data-total]');
+    if (!vals.length) { out.textContent = '-'; return; }
+    var total = vals.reduce(function (a, b) { return a + b; }, 0), unit = section.dataset.unit;
+    if (scoring === 'percent') out.textContent = (possible ? Math.round(total / possible * 1000) / 10 : 0) + ' %';
+    else if (scoring === 'single') out.textContent = vals[0] + (unit && unit !== 'points' ? ' ' + unit : '') + (isNaN(max) ? '' : ' / ' + max);
+    else out.textContent = (Math.round(total * 100) / 100) + (isNaN(max) ? '' : ' / ' + max);
+  }
+  document.querySelectorAll('.as-q').forEach(function (s) {
+    s.addEventListener('input', function () { update(s); }); s.addEventListener('change', function () { update(s); }); update(s);
+  });
+})();
+</script>
+{% endblock %}

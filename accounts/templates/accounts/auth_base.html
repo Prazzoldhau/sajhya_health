@@ -1,0 +1,55 @@
+{% load static %}<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}Sajhya Health{% endblock %}</title>
+    <link rel="icon" type="image/png" href="{% static 'images/favicon.png' %}">
+    <link rel="stylesheet" href="{% static 'vendor/fontawesome/css/all.min.css' %}">
+    <link rel="stylesheet" href="{% static 'accounts/auth.css' %}">
+</head>
+<body class="auth">
+<div class="auth-shell">
+    <aside class="auth-aside">
+        <a href="{% url 'landing' %}" class="auth-brand">
+            <img src="{% static 'images/logo-128.png' %}" alt="Sajhya Health" width="56" height="56">
+            <span><b>Sajhya Health</b><small>Your complete healthcare platform</small></span>
+        </a>
+        <div class="auth-pitch">
+            <h2>One workspace for your whole practice.</h2>
+            <p>Patients, appointments, treatment plans, exercises and billing - together, so you spend your time on care.</p>
+            <ul class="auth-points">
+                <li><i class="fa-solid fa-user-doctor"></i><div><b>Patients &amp; profiles</b><span>Medicines, nursing, aids, rehab and lab results in one place.</span></div></li>
+                <li><i class="fa-solid fa-calendar-check"></i><div><b>Appointments &amp; plans</b><span>A clear calendar and phased treatment plans with progress.</span></div></li>
+                <li><i class="fa-solid fa-file-invoice-dollar"></i><div><b>Billing &amp; packages</b><span>Session packages that count down as visits are completed.</span></div></li>
+            </ul>
+        </div>
+        <div class="auth-foot">&copy; Sajhya Healthcare. Patient data is private to the professional who records it.</div>
+    </aside>
+
+    <main class="auth-main">
+        <div class="auth-card">
+            <div class="auth-logo-sm"><a href="{% url 'landing' %}"><img src="{% static 'images/logo-128.png' %}" alt="Sajhya Health" width="64" height="64"></a></div>
+            {% block card %}{% endblock %}
+        </div>
+    </main>
+</div>
+<script>
+    // every password box with a data-pw-toggle button gets a show/hide control
+    (function () {
+        document.querySelectorAll('[data-pw-toggle]').forEach(function (button) {
+            var field = button.parentNode.querySelector('input');
+            button.addEventListener('click', function () {
+                var show = field.type === 'password';
+                field.type = show ? 'text' : 'password';
+                button.setAttribute('aria-label', show ? 'Hide password' : 'Show password');
+                button.title = show ? 'Hide password' : 'Show password';
+                button.firstElementChild.className = show ? 'fa-regular fa-eye-slash' : 'fa-regular fa-eye';
+                field.focus();
+            });
+        });
+    })();
+</script>
+{% block scripts %}{% endblock %}
+</body>
+</html>

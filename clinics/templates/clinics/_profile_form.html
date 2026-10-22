@@ -1,0 +1,64 @@
+{# The clinic profile form, five sections. Used by "Register a clinic" and by the clinic's Details tab. Context: form, submit_label, clinic (optional) #}
+{% if form.non_field_errors %}<div class="cl-err">{{ form.non_field_errors }}</div>{% endif %}
+
+<section class="panel cl-sec">
+  <h3><span>1</span> Basic clinic information</h3>
+  <div class="cl-form">
+    <label>Clinic name *{{ form.name }}{{ form.name.errors }}</label>
+    <label>{{ form.short_bio.label }}{{ form.short_bio }}{{ form.short_bio.errors }}<span class="hint">Up to 500 characters.</span></label>
+    <div class="cl-two">
+      <label>Clinic logo (JPG or PNG, max 2 MB){% if clinic and clinic.logo %}<img class="cl-logo-prev" src="{{ clinic.logo.url }}" alt="Current logo">{% endif %}{{ form.logo }}{{ form.logo.errors }}</label>
+      <label>Banner / cover image (16:9, cropped to fit){% if clinic and clinic.banner %}<img class="cl-banner-prev" src="{{ clinic.banner.url }}" alt="Current banner">{% endif %}{{ form.banner }}{{ form.banner.errors }}</label>
+    </div>
+  </div>
+</section>
+
+<section class="panel cl-sec">
+  <h3><span>2</span> Legal &amp; registration <em>(can be completed later)</em></h3>
+  <div class="cl-form">
+    <div class="cl-two">
+      <label>{{ form.pan_number.label }}{{ form.pan_number }}{{ form.pan_number.errors }}</label>
+      <label>{{ form.facility_license.label }}{{ form.facility_license }}{{ form.facility_license.errors }}</label>
+    </div>
+    <div><div class="cl-lab">{{ form.specializations.label }}</div><div class="cl-checks">{{ form.specializations }}</div></div>
+  </div>
+</section>
+
+<section class="panel cl-sec">
+  <h3><span>3</span> Contact &amp; location</h3>
+  <div class="cl-form">
+    <div class="cl-two">
+      <label>{{ form.phone.label }} *{{ form.phone }}{{ form.phone.errors }}</label>
+      <label>{{ form.phone_secondary.label }}{{ form.phone_secondary }}{{ form.phone_secondary.errors }}</label>
+    </div>
+    <div class="cl-two">
+      <label>{{ form.email.label }}{{ form.email }}{{ form.email.errors }}</label>
+      <label>{{ form.website.label }}{{ form.website }}{{ form.website.errors }}</label>
+    </div>
+    <div class="cl-two">
+      <label>Province *{{ form.province }}{{ form.province.errors }}</label>
+      <label>{{ form.district.label }} *{{ form.district }}{{ form.district.errors }}</label>
+    </div>
+    <label>{{ form.ward_street.label }}{{ form.ward_street }}{{ form.ward_street.errors }}</label>
+    <label>{{ form.map_link.label }}{{ form.map_link }}{{ form.map_link.errors }}</label>
+  </div>
+</section>
+
+<section class="panel cl-sec">
+  <h3><span>4</span> Operational hours &amp; slots <em>(can be completed later)</em></h3>
+  <div class="cl-form">
+    <table class="cl-hours">
+      {% for row in form.day_rows %}
+      <tr><td class="d"><label class="cl-check">{{ row.open }} {{ row.open.label }}</label></td><td>{{ row.start }}</td><td>to</td><td>{{ row.end }}{{ row.end.errors }}</td></tr>
+      {% endfor %}
+    </table>
+    <label style="max-width:260px">{{ form.slot_minutes.label }}{{ form.slot_minutes }}</label>
+  </div>
+</section>
+
+<section class="panel cl-sec">
+  <h3><span>5</span> Amenities &amp; facilities <em>(can be completed later)</em></h3>
+  <div class="cl-checks">{{ form.amenities }}</div>
+</section>
+
+<div style="margin:6px 0 30px"><button class="primary-btn" type="submit">{{ submit_label }}</button></div>

@@ -1,0 +1,195 @@
+{% comment %}
+  The Profile tab of the patient page. Included by accounts/patient_detail.html with the context from
+  profiles.views.profile_context. One sub-section at a time (?section=...), each with an "add" modal.
+{% endcomment %}
+{% load exercise_ui %}
+<div class="prof-nav no-print">
+  {% for key, label, count in sections %}
+    <a href="?tab=profile&section={{ key }}" class="{% if section == key %}on{% endif %}">{{ label }}{% if count %} <small>{{ count }}</small>{% endif %}</a>
+  {% endfor %}
+</div>
+
+<div class="prof-body">
+{% if section == 'general' %}
+  <form method="post" action="{% url 'profiles:standing-save' patient.pk %}" class="prof-form">
+    {% csrf_token %}
+    <div class="prof-two">
+      <label>Allergies <span class="hint">Drug, food or other allergies and the reaction</span>{{ standing_form.allergies }}</label>
+      <label>Medical history <span class="hint">Past surgeries, chronic conditions, family history</span>{{ standing_form.medical_history }}</label>
+      <label>Wound / catheter / ostomy care {{ standing_form.wound_catheter_care }}</label>
+      <label>Mobility assistance {{ standing_form.mobility_assistance }}</label>
+    </div>
+    <div style="display:flex;align-items:center;gap:12px;margin-top:10px">
+      <button class="primary-btn" type="submit">Save profile</button>
+      {% if info.updated_by %}<span class="patient-id" style="display:inline">Last updated {{ info.updated_at|date:"M j, Y H:i" }} by {{ info.updated_by.username }}</span>{% endif %}
+    </div>
+  </form>
+
+{% elif section == 'medicine' %}
+  <div class="prof-head"><h3>Medicines</h3><button type="button" class="primary-btn" data-open="medModal">＋ Add medicine</button></div>
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>MEDICINE</th><th>DOSE</th><th>WHEN</th><th>DATES</th><th>STATUS</th><th></th></tr></thead>
+      <tbody>
+      {% for m in medicines %}
+        <tr>
+          <td><b>{{ m.display_name }}</b>{% if m.pharmacy_product %}<div class="patient-id">From the pharmacy catalogue{% if m.pharmacy_product.requires_prescription %} · Rx{% endif %}</div>{% endif %}{% if m.instructions %}<div class="patient-id">{{ m.instructions }}</div>{% endif %}</td>
+          <td>{{ m.dosage|default:"—" }}</td>
+          <td>{{ m.times_label }}</td>
+          <td>{{ m.start_date|date:"M j, Y" }}{% if m.end_date %} → {{ m.end_date|date:"M j, Y" }}{% endif %}{% if m.prescribed_by %}<div class="patient-id">By {{ m.prescribed_by }}</div>{% endif %}</td>
+          <td><span class="status {% if m.effective_status == 'stopped' %}hold{% elif m.effective_status == 'completed' %}scheduled{% endif %}">{{ m.effective_status|capfirst }}</span></td>
+          <td class="prof-actions">
+            <form method="post" action="{% url 'profiles:medicine-status' patient.pk m.pk %}">{% csrf_token %}
+              {% if m.status == 'active' %}<button class="table-action" name="status" value="stopped">Stop</button><button class="table-action" name="status" value="completed">Completed</button>{% else %}<button class="table-action" name="status" value="active">Resume</button>{% endif %}
+            </form>
+            <form method="post" action="{% url 'profiles:delete' patient.pk 'medicine' m.pk %}" onsubmit="return confirm('Remove this medicine?')">{% csrf_token %}<button class="text-link" title="Remove">✕</button></form>
+          </td>
+        </tr>
+      {% empty %}
+        <tr><td colspan="6" class="prof-empty">No medicines recorded. Click <b>Add medicine</b> and search the pharmacy catalogue.</td></tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+
+{% elif section == 'nursing' %}
+  {% if info.wound_catheter_care or info.mobility_assistance %}
+  <div class="prof-note">
+    {% if info.wound_catheter_care %}<div><b>Wound / catheter care:</b> {{ info.wound_catheter_care }}</div>{% endif %}
+    {% if info.mobility_assistance %}<div><b>Mobility assistance:</b> {{ info.mobility_assistance }}</div>{% endif %}
+    <a href="?tab=profile&section=general" class="page-lead">Edit standing care needs</a>
+  </div>
+  {% endif %}
+  <div class="prof-head"><h3>Nursing record</h3><button type="button" class="primary-btn" data-open="nurseModal">＋ Add entry</button></div>
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>WHEN</th><th>TYPE</th><th>VITALS</th><th>NOTES</th><th>BY</th><th></th></tr></thead>
+      <tbody>
+      {% for n in nursing %}
+        <tr>
+          <td>{{ n.recorded_at|date:"M j, H:i" }}</td>
+          <td>{{ n.get_category_display }}</td>
+          <td>{% if n.vitals_summary %}<span {% if n.needs_attention %}style="color:#b83b3b;font-weight:700" title="Outside the usual range - check the patient"{% endif %}>{{ n.vitals_summary }}{% if n.needs_attention %} ⚠{% endif %}</span>{% else %}—{% endif %}</td>
+          <td style="white-space:normal;max-width:280px">{{ n.notes|default:"—" }}</td>
+          <td>{{ n.recorded_by.username|default:"—" }}</td>
+          <td class="prof-actions"><form method="post" action="{% url 'profiles:delete' patient.pk 'nursing' n.pk %}" onsubmit="return confirm('Remove this entry?')">{% csrf_token %}<button class="text-link" title="Remove">✕</button></form></td>
+        </tr>
+      {% empty %}
+        <tr><td colspan="6" class="prof-empty">No nursing entries yet. Record vitals, wound care or mobility help.</td></tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+
+{% elif section == 'aids' %}
+  <div class="prof-head"><h3>Surgical &amp; assistive aids</h3><button type="button" class="primary-btn" data-open="aidModal">＋ Add aid</button></div>
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>AID</th><th>TYPE</th><th>SIDE / SIZE</th><th>ISSUED</th><th>STATUS</th><th></th></tr></thead>
+      <tbody>
+      {% for a in aids %}
+        <tr>
+          <td><b>{{ a.display_name }}</b>{% if a.notes %}<div class="patient-id">{{ a.notes }}</div>{% endif %}</td>
+          <td>{{ a.get_category_display }}</td>
+          <td>{{ a.get_side_display|default:"—" }}{% if a.size %} · {{ a.size }}{% endif %}</td>
+          <td>{{ a.issued_on|date:"M j, Y" }}</td>
+          <td><span class="status {% if a.status != 'in_use' %}hold{% endif %}">{{ a.get_status_display }}</span></td>
+          <td class="prof-actions">
+            <form method="post" action="{% url 'profiles:aid-status' patient.pk a.pk %}">{% csrf_token %}
+              {% if a.status == 'in_use' %}<button class="table-action" name="status" value="returned">Returned</button><button class="table-action" name="status" value="lost">Lost / damaged</button>{% else %}<button class="table-action" name="status" value="in_use">In use</button>{% endif %}
+            </form>
+            <form method="post" action="{% url 'profiles:delete' patient.pk 'aids' a.pk %}" onsubmit="return confirm('Remove this aid?')">{% csrf_token %}<button class="text-link" title="Remove">✕</button></form>
+          </td>
+        </tr>
+      {% empty %}
+        <tr><td colspan="6" class="prof-empty">No aids recorded. Add walkers, crutches, braces, collars or wheelchairs given to the patient.</td></tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+
+{% elif section == 'rehab' %}
+  <div class="chipbar no-print">
+    {% for key, label in therapy_tabs %}<a href="?tab=profile&section=rehab&therapy={{ key }}" class="{% if therapy == key %}on{% endif %}">{{ label }}</a>{% endfor %}
+  </div>
+
+  {% if therapy == 'physio' %}
+    <p class="hint" style="margin:0 0 12px">Pulled automatically from the treatment plan, exercise prescriptions and visits recorded for this patient. Nothing to type here.</p>
+    {% if not physio.has_data %}
+      <div class="prof-empty">No physiotherapy has been recorded yet. Record a visit, build a treatment plan or prescribe exercises and it will appear here.</div>
+    {% else %}
+    <div class="rehab-grid">
+      <section class="rehab-card">
+        <h4>Assessment</h4>
+        {% if physio.measures %}
+          <table class="mini"><thead><tr><th>MEASURE</th><th>BASELINE</th><th>LATEST</th><th>TARGET</th></tr></thead><tbody>
+          {% for m in physio.measures %}<tr><td>{{ m.name }}</td><td>{{ m.baseline|default_if_none:"—" }}{{ m.unit }}</td><td><b>{{ m.latest|default_if_none:"—" }}{{ m.unit }}</b>{% if m.progress != None %} <span class="hint">({{ m.progress }}%)</span>{% endif %}</td><td>{{ m.target|default_if_none:"—" }}{{ m.unit }}</td></tr>{% endfor %}
+          </tbody></table>
+        {% else %}<p class="hint">No baseline measures yet. Add them in a treatment plan.</p>{% endif %}
+        {% for v in physio.initial_assessments %}<div class="line"><b>{{ v.date|date:"M j, Y" }}</b> · Initial assessment by {{ v.therapist }}{% if v.notes %}<div class="hint">{{ v.notes }}</div>{% endif %}</div>{% endfor %}
+      </section>
+
+      <section class="rehab-card">
+        <h4>Exercises</h4>
+        {% for rx in physio.prescriptions %}
+          <div class="line"><b>{{ rx.condition_label|default:"Exercise prescription" }}</b> <span class="status {% if rx.status != 'active' %}scheduled{% endif %}">{{ rx.get_status_display }}</span>
+            <div class="hint">{{ rx.created_at|date:"M j, Y" }} · {{ rx.completion_percentage }}% done</div>
+            {% if rx.status == 'active' %}<ul>{% for ex in rx.exercises.all %}<li class="ex-cell">{% exercise_thumb ex.exercise_name ex.cover %}{% if ex.is_completed %}✓ {% endif %}{{ ex.exercise_name }} <span class="hint">{{ ex.dose_label }}</span></li>{% endfor %}</ul>{% endif %}
+          </div>
+        {% empty %}<p class="hint">No exercises prescribed yet.</p>{% endfor %}
+        <a class="page-lead" href="{% url 'accounts:patient-detail' patient.pk %}?tab=exercises">Open exercises →</a>
+      </section>
+
+      <section class="rehab-card">
+        <h4>Interventions</h4>
+        {% if physio.plan %}<div class="line"><b>{{ physio.plan.title }}</b> <span class="status">{{ physio.plan.get_status_display }}</span>{% if physio.current_phase %}<div class="hint">Now: {{ physio.current_phase.name }} ({{ physio.current_phase.weeks_label }})</div>{% endif %}</div>
+          {% for block in physio.clinic_by_phase %}<div class="line"><b>{{ block.phase.name }}</b><ul>{% for i in block.items %}<li>{{ i.text }}</li>{% endfor %}</ul></div>{% endfor %}
+          <a class="page-lead" href="{% url 'accounts:plan-detail' physio.plan.pk %}">Open treatment plan →</a>
+        {% else %}<p class="hint">No treatment plan yet.</p>{% endif %}
+        {% for v in physio.recent_treatments %}<div class="line"><b>{{ v.date|date:"M j" }}</b> · {{ v.get_session_type_display }}{% if v.progress %} · {{ v.get_progress_display }}{% endif %}{% if v.notes %}<div class="hint">{{ v.notes }}</div>{% endif %}</div>{% endfor %}
+      </section>
+    </div>
+    {% endif %}
+
+  {% else %}
+    <div class="prof-head"><h3>{{ therapy_label }}</h3><button type="button" class="primary-btn" data-open="therapyModal">＋ Add session note</button></div>
+    {% for note in therapy_notes %}
+      <article class="rehab-card" style="margin-bottom:12px">
+        <div style="display:flex;gap:10px;align-items:center"><b>{{ note.session_date|date:"M j, Y" }}</b>{% if note.goal %}<span class="status scheduled">{{ note.goal }}</span>{% endif %}
+          <form method="post" action="{% url 'profiles:delete' patient.pk 'therapy' note.pk %}" style="margin-left:auto" onsubmit="return confirm('Remove this note?')">{% csrf_token %}<button class="text-link" title="Remove">✕</button></form></div>
+        {% if note.intervention %}<p><b>Done:</b> {{ note.intervention }}</p>{% endif %}
+        {% if note.response %}<p><b>Response:</b> {{ note.response }}</p>{% endif %}
+        {% if note.plan %}<p><b>Plan:</b> {{ note.plan }}</p>{% endif %}
+        <div class="hint">Recorded by {{ note.recorded_by.username|default:"—" }}</div>
+      </article>
+    {% empty %}<div class="prof-empty">No {{ therapy_label|lower }} notes yet.</div>{% endfor %}
+  {% endif %}
+
+{% elif section == 'labs' %}
+  <div class="prof-head"><h3>Lab tests</h3><button type="button" class="primary-btn" data-open="labModal">＋ Add lab test</button></div>
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>TEST</th><th>ORDERED</th><th>STATUS</th><th>RESULT</th><th></th></tr></thead>
+      <tbody>
+      {% for l in labs %}
+        <tr>
+          <td><b>{{ l.display_name }}</b>{% if l.lab_panel %}<div class="patient-id">Panel</div>{% elif l.lab_test %}<div class="patient-id">{{ l.lab_test.get_category_display }}</div>{% endif %}{% if l.notes %}<div class="patient-id">{{ l.notes }}</div>{% endif %}</td>
+          <td>{{ l.ordered_on|date:"M j, Y" }}</td>
+          <td><span class="status {% if l.status == 'cancelled' %}hold{% elif l.status != 'resulted' %}scheduled{% endif %}">{{ l.get_status_display }}</span></td>
+          <td>{% if l.result_value %}<b {% if l.flag == 'high' or l.flag == 'low' or l.flag == 'critical' %}style="color:#b83b3b"{% endif %}>{{ l.result_value }} {{ l.result_unit }}</b>{% if l.flag %} <span class="hint">{{ l.get_flag_display }}</span>{% endif %}{% if l.reference_range %}<div class="patient-id">Range {{ l.reference_range }}</div>{% endif %}{% if l.resulted_on %}<div class="patient-id">{{ l.resulted_on|date:"M j, Y" }}</div>{% endif %}{% else %}—{% endif %}
+            {% if l.report %}<div><a class="page-lead" href="{% url 'profiles:lab-report' patient.pk l.pk %}" target="_blank">View report</a></div>{% endif %}</td>
+          <td class="prof-actions">
+            {% if l.status != 'cancelled' %}<button type="button" class="table-action" data-result="{% url 'profiles:lab-result' patient.pk l.pk %}" data-name="{{ l.display_name }}" data-value="{{ l.result_value }}" data-unit="{{ l.result_unit }}" data-range="{{ l.reference_range }}" data-flag="{{ l.flag }}">{% if l.status == 'resulted' %}Edit result{% else %}Enter result{% endif %}</button>{% endif %}
+            {% if l.status == 'advised' %}<form method="post" action="{% url 'profiles:lab-status' patient.pk l.pk %}">{% csrf_token %}<button class="table-action" name="status" value="booked">Mark booked</button></form>{% endif %}
+            {% if l.status == 'booked' %}<form method="post" action="{% url 'profiles:lab-status' patient.pk l.pk %}">{% csrf_token %}<button class="table-action" name="status" value="collected">Sample collected</button></form>{% endif %}
+            <form method="post" action="{% url 'profiles:delete' patient.pk 'labs' l.pk %}" onsubmit="return confirm('Remove this lab entry?')">{% csrf_token %}<button class="text-link" title="Remove">✕</button></form>
+          </td>
+        </tr>
+      {% empty %}
+        <tr><td colspan="5" class="prof-empty">No lab tests recorded. Add tests advised or done, then enter the results.</td></tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+{% endif %}
+</div>

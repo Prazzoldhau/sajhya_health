@@ -1,0 +1,9 @@
+{% comment %}Renders every visible field of a ModelForm as a labelled control (checkboxes become compact inline toggles).{% endcomment %}
+{% for field in form.visible_fields %}
+  {% if field.field.widget.input_type == 'checkbox' %}
+    <label class="chk-inline">{{ field }} {{ field.label }}</label>
+  {% else %}
+    <label>{{ field.label }}{% if field.field.required %} <i style="color:#d94b4b;font-style:normal">*</i>{% endif %} {{ field }}{% if field.help_text %}<span class="hint">{{ field.help_text }}</span>{% endif %}</label>
+  {% endif %}
+{% endfor %}
+{% for field in form.hidden_fields %}{{ field }}{% endfor %}

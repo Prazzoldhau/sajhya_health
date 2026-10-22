@@ -1,0 +1,50 @@
+{% extends 'marketplace/base.html' %}
+{% load static %}
+{% load marketplace_extras %}
+
+{% block title %}{{ test.name }} — Sajhya Lab Tests{% endblock %}
+{% block meta_description %}Book {{ test.name }} at Sajhya — NPR {{ test.price }}{% if test.turnaround_time %}, results in {{ test.turnaround_time }}{% endif %}.{% endblock %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="{{ 'css/marketplace-store.css'|plain_static }}">
+{% endblock %}
+
+{% block content %}
+<div class="store">
+
+    {% include 'lab/_lab_header.html' %}
+
+    <div class="store-wrap">
+
+        <div class="store-breadcrumb">
+            <a href="{% url 'lab:tests' %}">Lab Tests</a>
+            <span>›</span>
+            <span>{{ test.name }}</span>
+        </div>
+
+        <div class="store-lab-single-col">
+            <span class="store-detail-cat">{{ test.get_category_display }}</span>
+
+            <h1 class="store-detail-title">{{ test.name }}</h1>
+
+            <div class="store-detail-price">NPR {{ test.price }}</div>
+
+            <div class="store-lab-meta">
+                {% if test.sample_type %}<div><strong>Sample</strong><span>{{ test.sample_type }}</span></div>{% endif %}
+                {% if test.prep_instructions %}<div><strong>Preparation</strong><span>{{ test.prep_instructions }}</span></div>{% endif %}
+                {% if test.turnaround_time %}<div><strong>Results in</strong><span>{{ test.turnaround_time }}</span></div>{% endif %}
+            </div>
+
+            <div class="store-detail-actions">
+                <a href="{% url 'lab:tests' %}?add=test-{{ test.id }}#request" class="store-btn-primary">
+                    Select This Test →
+                </a>
+                <a href="{% url 'lab:tests' %}" class="store-btn-outline">
+                    Browse More Tests
+                </a>
+            </div>
+        </div>
+
+    </div>
+</div>
+{% endblock %}

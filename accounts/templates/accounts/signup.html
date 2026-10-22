@@ -1,0 +1,14 @@
+{% extends 'accounts/base.html' %}
+{% block title %}Sign up - Sajhya Health{% endblock %}
+{% block content %}
+<div class="text-center mb-4">
+    <h1 class="fw-bold page-title">Create your {{ account_type }} account</h1>
+    {% if subtype %}<p class="lead page-lead">{{ subtype.name|capfirst }}</p>{% endif %}
+</div>
+<form method="post" enctype="multipart/form-data" class="form-panel">
+    {% csrf_token %}
+    {{ form.as_p }}
+    <button type="submit" class="btn btn-gradient">Create Account</button>
+    <p class="text-center mt-3 mb-0"><a href="{% url 'accounts:package' %}" class="page-lead">&larr; Change account type</a></p>
+</form>
+{% endblock %}

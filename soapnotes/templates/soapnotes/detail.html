@@ -1,0 +1,83 @@
+{% extends 'accounts/pro_base.html' %}
+{% block title %}SOAP note | Sajhya Health{% endblock %}
+{% block extra_css %}
+{% include 'soapnotes/_styles.html' %}
+{% endblock %}
+{% block main %}
+<div class="sn-wrap sn-read">
+<p class="no-print" style="margin:0 0 4px"><a class="text-link" href="{{ tab_url }}" style="text-decoration:none">← {{ patient.name }}</a></p>
+<div class="sn-head">
+  <h1 style="font-size:20px;margin:0">SOAP note · {{ note.get_note_type_display }}</h1>
+  <span class="sn-tag {% if not note.is_final %}draft{% endif %}">{{ note.get_status_display }}</span>
+  <span class="hint">{{ patient.name }} ({{ patient.patient_code }}) · {{ note.note_date|date:"F j, Y" }} · {{ note.author_name }}</span>
+  <span class="no-print" style="margin-left:auto;display:flex;gap:8px;flex-wrap:wrap">
+    <a class="primary-btn" href="{% url 'accounts:plan-new' patient.pk %}?from_soap={{ note.pk }}" style="text-decoration:none;display:inline-flex;align-items:center">▤ Create treatment plan from this note</a>
+    {% if not note.is_final and is_author %}<a class="secondary-btn" href="{% url 'soapnotes:edit' note.pk %}" style="text-decoration:none;display:inline-flex;align-items:center">Edit draft</a>{% endif %}
+    <button type="button" class="secondary-btn" onclick="window.print()">Print</button>
+  </span>
+</div>
+{% if note.finalized_at %}<p class="hint">Finalised {{ note.finalized_at|date:"M j, Y H:i" }} - locked; changes are recorded as addenda below.</p>{% endif %}
+
+<section class="sn-sec"><header><span class="letter">S</span><h3>Subjective</h3></header><div class="sn-body">
+  {% if note.chief_complaint %}<div><h4>Chief complaint</h4><p>{{ note.chief_complaint }}</p></div>{% endif %}
+  {% if note.mechanism %}<div><h4>Onset / mechanism</h4><p>{{ note.mechanism }}</p></div>{% endif %}
+  {% if note.pain_now != None or note.pain_best != None or note.pain_worst != None or note.pain_location or note.pain_character %}
+  <div><h4>Pain</h4><p>{% if note.pain_now != None %}Now <b>{{ note.pain_now }}/10</b>{% endif %}{% if note.pain_best != None %} · best {{ note.pain_best }}/10{% endif %}{% if note.pain_worst != None %} · worst {{ note.pain_worst }}/10{% endif %}{% if note.pain_location %} · {{ note.pain_location }}{% endif %}{% if note.pain_character %} · {{ note.pain_character }}{% endif %}</p></div>{% endif %}
+  {% if note.history %}<div><h4>History of present condition</h4><p>{{ note.history }}</p></div>{% endif %}
+  {% if note.aggravating or note.easing or note.pattern_24h %}<div><h4>Behaviour of symptoms</h4><p>{% if note.aggravating %}Aggravating: {{ note.aggravating }}. {% endif %}{% if note.easing %}Easing: {{ note.easing }}. {% endif %}{% if note.pattern_24h %}24-hour: {{ note.pattern_24h }}.{% endif %}</p></div>{% endif %}
+  {% if flag_labels %}<div><h4>Red flags present</h4><p>{% for f in flag_labels %}<span class="sn-tag bad">{{ f }}</span> {% endfor %}</p></div>{% else %}<div><h4>Red flags</h4><p class="hint">None ticked.</p></div>{% endif %}
+  {% if note.medical_history %}<div><h4>Medical history / medications</h4><p>{{ note.medical_history }}</p></div>{% endif %}
+  {% if note.functional_limits %}<div><h4>Functional limitations</h4><p>{{ note.functional_limits }}</p></div>{% endif %}
+  {% if note.patient_goals %}<div><h4>Patient's goals</h4><p>{{ note.patient_goals }}</p></div>{% endif %}
+</div></section>
+
+<section class="sn-sec"><header><span class="letter">O</span><h3>Objective</h3></header><div class="sn-body">
+  {% if note.observation %}<div><h4>Observation / posture</h4><p>{{ note.observation }}</p></div>{% endif %}
+  {% if note.palpation %}<div><h4>Palpation</h4><p>{{ note.palpation }}</p></div>{% endif %}
+  {% if note.vitals %}<div><h4>Vitals</h4><p>{{ note.vitals }}</p></div>{% endif %}
+  {% if note.rom %}<div><h4>Range of motion</h4><table><thead><tr><th>Movement</th><th>Side</th><th>Active</th><th>Passive</th><th>Pain</th><th>Note</th></tr></thead><tbody>
+    {% for r in note.rom %}<tr><td>{{ r.movement }}</td><td>{{ r.side }}</td><td>{{ r.active }}</td><td>{{ r.passive }}</td><td>{% if r.pain %}Yes{% endif %}</td><td>{{ r.note }}</td></tr>{% endfor %}</tbody></table></div>{% endif %}
+  {% if note.strength %}<div><h4>Muscle strength (MMT)</h4><table><thead><tr><th>Muscle</th><th>Side</th><th>Grade</th></tr></thead><tbody>
+    {% for r in note.strength %}<tr><td>{{ r.muscle }}</td><td>{{ r.side }}</td><td><b>{{ r.grade }}</b></td></tr>{% endfor %}</tbody></table></div>{% endif %}
+  {% if note.neuro %}<div><h4>Neurological screen</h4><p>{{ note.neuro }}</p></div>{% endif %}
+  {% if note.special_tests %}<div><h4>Special tests</h4><table><thead><tr><th>Test</th><th>Result</th><th>Note</th></tr></thead><tbody>
+    {% for r in note.special_tests %}<tr><td>{{ r.name }}</td><td>{% if r.result == 'positive' %}<span class="sn-tag warn">positive</span>{% else %}{{ r.result }}{% endif %}</td><td>{{ r.note }}</td></tr>{% endfor %}</tbody></table></div>{% endif %}
+  {% if note.gait_function %}<div><h4>Gait, balance, function</h4><p>{{ note.gait_function }}</p></div>{% endif %}
+</div></section>
+
+<section class="sn-sec"><header><span class="letter">A</span><h3>Assessment</h3></header><div class="sn-body">
+  {% if note.impression %}<div><h4>Clinical impression</h4><p>{{ note.impression }}{% if note.icd10_code %} <span class="sn-tag">{{ note.icd10_code }}</span>{% endif %}</p></div>{% endif %}
+  {% if note.stage or note.irritability or note.prognosis %}<div><h4>Status</h4><p>{% if note.stage %}Stage: {{ note.get_stage_display }}. {% endif %}{% if note.irritability %}Irritability: {{ note.get_irritability_display }}. {% endif %}{% if note.prognosis %}Prognosis: {{ note.get_prognosis_display }}.{% endif %}</p></div>{% endif %}
+  {% if note.problem_list %}<div><h4>Problem list</h4><p>{{ note.problem_list }}</p></div>{% endif %}
+  {% if note.contributing %}<div><h4>Contributing factors</h4><p>{{ note.contributing }}</p></div>{% endif %}
+</div></section>
+
+<section class="sn-sec"><header><span class="letter">P</span><h3>Plan</h3></header><div class="sn-body">
+  {% if note.treatment_today %}<div><h4>Treatment given today</h4><p>{{ note.treatment_today }}</p></div>{% endif %}
+  {% if note.measures %}<div><h4>Baseline metrics</h4><table><thead><tr><th>Measure</th><th>Baseline / now</th><th>Target</th></tr></thead><tbody>
+    {% for m in note.measures %}<tr><td>{{ m.name }}</td><td><b>{{ m.baseline|default:"-" }}</b> {{ m.unit }}</td><td>{{ m.target|default:"-" }} {{ m.unit }}</td></tr>{% endfor %}</tbody></table></div>{% endif %}
+  {% if note.goals %}<div><h4>Clinical goals</h4><table><thead><tr><th>Goal</th><th>Term</th><th>Target date</th></tr></thead><tbody>
+    {% for g in note.goals %}<tr><td>{{ g.text }}</td><td>{% if g.term == 'long' %}Long-term{% else %}Short-term{% endif %}</td><td>{{ g.target_date|default:"-" }}</td></tr>{% endfor %}</tbody></table></div>{% endif %}
+  {% if note.frequency_per_week or note.duration_weeks or note.next_review %}<div><h4>Frequency and review</h4><p>{% if note.frequency_per_week %}{{ note.frequency_per_week }} session{{ note.frequency_per_week|pluralize }} per week{% endif %}{% if note.duration_weeks %} for {{ note.duration_weeks }} week{{ note.duration_weeks|pluralize }}{% endif %}{% if note.next_review %} · next review {{ note.next_review|date:"M j, Y" }}{% endif %}</p></div>{% endif %}
+  {% if note.hep %}<div><h4>Home exercise programme</h4><p>{{ note.hep }}</p></div>{% endif %}
+  {% if note.education %}<div><h4>Education and advice</h4><p>{{ note.education }}</p></div>{% endif %}
+  {% if note.precautions %}<div><h4>Precautions</h4><p>{{ note.precautions }}</p></div>{% endif %}
+  {% if note.referral %}<div><h4>Referral</h4><p>{{ note.referral }}</p></div>{% endif %}
+</div></section>
+
+{% if addenda or note.is_final %}
+<section class="sn-sec"><header><h3>Addenda</h3></header><div class="sn-body">
+  {% for a in addenda %}<div><p>{{ a.text }}</p><span class="hint">{{ a.author_name }} · {{ a.created_at|date:"M j, Y H:i" }}</span></div>{% empty %}<p class="hint">None.</p>{% endfor %}
+  {% if note.is_final %}
+  <form method="post" action="{% url 'soapnotes:addendum' note.pk %}" class="no-print" style="display:grid;gap:8px">{% csrf_token %}
+    <label class="sn-f">Add an addendum (dated and signed automatically)<textarea name="text" required></textarea></label>
+    <button class="secondary-btn" type="submit" style="width:fit-content">Add addendum</button>
+  </form>{% endif %}
+</div></section>
+{% endif %}
+
+{% if not note.is_final and is_author %}
+<form method="post" action="{% url 'soapnotes:delete' note.pk %}" class="no-print" onsubmit="return confirm('Delete this draft?')">{% csrf_token %}<button class="text-link" type="submit">Delete draft</button></form>
+{% endif %}
+</div>
+{% endblock %}

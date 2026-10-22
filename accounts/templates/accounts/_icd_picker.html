@@ -1,0 +1,17 @@
+<script>
+  // ICD-10 lookup for the Diagnosis / ICD-10 fields: type in either box, pick a row, both fill in.
+  (function () {
+    var dx = document.getElementById('id_diagnosis'), code = document.getElementById('id_icd10_code');
+    if (!dx || !code || !window.SajhyaUI) return;
+    var url = "{% url 'accounts:icd10-search' %}";
+    var opts = {
+      url: url,
+      render: function (r) { return '<b>' + SajhyaUI.esc(r.code) + '</b> ' + SajhyaUI.esc(r.title); },
+      onPick: function (r) { dx.value = r.title; code.value = r.code; },
+    };
+    SajhyaUI.picker(dx, opts);
+    SajhyaUI.picker(code, opts);
+    dx.placeholder = 'Search a diagnosis, e.g. low back pain';
+    code.placeholder = 'Search a code, e.g. M54';
+  })();
+</script>

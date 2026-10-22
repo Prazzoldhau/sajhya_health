@@ -1,0 +1,105 @@
+{% extends 'accounts/pro_base.html' %}
+{% load accounts_ui %}
+{% block main %}
+      {% if clinic_invites %}
+      <div class="notice-bar" style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;background:#fff8e6;border:1px solid #f0d58a;color:#7a5a10;border-radius:10px;padding:10px 14px;margin-bottom:12px">
+        <b>You have {{ clinic_invites }} clinic invitation{{ clinic_invites|pluralize }}.</b> Review and accept {{ clinic_invites|pluralize:"it,them" }} to join the team.
+        <a class="primary-btn" href="{% url 'clinics:hub' %}" style="margin-left:auto;text-decoration:none;display:inline-flex;align-items:center;height:32px">Open Clinic Connect</a>
+      </div>
+      {% endif %}
+      <div class="page-heading">
+        <div><h1>Dashboard</h1><p class="subtitle">Welcome, {{ first_name }}. Here's your practice overview.</p></div>
+        <div class="heading-actions">
+          <span class="filter" style="display:inline-flex;align-items:center">Today, {% now "M j, Y" %}</span>
+          <a class="primary-btn" href="{% url 'accounts:appointments' %}?new=1" style="text-decoration:none;display:inline-flex;align-items:center">＋ New Appointment</a>
+        </div>
+      </div>
+
+
+      <section class="metrics" aria-label="Clinic summary">
+        <article class="metric"><div class="metric-top"><div class="metric-icon">▦</div><div><div class="metric-label">Today's Appointments</div><div class="metric-value">{{ stats.today_appointments }}</div></div></div><div class="metric-note">{{ stats.week_appointments }} in the next 7 days</div></article>
+        <article class="metric"><div class="metric-top"><div class="metric-icon">♙</div><div><div class="metric-label">Patients to Treat</div><div class="metric-value">{{ stats.active }}</div></div></div><div class="metric-note">of {{ stats.total }} total patients</div></article>
+        <article class="metric"><div class="metric-top"><div class="metric-icon">◷</div><div><div class="metric-label">Follow-ups Due</div><div class="metric-value">{{ stats.followups_due }}</div></div></div><div class="metric-note" style="color:#b78317">{% if stats.followups_due %}Needs attention{% else %}All caught up{% endif %}</div></article>
+        <article class="metric"><div class="metric-top"><div class="metric-icon">▤</div><div><div class="metric-label">Revenue Today</div><div class="metric-value" style="font-size:22px">NPR {{ stats.revenue_today }}</div></div></div><div class="metric-note"><a href="{% url 'billing:billing' %}" style="color:inherit">View billing →</a></div></article>
+      </section>
+
+      <div class="content-grid">
+        <div class="left-col">
+          <section class="panel">
+            <div class="panel-header"><div class="panel-title"><span class="small-icon">▦</span>Upcoming Appointments</div><a class="text-link" href="{% url 'accounts:appointments' %}" style="text-decoration:none">View all →</a></div>
+            <div class="table-wrap"><table id="scheduleTable">
+              <thead><tr><th>WHEN</th><th>PATIENT</th><th>TREATMENT FOCUS</th><th>STATUS</th><th>ACTION</th></tr></thead>
+              <tbody>
+              {% for a in upcoming %}
+                <tr>
+                  <td>{{ a.start|date:"M j, g:i A" }}</td>
+                  <td>{% patient_cell a.patient link=False %}</td>
+                  <td>{{ a.patient.diagnosis|default:"—" }}</td>
+                  <td>{% if a.start|date:"Y-m-d" == today|date:"Y-m-d" %}<span class="status">● Today</span>{% else %}<span class="status scheduled">○ Scheduled</span>{% endif %}</td>
+                  <td><a class="table-action" href="{% url 'accounts:patient-detail' a.patient.pk %}" style="text-decoration:none">View</a></td>
+                </tr>
+              {% empty %}
+                <tr><td colspan="5" style="padding:22px;text-align:center;color:var(--muted)">No upcoming appointments. Book a visit from a patient's page.</td></tr>
+              {% endfor %}
+              </tbody>
+            </table></div>
+          </section>
+
+          <section class="panel">
+            <div class="panel-header"><div class="panel-title"><span class="small-icon">♙</span>Recent Patients</div><a class="text-link" href="{% url 'accounts:patients' %}" style="text-decoration:none">View all →</a></div>
+            <div class="table-wrap"><table id="recentTable">
+              <thead><tr><th>NAME</th><th>PATIENT ID</th><th>LAST VISIT</th><th>CONDITION</th><th>STATUS</th><th></th></tr></thead>
+              <tbody>
+              {% for p in recent %}
+                <tr>
+                  <td>{% patient_cell p sub="" link=False %}</td>
+                  <td>{{ p.patient_code }}</td>
+                  <td>{{ p.last_visit|date:"Y-m-d"|default:"—" }}</td>
+                  <td>{{ p.diagnosis|default:"—" }}</td>
+                  <td><span class="status {% if p.status == 'on_hold' %}hold{% elif p.status == 'discharged' %}scheduled{% endif %}">● {{ p.get_status_display }}</span></td>
+                  <td><a class="text-link" href="{% url 'accounts:patient-detail' p.pk %}" style="text-decoration:none">View</a></td>
+                </tr>
+              {% empty %}
+                <tr><td colspan="6" style="padding:22px;text-align:center;color:var(--muted)">{% if stats.total %}No recent patients yet.{% else %}No patients yet. Use <strong>Add Patient</strong> to register your first one.{% endif %}</td></tr>
+              {% endfor %}
+              </tbody>
+            </table></div>
+          </section>
+        </div>
+
+        <div class="right-col">
+          <section class="panel">
+            <div class="panel-header"><div class="panel-title"><span class="small-icon">✦</span>Quick Actions</div></div>
+            <div class="quick-grid">
+              <button class="quick-action" onclick="location.href='{% url 'accounts:patients' %}?add=1'"><span class="qa-icon">♙+</span><strong>Add Patient</strong><span>Register a new patient</span></button>
+              <button class="quick-action" onclick="notify('Assessments are not connected yet.')"><span class="qa-icon">▤</span><strong>New Assessment</strong><span>Start assessment</span></button>
+              <button class="quick-action" onclick="location.href='{% url 'accounts:plans' %}'"><span class="qa-icon">▦</span><strong>Create Treatment Plan</strong><span>Set up rehab plan</span></button>
+              <button class="quick-action" onclick="location.href='{% url 'billing:billing' %}?new=1'"><span class="qa-icon">▣</span><strong>Record Payment</strong><span>Receive payment</span></button>
+            </div>
+          </section>
+
+          <section class="panel">
+            <div class="panel-header"><div class="panel-title"><span class="small-icon">♧</span>Follow-up Reminders</div><span class="patient-id">Not seen in 14+ days</span></div>
+            <div class="reminder-list">
+              {% for p in reminders %}
+              <a class="reminder" href="{% url 'accounts:patient-detail' p.pk %}" style="text-decoration:none;color:inherit">{% patient_avatar p %}<div class="reminder-main"><div class="reminder-name">{{ p.name }}</div><div class="reminder-desc">{{ p.diagnosis|default:"Follow-up" }} · {% if p.last_visit %}last seen {{ p.last_visit|date:"M j" }}{% else %}no visits yet{% endif %}</div></div><div class="reminder-date">View <span>›</span></div></a>
+              {% empty %}
+              <div class="reminder"><div class="reminder-main"><div class="reminder-desc">No follow-ups due. Nice work.</div></div></div>
+              {% endfor %}
+            </div>
+          </section>
+
+          <section class="panel">
+            <div class="panel-header"><div class="panel-title"><span class="small-icon">▥</span>Weekly Visits</div><span class="patient-id">Last 7 days</span></div>
+            <div class="chart-area">
+              <div class="chart" aria-label="Weekly visits bar chart">
+                {% for d in chart %}
+                <div class="bar-wrap" title="{{ d.count }} visit{{ d.count|pluralize }}"><div class="bar" style="height:{{ d.height }}%"></div><div class="bar-label">{{ d.label }}</div></div>
+                {% endfor %}
+              </div>
+              <div class="chart-summary"><span>Total visits this week</span><strong>{{ stats.visits_week }}</strong></div>
+            </div>
+          </section>
+        </div>
+      </div>
+{% endblock %}

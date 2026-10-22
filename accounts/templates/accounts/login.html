@@ -1,0 +1,31 @@
+{% extends 'accounts/auth_base.html' %}
+{% block title %}Sign in - Sajhya Health{% endblock %}
+{% block card %}
+<h1>Welcome back</h1>
+<p class="auth-sub">Sign in to your Sajhya Health workspace.</p>
+
+<form method="post" novalidate>
+    {% csrf_token %}
+    <input type="hidden" name="next" value="{{ next }}">
+
+    {% if form.non_field_errors %}
+    <div class="auth-alert error" role="alert"><i class="fa-solid fa-circle-exclamation" style="margin-top:2px"></i>
+        <div>{% for error in form.non_field_errors %}{{ error }}{% if not forloop.last %}<br>{% endif %}{% endfor %}</div></div>
+    {% endif %}
+
+    {% include 'accounts/_auth_field.html' with field=form.username icon='user' %}
+    {% include 'accounts/_auth_field.html' with field=form.password icon='lock' toggle=True %}
+
+    <button type="submit" class="btn-sj primary block"><i class="fa-solid fa-right-to-bracket"></i> Sign in</button>
+
+    <div class="forgot-row">
+        <a href="{% url 'accounts:password-reset' %}" class="btn-sj soft"><i class="fa-solid fa-key"></i> Forgot password?</a>
+    </div>
+
+    <div class="divider">New to Sajhya?</div>
+    <div class="btn-row">
+        <a href="{% url 'accounts:package' %}" class="btn-sj outline"><i class="fa-solid fa-rocket"></i> Get started</a>
+        <a href="{% url 'landing' %}" class="btn-sj ghost"><i class="fa-solid fa-house"></i> Home</a>
+    </div>
+</form>
+{% endblock %}

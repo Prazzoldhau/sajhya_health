@@ -1,0 +1,32 @@
+{% extends 'accounts/pro_base.html' %}
+{% block title %}Treatment Plans | Sajhya Health{% endblock %}
+{% block extra_css %}
+{% endblock %}
+{% block main %}
+<section class="panel">
+  <div class="panel-header"><div><h1 style="font-size:22px;margin:0 0 4px">Treatment Plans</h1><p class="subtitle">All treatment plans across your patients. Create a new plan from a patient's page.</p></div></div>
+  <div class="chipbar" style="padding:0 18px">
+    <a href="?" class="{% if not status %}on{% endif %}">All</a>
+    {% for value, label in status_choices %}<a href="?status={{ value }}" class="{% if status == value %}on{% endif %}">{{ label }}</a>{% endfor %}
+  </div>
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>PLAN</th><th>PATIENT</th><th>DIAGNOSIS</th><th>PROGRESS</th><th>STATUS</th><th></th></tr></thead>
+      <tbody>
+      {% for p in plans %}
+        <tr>
+          <td><b>{{ p.title }}</b><div class="patient-id">Started {{ p.start_date|date:"M j, Y" }}</div></td>
+          <td><a href="{% url 'accounts:patient-detail' p.patient.pk %}" style="color:inherit">{{ p.patient.name }}</a><div class="patient-id">{{ p.patient.patient_code }}</div></td>
+          <td>{{ p.diagnosis|default:"—" }}</td>
+          <td>{% if p.total_weeks %}Week {{ p.current_week }} of {{ p.total_weeks }}{% else %}—{% endif %}</td>
+          <td><span class="badge {{ p.status }}">{{ p.get_status_display }}</span></td>
+          <td><a class="table-action" href="{% url 'accounts:plan-detail' p.pk %}" style="text-decoration:none">Open</a></td>
+        </tr>
+      {% empty %}
+        <tr><td colspan="6" style="padding:26px;text-align:center;color:var(--muted)">No treatment plans yet. Open a patient and choose the <b>Treatment Plan</b> tab to create one.</td></tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</section>
+{% endblock %}

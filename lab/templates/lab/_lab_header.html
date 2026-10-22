@@ -1,0 +1,32 @@
+{% load marketplace_extras static %}
+<header class="store-header">
+    <div class="store-wrap store-header-row">
+        <a href="{% url 'landing' %}" class="store-logo">
+            <img src="{% static 'images/logo-64.png' %}" alt="Sajhya" width="32" height="32" style="border-radius:50%">
+            Sajhya
+        </a>
+
+        <nav class="store-nav">
+            <a href="{% url 'marketplace:marketplace' %}">Store</a>
+            <a href="{% url 'marketplace:pharmacy' %}">Pharmacy</a>
+            <a href="{% url 'lab:tests' %}" class="is-active">Lab Tests</a>
+        </nav>
+
+        <form class="store-search" method="GET" action="{% url 'lab:tests' %}">
+            <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <circle cx="11" cy="11" r="7" stroke="currentColor" stroke-width="2"/>
+                <path d="M21 21l-3.5-3.5" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+            </svg>
+            <input type="text" name="search" value="{{ search }}" placeholder="Search tests & panels...">
+        </form>
+
+        <div class="store-header-icons">
+            <a href="{% if user.is_authenticated %}{% url 'accounts:welcome' %}{% else %}{% url 'accounts:login' %}{% endif %}" class="store-icon-btn" title="Account">
+                <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <circle cx="12" cy="8" r="3.4" stroke="currentColor" stroke-width="1.8"/>
+                    <path d="M4.5 20c1.4-3.4 4.4-5.2 7.5-5.2s6.1 1.8 7.5 5.2" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
+                </svg>
+            </a>
+        </div>
+    </div>
+</header>

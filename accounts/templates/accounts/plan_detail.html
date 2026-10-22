@@ -1,0 +1,164 @@
+{% extends 'accounts/pro_base.html' %}
+{% block title %}{{ plan.title }} | Sajhya Health{% endblock %}
+{% block extra_css %}
+  .ph-top { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; flex-wrap: wrap; margin-bottom: 14px; }
+  .ph-top h1 { margin: 0 0 6px; }
+  .tools { display: flex; gap: 8px; flex-wrap: wrap; }
+  .tools form { margin: 0; }
+  .meters { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; margin-bottom: 14px; }
+  .meter { background: #fff; border: 1px solid var(--line); border-radius: 10px; padding: 14px 16px; }
+  .meter .k { font-size: 11px; color: var(--muted); }
+  .meter .v { font-size: 20px; font-weight: 800; margin: 4px 0 8px; }
+  .bar-track { height: 8px; background: #e8f1ec; border-radius: 6px; overflow: hidden; }
+  .bar-fill { height: 100%; background: linear-gradient(90deg, #52bd83, #168653); border-radius: 6px; }
+  .ctx { border: 1px solid #9fd5b5; background: #f4fbf6; border-radius: 10px; padding: 14px 18px; margin-bottom: 14px; display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px 16px; }
+  .ctx .k { font-size: 10px; text-transform: uppercase; letter-spacing: .6px; color: #7c9186; font-weight: 800; margin-bottom: 3px; }
+  .ctx .v { font-weight: 700; }
+  .ctx .wide { grid-column: span 2; }
+  .step-title { font-size: 16px; font-weight: 800; color: var(--green-dark); margin: 22px 0 10px; display: flex; align-items: center; gap: 8px; }
+  .step-title small { font-weight: 600; color: var(--muted); font-size: 12px; }
+  .sect { background: #fff; border: 1px solid var(--line); border-radius: 10px; padding: 6px 4px; margin-bottom: 12px; overflow-x: auto; }
+  .goal { display: flex; align-items: center; gap: 10px; padding: 9px 14px; border-bottom: 1px solid #edf2ee; }
+  .goal:last-child { border-bottom: 0; }
+  .goal form { margin: 0; }
+  .goal .chk { width: 22px; height: 22px; border-radius: 50%; border: 2px solid #7fa793; background: transparent; padding: 0; color: #fff; font-size: 12px; line-height: 1; cursor: pointer; }
+  .goal.done .chk { background: var(--green); border-color: var(--green); }
+  .goal.done .gt { text-decoration: line-through; opacity: .6; }
+  .goal .gm { margin-left: auto; font-size: 11px; color: var(--muted); white-space: nowrap; }
+  .log-form { display: flex; gap: 4px; margin: 0; }
+  .log-form input { width: 84px; height: 30px; border: 1px solid #dce8e0; border-radius: 6px; padding: 0 8px; font: inherit; font-size: 11px; }
+  .log-form input[type=date] { width: 122px; }
+  .log-form button { height: 30px; border: 0; background: var(--green); color: #fff; border-radius: 6px; padding: 0 10px; font-weight: 700; font-size: 11px; cursor: pointer; }
+  .phase { border: 1px solid #cfe6d8; border-radius: 10px; margin-bottom: 14px; overflow: hidden; background: #fff; }
+  .phase.is-current { border-color: var(--green); box-shadow: 0 0 0 2px #16865322; }
+  .phase.is-completed { opacity: .8; }
+  .phase-head { background: #2b6a4e; color: #fff; display: flex; align-items: center; gap: 14px; padding: 10px 14px; flex-wrap: wrap; }
+  .phase-head b { font-size: 14px; }
+  .phase-head .sp { margin-left: auto; display: flex; gap: 6px; }
+  .phase-head form { margin: 0; }
+  .phase-head button { border: 0; border-radius: 6px; height: 28px; padding: 0 10px; font-weight: 700; font-size: 11px; cursor: pointer; background: #ffffff2e; color: #fff; }
+  .phase-body { display: grid; grid-template-columns: 1fr 1fr; }
+  .phase-body > div { padding: 12px 16px; }
+  .phase-body > div + div { border-left: 1px solid #e4efe8; }
+  .phase-body h5 { font-size: 11px; text-transform: uppercase; letter-spacing: .5px; color: #5d7568; margin: 0 0 8px; }
+  .phase-body ul { margin: 0; padding-left: 18px; }
+  .phase-body li { margin-bottom: 4px; }
+  .phase-body li small { color: var(--muted); }
+  .phase-foot { padding: 8px 16px 12px; font-size: 12px; color: #426052; border-top: 1px solid #edf2ee; }
+  .precaution { border: 1px solid #f0c5c5; background: #fff3f3; border-radius: 10px; padding: 12px 16px; white-space: pre-line; }
+  .note-box { background: #fff; border: 1px solid var(--line); border-radius: 10px; padding: 12px 16px; white-space: pre-line; }
+  .foot-actions { display: flex; gap: 8px; flex-wrap: wrap; margin: 22px 0 40px; }
+  .foot-actions form { margin: 0; }
+  .print-only { display: none; }
+  @media print { .print-only { display: block; } .phase-head button, .log-form, .goal .chk { display: none !important; } }
+  @media (max-width: 900px) { .meters { grid-template-columns: 1fr; } .ctx { grid-template-columns: 1fr 1fr; } .phase-body { grid-template-columns: 1fr; } .phase-body > div + div { border-left: 0; border-top: 1px solid #e4efe8; } }
+{% endblock %}
+
+{% block main %}
+<a class="back-link no-print" href="{% url 'accounts:patient-detail' patient.pk %}?tab=plan">← Back to {{ patient.name }}</a>
+<div class="ph-top">
+  <div>
+    <h1>{{ plan.title }}</h1>
+    <span class="badge {{ plan.status }}">{{ plan.get_status_display }}</span>
+    <span class="patient-id" style="display:inline"> &nbsp;Started {{ plan.start_date|date:"M j, Y" }}{% if plan.published_at %} · Published {{ plan.published_at|date:"M j, Y" }}{% endif %}</span>
+  </div>
+  <div class="tools no-print">
+    {% if can_edit %}<a class="secondary-btn" href="{% url 'accounts:plan-edit' plan.pk %}" style="text-decoration:none;display:inline-flex;align-items:center">✎ Edit plan</a>{% endif %}
+    <button type="button" class="secondary-btn" onclick="window.print()">Print / Export to Patient</button>
+    {% if plan.status == 'draft' %}
+    <form method="post" action="{% url 'accounts:plan-action' plan.pk %}">{% csrf_token %}<button class="primary-btn" name="action" value="publish">Finalize &amp; Publish</button></form>
+    {% endif %}
+  </div>
+</div>
+
+<div class="ctx">
+  <div><div class="k">Patient</div><div class="v"><a href="{% url 'accounts:patient-detail' patient.pk %}" style="color:inherit">{{ patient.name }}</a></div></div>
+  <div><div class="k">Age / Gender</div><div class="v">{% if patient.age != None %}{{ patient.age }}{% else %}—{% endif %} / {{ patient.get_gender_display|default:"—" }}</div></div>
+  <div><div class="k">Case ID</div><div class="v">{{ patient.patient_code }}</div></div>
+  <div><div class="k">Onset date</div><div class="v">{{ plan.onset_date|date:"M j, Y"|default:"—" }}</div></div>
+  <div class="wide"><div class="k">Primary diagnosis</div><div class="v">{{ plan.diagnosis|default:"—" }}{% if plan.icd10_code %} (ICD-10 {{ plan.icd10_code }}){% endif %}</div></div>
+</div>
+
+<div class="meters">
+  <div class="meter"><div class="k">Plan timeline</div><div class="v">{% if current_week %}Week {{ current_week }} of {{ total_weeks }}{% elif plan.start_date > today %}Starts {{ plan.start_date|date:"M j" }}{% else %}{{ total_weeks }} weeks{% endif %}</div><div class="bar-track"><div class="bar-fill" style="width:{{ week_pct }}%"></div></div></div>
+  <div class="meter"><div class="k">Sessions attended</div><div class="v">{{ attended_sessions }} of {{ planned_sessions }}</div><div class="bar-track"><div class="bar-fill" style="width:{{ session_pct }}%"></div></div></div>
+  <div class="meter"><div class="k">Goals achieved</div><div class="v">{{ goals_done }} of {{ goals|length }}</div><div class="bar-track"><div class="bar-fill" style="width:{% if goals %}{% widthratio goals_done goals|length 100 %}{% else %}0{% endif %}%"></div></div></div>
+</div>
+
+<div class="step-title">Baseline Metrics &amp; Progress</div>
+<div class="sect">
+  <table>
+    <thead><tr><th>MEASURE</th><th>BASELINE</th><th>LATEST</th><th>TARGET</th><th style="min-width:160px">PROGRESS</th><th class="no-print">LOG READING</th></tr></thead>
+    <tbody>
+    {% for m in measures %}
+      <tr>
+        <td><b>{{ m.name }}</b></td>
+        <td>{{ m.baseline|default_if_none:"—" }}{% if m.baseline != None %} {{ m.unit }}{% endif %}</td>
+        <td><b>{{ m.latest|default_if_none:"—" }}</b>{% if m.latest != None %} {{ m.unit }}{% endif %}</td>
+        <td>{{ m.target|default_if_none:"—" }}{% if m.target != None %} {{ m.unit }}{% endif %}</td>
+        <td>{% if m.progress_pct != None %}<div class="bar-track"><div class="bar-fill" style="width:{{ m.progress_pct }}%"></div></div><span class="patient-id">{{ m.progress_pct }}% to target</span>{% else %}<span class="patient-id">Set a baseline and target to track</span>{% endif %}</td>
+        <td class="no-print"><form method="post" action="{% url 'accounts:plan-action' plan.pk %}" class="log-form">{% csrf_token %}<input type="hidden" name="action" value="log_reading"><input type="hidden" name="measure" value="{{ m.pk }}"><input type="number" step="any" name="value" placeholder="Value" required><input type="date" name="date" value="{{ today|date:'Y-m-d' }}"><button type="submit">Log</button></form></td>
+      </tr>
+      {% if m.readings.all %}<tr><td colspan="6" style="padding:0 9px 10px;color:var(--muted);font-size:10px">History: {% for r in m.readings.all %}{{ r.date|date:"M j" }}: <b>{{ r.value }}</b>{% if not forloop.last %} → {% endif %}{% endfor %}</td></tr>{% endif %}
+    {% empty %}
+      <tr><td colspan="6" style="padding:18px;text-align:center;color:var(--muted)">No baseline metrics recorded. Edit the plan to add pain scores, ROM or strength measures.</td></tr>
+    {% endfor %}
+    </tbody>
+  </table>
+</div>
+
+<div class="step-title">Goals</div>
+<div class="sect">
+  {% for g in goals %}
+  <div class="goal {% if g.achieved %}done{% endif %}">
+    <form method="post" action="{% url 'accounts:plan-action' plan.pk %}">{% csrf_token %}<input type="hidden" name="action" value="goal_toggle"><input type="hidden" name="goal" value="{{ g.pk }}"><button type="submit" class="chk" aria-label="Toggle achieved">{% if g.achieved %}✓{% endif %}</button></form>
+    <span class="gt">{{ g.text }}</span>
+    <span class="gm">{{ g.get_term_display }}{% if g.target_date %} · by {{ g.target_date|date:"M j, Y" }}{% endif %}</span>
+  </div>
+  {% empty %}
+  <div style="padding:16px;text-align:center;color:var(--muted)">No goals set yet.</div>
+  {% endfor %}
+</div>
+
+<div class="step-title">Interventions &amp; Plan Breakdown <small>{{ phases|length }} phase{{ phases|length|pluralize }}</small></div>
+{% for ph in phases %}
+<div class="phase is-{{ ph.status }}">
+  <div class="phase-head">
+    <b>{{ ph.name }}</b><span>{{ ph.weeks_label }}</span>
+    <span>{{ ph.frequency_per_week }}× per week{% if ph.frequency_note %} <i>({{ ph.frequency_note }})</i>{% endif %}</span>
+    <span class="badge {{ ph.status }}">{{ ph.get_status_display }}</span>
+    {% if plan.status == 'active' %}
+    <div class="sp no-print">
+      <form method="post" action="{% url 'accounts:plan-action' plan.pk %}">{% csrf_token %}<input type="hidden" name="action" value="phase_status"><input type="hidden" name="phase" value="{{ ph.pk }}">
+        {% if ph.status != 'current' %}<button name="status" value="current">{% if ph.status == 'completed' %}Reopen{% else %}Start phase{% endif %}</button>{% endif %}
+        {% if ph.status != 'completed' %}<button name="status" value="completed">Mark complete</button>{% endif %}
+      </form>
+    </div>
+    {% endif %}
+  </div>
+  <div class="phase-body">
+    <div><h5>Clinical interventions (in-clinic)</h5>{% if ph.clinic_items %}<ul>{% for i in ph.clinic_items %}<li>{{ i.text }}</li>{% endfor %}</ul>{% else %}<span class="patient-id">None listed</span>{% endif %}</div>
+    <div><h5>Home exercise program (HEP)</h5>{% if ph.hep_items %}<ul>{% for i in ph.hep_items %}<li>{{ i.text }}{% if i.dosage %} <small>({{ i.dosage }})</small>{% endif %}</li>{% endfor %}</ul>{% else %}<span class="patient-id">None listed</span>{% endif %}</div>
+  </div>
+  {% if ph.goal %}<div class="phase-foot"><b>Progress when:</b> {{ ph.goal }}</div>{% endif %}
+</div>
+{% empty %}
+<div class="sect" style="padding:18px;text-align:center;color:var(--muted)">No phases yet.</div>
+{% endfor %}
+
+{% if plan.precautions %}<div class="step-title">Precautions / Contraindications</div><div class="precaution">{{ plan.precautions }}</div>{% endif %}
+{% if plan.education %}<div class="step-title">Patient education &amp; notes</div><div class="note-box">{{ plan.education }}</div>{% endif %}
+
+<div class="foot-actions no-print">
+  <form method="post" action="{% url 'accounts:plan-action' plan.pk %}">{% csrf_token %}
+    {% if plan.status == 'active' %}
+      <button class="primary-btn" name="action" value="complete">Mark plan completed</button>
+      <button class="secondary-btn" name="action" value="discontinue" onclick="return confirm('Discontinue this plan?')">Discontinue</button>
+    {% elif plan.status == 'completed' or plan.status == 'discontinued' %}
+      <button class="secondary-btn" name="action" value="reopen">Reopen plan</button>
+    {% elif plan.status == 'draft' %}
+      <button class="secondary-btn" name="action" value="delete" onclick="return confirm('Delete this draft?')">Delete draft</button>
+    {% endif %}
+  </form>
+</div>
+{% endblock %}

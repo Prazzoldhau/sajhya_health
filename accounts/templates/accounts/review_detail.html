@@ -1,0 +1,47 @@
+{% extends 'accounts/base.html' %}
+{% block title %}Review {{ profile.full_name }} - Sajhya Health{% endblock %}
+{% block content %}
+<div class="text-center mb-4">
+    <h1 class="fw-bold page-title">{{ profile.full_name }}, {{ profile.title }}</h1>
+    <p class="page-lead">{{ profile.account.profession|default:"Professional" }} &middot; {{ profile.get_status_display }}</p>
+</div>
+{% if messages %}{% for m in messages %}<div class="alert alert-danger">{{ m }}</div>{% endfor %}{% endif %}
+<div class="form-panel" style="max-width:720px">
+    <h5>Contact</h5>
+    <p>{{ profile.account.user.email }} &middot; {{ profile.mobile }} &middot; username <code>{{ profile.account.user.username }}</code></p>
+
+    <h5>Licensing</h5>
+    <p>Number: <strong>{{ profile.license_number|default:"-" }}</strong><br>
+       Issuing authority: {{ profile.issuing_authority|default:"-" }}<br>
+       Expiry: {{ profile.license_expiry|default:"-" }}<br>
+       NPI: {{ profile.npi|default:"-" }}</p>
+
+    <h5>Documents</h5>
+    <ul>
+        {% if profile.id_document %}<li><a href="{% url 'accounts:professional-document-staff' profile.pk 'id_document' %}" target="_blank">Government ID</a></li>{% endif %}
+        {% if profile.license_document %}<li><a href="{% url 'accounts:professional-document-staff' profile.pk 'license_document' %}" target="_blank">Licence proof</a></li>{% endif %}
+        {% if profile.indemnity_document %}<li><a href="{% url 'accounts:professional-document-staff' profile.pk 'indemnity_document' %}" target="_blank">Indemnity insurance</a> -- policy {{ profile.indemnity_policy_number }}, expires {{ profile.indemnity_expiry }}</li>{% endif %}
+        {% if profile.degree_document %}<li><a href="{% url 'accounts:professional-document-staff' profile.pk 'degree_document' %}" target="_blank">Degrees / certifications</a></li>{% endif %}
+    </ul>
+
+    <h5>Practice</h5>
+    <p>{{ profile.years_experience|default:"-" }} years<br>
+       Focus: {% for f in profile.focus_areas.all %}{{ f }}{% if not forloop.last %}, {% endif %}{% empty %}-{% endfor %}<br>
+       Services: {% for s in profile.services.all %}{{ s }}{% if not forloop.last %}, {% endif %}{% empty %}-{% endfor %}</p>
+
+    {% if profile.reviewed_at %}
+    <p class="text-muted">Last reviewed {{ profile.reviewed_at|date:"d M Y H:i" }}{% if profile.reviewed_by %} by {{ profile.reviewed_by.username }}{% endif %}.{% if profile.rejection_reason %} Reason: {{ profile.rejection_reason }}{% endif %}</p>
+    {% endif %}
+
+    <form method="post">
+        {% csrf_token %}
+        <label for="reason">Reason (required when rejecting; shown to the applicant)</label>
+        <textarea name="reason" id="reason" rows="3" class="form-control mb-3"></textarea>
+        <div class="d-flex gap-2">
+            <button type="submit" name="decision" value="approve" class="btn btn-gradient">Approve</button>
+            <button type="submit" name="decision" value="reject" class="btn btn-outline-success w-100">Reject</button>
+        </div>
+    </form>
+    <p class="text-center mt-3 mb-0"><a href="{% url 'accounts:review-list' %}" class="page-lead">&larr; All applications</a></p>
+</div>
+{% endblock %}

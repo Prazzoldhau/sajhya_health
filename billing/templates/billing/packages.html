@@ -1,0 +1,117 @@
+{% extends 'accounts/pro_base.html' %}
+{% block title %}Packages | Sajhya Health{% endblock %}
+{% block extra_css %}
+  .pk-head { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; margin-bottom: 14px; }
+  .pk-head h1 { margin: 0 10px 0 0; font-size: 24px; }
+  .pk { background: #fff; border: 1px solid var(--line); border-radius: 12px; margin-bottom: 14px; overflow: hidden; }
+  .pk-top { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; padding: 12px 16px; background: #f6faf7; }
+  .pk-top .who { font-weight: 800; font-size: 14px; } .pk-top .who a { color: inherit; text-decoration: none; }
+  .pk-top .acts { margin-left: auto; display: flex; gap: 6px; } .pk-top form { margin: 0; }
+  .pk-grid { display: grid; grid-template-columns: 1.4fr 1fr 1fr 1fr; gap: 14px; padding: 14px 16px; }
+  .pk-grid .l { font-size: 10px; text-transform: uppercase; letter-spacing: .5px; color: #7c9186; font-weight: 800; margin-bottom: 4px; }
+  .bar-t { height: 8px; background: #e8f1ec; border-radius: 5px; margin-top: 7px; } .bar-f { height: 100%; background: linear-gradient(90deg, #52bd83, #168653); border-radius: 5px; }
+  .pk-foot { padding: 0 16px 12px; font-size: 11px; color: var(--muted); }
+  .st { display: inline-block; padding: 4px 10px; border-radius: 12px; font-size: 10px; font-weight: 800; background: #e7f7ed; color: #16834f; }
+  .st.completed { background: #edf2ff; color: #526fc0; } .st.expired { background: #fff3d6; color: #a97510; } .st.cancelled { background: #fde8e8; color: #b83b3b; }
+  @media (max-width: 800px) { .kpis { grid-template-columns: 1fr 1fr; } .pk-grid { grid-template-columns: 1fr 1fr; } }
+{% endblock %}
+
+{% block main %}
+{% include 'billing/_tabs.html' %}
+<div class="pk-head">
+  <h1>Packages</h1>
+  <button type="button" class="primary-btn" data-open="pkModal">＋ Start package</button>
+</div>
+
+<div class="kpis">
+  <div class="kpi"><div class="k">Active packages</div><div class="v">{{ active_count }}</div><div class="n">{{ sessions_left }} session{{ sessions_left|pluralize }} left in total</div></div>
+  <div class="kpi"><div class="k">Collected</div><div class="v">NPR {{ collected }}</div><div class="n">Across all packages</div></div>
+  <div class="kpi"><div class="k">Balance due</div><div class="v" style="color:#b78317">NPR {{ total_due }}</div><div class="n" style="color:#b78317">Still to collect</div></div>
+  <div class="kpi"><div class="k">Package options</div><div class="v" style="font-size:16px;line-height:1.4">1 · 2 · 3 · 4 weeks</div><div class="n">Each visit uses a session</div></div>
+</div>
+
+<div class="chipbar">
+  <a href="?" class="{% if not show %}on{% endif %}">All</a>
+  {% for f in filters %}<a href="?show={{ f }}" class="{% if show == f %}on{% endif %}">{{ f|capfirst }}{% if f == 'due' %} balance{% endif %}</a>{% endfor %}
+</div>
+
+{% for pk in packages %}
+<article class="pk">
+  <div class="pk-top">
+    <span class="who"><a href="{% url 'accounts:patient-detail' pk.patient.pk %}">{{ pk.patient.name }}</a> <span class="patient-id" style="display:inline">{{ pk.patient.patient_code }}</span></span>
+    <b>{{ pk.get_duration_display }} package</b>
+    <span class="patient-id" style="display:inline">{{ pk.start_date|date:"M j" }} – {{ pk.end_date|date:"M j, Y" }}</span>
+    <span class="st {{ pk.effective_status }}">{{ pk.effective_status_display }}</span>
+    <div class="acts no-print">
+      {% if not pk.is_fully_paid and pk.status != 'cancelled' %}<button type="button" class="table-action" data-pay="{% url 'billing:package-payment' pk.pk %}" data-due="{{ pk.amount_due }}" data-who="{{ pk.patient.name }}">Record payment</button>{% endif %}
+      {% if pk.status == 'active' %}<form method="post" action="{% url 'billing:package-cancel' pk.pk %}" onsubmit="return confirm('Cancel this package?')">{% csrf_token %}<button class="table-action" type="submit">Cancel</button></form>{% endif %}
+    </div>
+  </div>
+  <div class="pk-grid">
+    <div><div class="l">Sessions</div><b>{{ pk.sessions_used }} of {{ pk.total_sessions }} used</b> <span class="hint">· {{ pk.sessions_remaining }} left</span><div class="bar-t"><div class="bar-f" style="width:{{ pk.usage_pct }}%"></div></div></div>
+    <div><div class="l">Package price</div><b>NPR {{ pk.total_amount }}</b><div class="hint">≈ NPR {{ pk.per_session|floatformat:0 }} per session</div></div>
+    <div><div class="l">Paid</div><b style="color:#16834f">NPR {{ pk.amount_paid }}</b></div>
+    <div><div class="l">Balance due</div><b style="color:{% if pk.is_fully_paid %}#16834f{% else %}#b78317{% endif %}">{% if pk.is_fully_paid %}Fully paid{% else %}NPR {{ pk.amount_due }}{% endif %}</b></div>
+  </div>
+  {% if pk.payments.all or pk.notes %}<div class="pk-foot">{% if pk.notes %}{{ pk.notes }}{% endif %}{% if pk.payments.all %}{% if pk.notes %} · {% endif %}Payments: {% for pay in pk.payments.all %}{{ pay.created_at|date:"M j" }} NPR {{ pay.amount }} ({{ pay.get_payment_mode_display }}){% if not forloop.last %} · {% endif %}{% endfor %}{% endif %}</div>{% endif %}
+</article>
+{% empty %}
+<div class="panel" style="padding:36px;text-align:center;color:var(--muted)">{% if show %}No packages match this filter.{% else %}No packages yet. Click <b>Start package</b> to sell a patient a 1, 2, 3 or 4 week package with a set number of sessions.{% endif %}</div>
+{% endfor %}
+{% endblock %}
+
+{% block modals %}
+<div class="modal-backdrop" id="pkModal" role="dialog" aria-modal="true">
+  <div class="modal-card" style="max-width:480px">
+    <div class="modal-head"><h2>Start a package</h2><button type="button" class="modal-x" data-close aria-label="Close">×</button></div>
+    <form method="post" action="{% url 'billing:package-create' %}" class="mini-form" id="pkForm">
+      {% csrf_token %}
+      <label>Patient
+        <span style="position:relative;display:block">
+          <input type="search" id="pkSearch" placeholder="Search by name, phone or patient ID..." autocomplete="off">
+          {{ form.patient }}
+          <span class="hint" id="pkChosen" style="display:block;margin-top:4px"></span>
+        </span>
+      </label>
+      <div class="two"><label>Duration {{ form.duration }}</label><label>Number of sessions {{ form.total_sessions }}</label></div>
+      <div class="two"><label>Package price (NPR) {{ form.total_amount }}</label><label>Amount paid now {{ form.amount_paid_now }}</label></div>
+      <label>Start date {{ form.start_date }}</label>
+      <label>Notes {{ form.notes }}</label>
+      <div class="pf-actions" style="padding:10px 0 0"><button type="button" class="secondary-btn" data-close>Cancel</button><button type="submit" class="primary-btn">Start package</button></div>
+    </form>
+  </div>
+</div>
+<div class="modal-backdrop" id="payModal" role="dialog" aria-modal="true">
+  <div class="modal-card" style="max-width:400px">
+    <div class="modal-head"><h2>Record payment</h2><button type="button" class="modal-x" data-close aria-label="Close">×</button></div>
+    <form method="post" action="#" id="payForm" class="mini-form">
+      {% csrf_token %}
+      <p class="hint" id="payDue" style="margin:0"></p>
+      <label>Amount (NPR) {{ payment_form.amount }}</label>
+      <label>Payment mode {{ payment_form.payment_mode }}</label>
+      <label>Notes {{ payment_form.notes }}</label>
+      <div class="pf-actions" style="padding:10px 0 0"><button type="button" class="secondary-btn" data-close>Cancel</button><button type="submit" class="primary-btn">Record payment</button></div>
+    </form>
+  </div>
+</div>
+{{ preset|json_script:"preset-data" }}
+<script>
+(function () {
+  function $(id) { return document.getElementById(id); }
+  document.querySelectorAll('[data-pay]').forEach(function (b) {
+    b.addEventListener('click', function () {
+      $('payForm').action = b.dataset.pay;
+      $('payDue').textContent = b.dataset.who + ' — balance due: NPR ' + b.dataset.due;
+      $('payForm').elements['amount'].value = b.dataset.due;
+      SajhyaUI.openModal('payModal');
+    });
+  });
+
+  // patient search for the new-package form (shared picker: blocks submit until a patient is chosen)
+  SajhyaUI.patientPicker($('pkSearch'), $('id_patient'), {
+    url: "{% url 'accounts:appointment-patient-search' %}", hint: $('pkChosen'), preset: JSON.parse($('preset-data').textContent),
+  });
+  {% if open_new %}SajhyaUI.openModal('pkModal');{% endif %}
+})();
+</script>
+{% endblock %}

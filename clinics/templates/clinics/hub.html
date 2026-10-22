@@ -1,0 +1,79 @@
+{% extends 'accounts/pro_base.html' %}
+{% block title %}Clinic Connect | Sajhya Health{% endblock %}
+{% block extra_css %}
+{% include 'clinics/_styles.html' %}
+{% endblock %}
+{% block main %}
+<div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:12px">
+  <h1 style="font-size:20px;margin:0">Clinic Connect</h1>
+  {% if can_create and owned %}<a class="primary-btn" href="{% url 'clinics:create' %}" style="margin-left:auto;text-decoration:none;display:inline-flex;align-items:center">＋ New clinic</a>{% endif %}
+</div>
+
+{% if invitations %}
+<div class="cl-h" style="margin-top:0">Invitations to join a clinic ({{ invitations|length }})</div>
+<div class="cl-grid">
+  {% for inv in invitations %}
+  <div class="cl-card" style="border-color:#f0c874;background:#fffaf0">
+    <h3>{{ inv.clinic.name }}</h3>
+    <div class="sub">Invited by {{ inv.clinic.owner.full_name }} · {{ inv.clinic.address }}</div>
+    <div class="sub">If you join, you can view the clinic's patients and record treatment for them. You will not see patients' contact details (phone, email, address); the clinic can see counts of visits you record.</div>
+    <form method="post" action="{% url 'clinics:invitation-respond' inv.pk %}" style="display:flex;gap:8px;margin-top:6px">{% csrf_token %}
+      <button class="primary-btn" name="action" value="accept">Accept</button><button class="secondary-btn" name="action" value="decline">Decline</button></form>
+  </div>
+  {% endfor %}
+</div>
+{% endif %}
+
+{% if owned %}
+  <div class="cl-h" style="margin-top:0">My clinics</div>
+  <div class="cl-grid">
+    {% for c in owned %}
+    <a class="cl-card" href="{% url 'clinics:detail' c.pk %}" style="text-decoration:none;color:inherit">
+      <h3>{{ c.name }}</h3><div class="sub">{{ c.code }} · {{ c.address }}</div>
+      <div class="sub"><b>{{ c.team|add:1 }}</b> on the team · <b>{{ c.patient_count }}</b> patient{{ c.patient_count|pluralize }}</div>
+      {% if c.is_usable %}<span class="tone good" style="width:fit-content">Active</span>{% else %}<span class="tone warn" style="width:fit-content">Awaiting plan activation</span>{% endif %}
+    </a>
+    {% endfor %}
+  </div>
+  {% if sub.is_active %}<p class="hint">Clinic plan active{% if sub.expires_at %} until {{ sub.expires_at|date:"M j, Y" }}{% endif %} · up to {{ sub.clinic_limit }} clinic{{ sub.clinic_limit|pluralize }}.</p>
+  {% elif sub.is_expired %}<div class="cl-notice"><b>Your Clinic plan expired.</b> Your clinics are paused; contact us to renew and everything returns as it was.</div>
+  {% elif sub.status == 'rejected' %}<div class="cl-notice">Your Clinic plan request was declined{% if sub.staff_note %}: {{ sub.staff_note }}{% endif %}. Contact us, or register again to re-request.</div>
+  {% else %}<p class="hint">We received your Clinic plan request and will contact you on <b>{{ sub.contact_phone }}</b> to activate it.</p>{% endif %}
+{% else %}
+  <div class="cl-upgrade">
+    <h2>Register your clinic on Sajhya</h2>
+    <p style="margin:0 0 4px">Keep your professional account exactly as it is and add clinic features on top.</p>
+    <div class="price">{% if plan %}{{ plan.price_label }}{% else %}Custom pricing{% endif %}</div>
+    <ul>
+      <li>Fill in the clinic profile: details, registration, location, opening hours, amenities</li>
+      <li>Add verified physios (they accept an invitation) and your staff</li>
+      <li>Register patients under the clinic and run a daily on-site queue</li>
+      <li>A clinic dashboard with counts per physio</li>
+    </ul>
+    <a class="primary-btn" href="{% url 'clinics:create' %}" style="text-decoration:none;display:inline-flex;align-items:center">Register a clinic</a>
+    <p class="hint" style="margin-bottom:0">Submitting the form also requests the Clinic plan; our team contacts you to activate it.</p>
+  </div>
+{% endif %}
+
+{% if memberships %}
+<div class="cl-h">Clinics I work at</div>
+<div class="cl-grid">
+  {% for m in memberships %}
+  <div class="cl-card">
+    <h3>{{ m.clinic.name }}</h3>
+    <div class="sub">{{ m.clinic.code }} · owner {{ m.clinic.owner.full_name }}</div>
+    <div class="sub">{{ m.clinic.address }}</div>
+    <div class="sub">Joined {{ m.joined_at|date:"M j, Y" }} · <b>{{ m.patient_total }}</b> clinic patient{{ m.patient_total|pluralize }}</div>
+    <div style="display:flex;gap:8px;margin-top:6px;flex-wrap:wrap">
+      <a class="primary-btn" href="{% url 'clinics:detail' m.clinic.pk %}?tab=patients" style="text-decoration:none;display:inline-flex;align-items:center;height:32px">View patients</a>
+      <a class="secondary-btn" href="{% url 'clinics:detail' m.clinic.pk %}?tab=queue" style="text-decoration:none;display:inline-flex;align-items:center;height:32px">Queue</a>
+    </div>
+  </div>
+  {% endfor %}
+</div>
+{% endif %}
+{% if past_memberships %}
+<div class="cl-h">Previous clinics</div>
+<p class="hint">{% for m in past_memberships %}{{ m.clinic.name }}{% if not forloop.last %}, {% endif %}{% endfor %} - you have left these; their patients are no longer visible to you.</p>
+{% endif %}
+{% endblock %}

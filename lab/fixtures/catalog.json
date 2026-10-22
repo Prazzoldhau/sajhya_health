@@ -1,0 +1,434 @@
+{
+ "tests": [
+  {
+   "name": "C-Reactive Protein (CRP)",
+   "category": "biochemistry",
+   "price": "700.00",
+   "sample_type": "Blood - Venous",
+   "prep_instructions": "",
+   "turnaround_time": "Same day",
+   "is_active": true
+  },
+  {
+   "name": "Fasting Blood Sugar (FBS)",
+   "category": "biochemistry",
+   "price": "200.00",
+   "sample_type": "Blood - Venous",
+   "prep_instructions": "8-12 hours fasting required",
+   "turnaround_time": "Same day",
+   "is_active": true
+  },
+  {
+   "name": "HbA1c (Glycated Hemoglobin)",
+   "category": "biochemistry",
+   "price": "900.00",
+   "sample_type": "Blood - Venous",
+   "prep_instructions": "",
+   "turnaround_time": "24 hours",
+   "is_active": true
+  },
+  {
+   "name": "Lipid Profile",
+   "category": "biochemistry",
+   "price": "1000.00",
+   "sample_type": "Blood - Venous",
+   "prep_instructions": "10-12 hours fasting required",
+   "turnaround_time": "24 hours",
+   "is_active": true
+  },
+  {
+   "name": "Liver Function Test (LFT)",
+   "category": "biochemistry",
+   "price": "900.00",
+   "sample_type": "Blood - Venous",
+   "prep_instructions": "",
+   "turnaround_time": "24 hours",
+   "is_active": true
+  },
+  {
+   "name": "Random Blood Sugar (RBS)",
+   "category": "biochemistry",
+   "price": "200.00",
+   "sample_type": "Blood - Venous",
+   "prep_instructions": "",
+   "turnaround_time": "Same day",
+   "is_active": true
+  },
+  {
+   "name": "Renal Function Test (RFT/KFT)",
+   "category": "biochemistry",
+   "price": "800.00",
+   "sample_type": "Blood - Venous",
+   "prep_instructions": "",
+   "turnaround_time": "24 hours",
+   "is_active": true
+  },
+  {
+   "name": "Serum Amylase",
+   "category": "biochemistry",
+   "price": "700.00",
+   "sample_type": "Blood - Venous",
+   "prep_instructions": "",
+   "turnaround_time": "24 hours",
+   "is_active": true
+  },
+  {
+   "name": "Serum Creatinine",
+   "category": "biochemistry",
+   "price": "300.00",
+   "sample_type": "Blood - Venous",
+   "prep_instructions": "",
+   "turnaround_time": "Same day",
+   "is_active": true
+  },
+  {
+   "name": "Serum Uric Acid",
+   "category": "biochemistry",
+   "price": "350.00",
+   "sample_type": "Blood - Venous",
+   "prep_instructions": "",
+   "turnaround_time": "Same day",
+   "is_active": true
+  },
+  {
+   "name": "Serum Calcium",
+   "category": "electrolytes",
+   "price": "350.00",
+   "sample_type": "Blood - Venous",
+   "prep_instructions": "",
+   "turnaround_time": "Same day",
+   "is_active": true
+  },
+  {
+   "name": "Serum Electrolytes (Na, K, Cl)",
+   "category": "electrolytes",
+   "price": "700.00",
+   "sample_type": "Blood - Venous",
+   "prep_instructions": "",
+   "turnaround_time": "Same day",
+   "is_active": true
+  },
+  {
+   "name": "Serum Magnesium",
+   "category": "electrolytes",
+   "price": "500.00",
+   "sample_type": "Blood - Venous",
+   "prep_instructions": "",
+   "turnaround_time": "Same day",
+   "is_active": true
+  },
+  {
+   "name": "Serum Phosphorus",
+   "category": "electrolytes",
+   "price": "350.00",
+   "sample_type": "Blood - Venous",
+   "prep_instructions": "",
+   "turnaround_time": "Same day",
+   "is_active": true
+  },
+  {
+   "name": "Blood Grouping & Rh Factor",
+   "category": "hematology",
+   "price": "300.00",
+   "sample_type": "Blood - Venous",
+   "prep_instructions": "",
+   "turnaround_time": "Same day",
+   "is_active": true
+  },
+  {
+   "name": "Complete Blood Count (CBC)",
+   "category": "hematology",
+   "price": "400.00",
+   "sample_type": "Blood - Venous",
+   "prep_instructions": "",
+   "turnaround_time": "Same day",
+   "is_active": true
+  },
+  {
+   "name": "Erythrocyte Sedimentation Rate (ESR)",
+   "category": "hematology",
+   "price": "250.00",
+   "sample_type": "Blood - Venous",
+   "prep_instructions": "",
+   "turnaround_time": "Same day",
+   "is_active": true
+  },
+  {
+   "name": "Peripheral Blood Smear",
+   "category": "hematology",
+   "price": "350.00",
+   "sample_type": "Blood - Venous",
+   "prep_instructions": "",
+   "turnaround_time": "Same day",
+   "is_active": true
+  },
+  {
+   "name": "Reticulocyte Count",
+   "category": "hematology",
+   "price": "400.00",
+   "sample_type": "Blood - Venous",
+   "prep_instructions": "",
+   "turnaround_time": "Same day",
+   "is_active": true
+  },
+  {
+   "name": "Serum Cortisol",
+   "category": "hormonal",
+   "price": "1500.00",
+   "sample_type": "Blood - Venous",
+   "prep_instructions": "",
+   "turnaround_time": "48 hours",
+   "is_active": true
+  },
+  {
+   "name": "Serum Ferritin",
+   "category": "hormonal",
+   "price": "1500.00",
+   "sample_type": "Blood - Venous",
+   "prep_instructions": "",
+   "turnaround_time": "24 hours",
+   "is_active": true
+  },
+  {
+   "name": "Thyroid Profile (TSH, T3, T4)",
+   "category": "hormonal",
+   "price": "1300.00",
+   "sample_type": "Blood - Venous",
+   "prep_instructions": "",
+   "turnaround_time": "24 hours",
+   "is_active": true
+  },
+  {
+   "name": "TSH Only",
+   "category": "hormonal",
+   "price": "600.00",
+   "sample_type": "Blood - Venous",
+   "prep_instructions": "",
+   "turnaround_time": "24 hours",
+   "is_active": true
+  },
+  {
+   "name": "Vitamin B12",
+   "category": "hormonal",
+   "price": "2000.00",
+   "sample_type": "Blood - Venous",
+   "prep_instructions": "",
+   "turnaround_time": "24-48 hours",
+   "is_active": true
+  },
+  {
+   "name": "Vitamin D (25-OH)",
+   "category": "hormonal",
+   "price": "3000.00",
+   "sample_type": "Blood - Venous",
+   "prep_instructions": "",
+   "turnaround_time": "48-72 hours",
+   "is_active": true
+  },
+  {
+   "name": "Anti-HCV (Hepatitis C)",
+   "category": "serology",
+   "price": "700.00",
+   "sample_type": "Blood - Venous",
+   "prep_instructions": "",
+   "turnaround_time": "Same day",
+   "is_active": true
+  },
+  {
+   "name": "Dengue NS1/IgG/IgM",
+   "category": "serology",
+   "price": "1200.00",
+   "sample_type": "Blood - Venous",
+   "prep_instructions": "",
+   "turnaround_time": "Same day",
+   "is_active": true
+  },
+  {
+   "name": "HBsAg (Hepatitis B)",
+   "category": "serology",
+   "price": "500.00",
+   "sample_type": "Blood - Venous",
+   "prep_instructions": "",
+   "turnaround_time": "Same day",
+   "is_active": true
+  },
+  {
+   "name": "HIV Screening",
+   "category": "serology",
+   "price": "600.00",
+   "sample_type": "Blood - Venous",
+   "prep_instructions": "",
+   "turnaround_time": "Same day",
+   "is_active": true
+  },
+  {
+   "name": "VDRL (Syphilis)",
+   "category": "serology",
+   "price": "400.00",
+   "sample_type": "Blood - Venous",
+   "prep_instructions": "",
+   "turnaround_time": "Same day",
+   "is_active": true
+  },
+  {
+   "name": "Widal Test (Typhoid)",
+   "category": "serology",
+   "price": "400.00",
+   "sample_type": "Blood - Venous",
+   "prep_instructions": "",
+   "turnaround_time": "Same day",
+   "is_active": true
+  },
+  {
+   "name": "Urine Culture & Sensitivity",
+   "category": "urine",
+   "price": "800.00",
+   "sample_type": "Urine - Midstream",
+   "prep_instructions": "",
+   "turnaround_time": "48-72 hours",
+   "is_active": true
+  },
+  {
+   "name": "Urine Routine & Microscopy (R/E)",
+   "category": "urine",
+   "price": "250.00",
+   "sample_type": "Urine - Midstream",
+   "prep_instructions": "",
+   "turnaround_time": "Same day",
+   "is_active": true
+  }
+ ],
+ "panels": [
+  {
+   "name": "Anemia Panel",
+   "description": "Full anemia workup -- blood count, smear, iron stores, and B12.",
+   "price": "4000.00",
+   "is_featured": false,
+   "is_active": true,
+   "tests": [
+    "Complete Blood Count (CBC)",
+    "Peripheral Blood Smear",
+    "Reticulocyte Count",
+    "Serum Ferritin",
+    "Vitamin B12"
+   ]
+  },
+  {
+   "name": "Cardiology Panel",
+   "description": "Cholesterol/triglycerides and inflammation marker for cardiovascular risk screening.",
+   "price": "1500.00",
+   "is_featured": true,
+   "is_active": true,
+   "tests": [
+    "C-Reactive Protein (CRP)",
+    "Lipid Profile"
+   ]
+  },
+  {
+   "name": "Diabetes Panel",
+   "description": "Fasting & random blood sugar plus 3-month average control (HbA1c).",
+   "price": "1100.00",
+   "is_featured": true,
+   "is_active": true,
+   "tests": [
+    "Fasting Blood Sugar (FBS)",
+    "HbA1c (Glycated Hemoglobin)",
+    "Random Blood Sugar (RBS)"
+   ]
+  },
+  {
+   "name": "Electrolyte & Mineral Panel",
+   "description": "Sodium, potassium, chloride, calcium, magnesium and phosphorus.",
+   "price": "1600.00",
+   "is_featured": false,
+   "is_active": true,
+   "tests": [
+    "Serum Calcium",
+    "Serum Electrolytes (Na, K, Cl)",
+    "Serum Magnesium",
+    "Serum Phosphorus"
+   ]
+  },
+  {
+   "name": "Fever Panel",
+   "description": "Covers the most common causes of fever investigated in Nepal -- typhoid, dengue, and a general infection/blood workup.",
+   "price": "2500.00",
+   "is_featured": true,
+   "is_active": true,
+   "tests": [
+    "C-Reactive Protein (CRP)",
+    "Complete Blood Count (CBC)",
+    "Dengue NS1/IgG/IgM",
+    "Widal Test (Typhoid)",
+    "Urine Routine & Microscopy (R/E)"
+   ]
+  },
+  {
+   "name": "Infection Screening Panel",
+   "description": "Standard pre-marital/pre-employment infection screen.",
+   "price": "1900.00",
+   "is_featured": false,
+   "is_active": true,
+   "tests": [
+    "Anti-HCV (Hepatitis C)",
+    "HBsAg (Hepatitis B)",
+    "HIV Screening",
+    "VDRL (Syphilis)"
+   ]
+  },
+  {
+   "name": "Kidney Panel",
+   "description": "Renal function, electrolytes, and uric acid.",
+   "price": "1600.00",
+   "is_featured": false,
+   "is_active": true,
+   "tests": [
+    "Renal Function Test (RFT/KFT)",
+    "Serum Uric Acid",
+    "Serum Electrolytes (Na, K, Cl)"
+   ]
+  },
+  {
+   "name": "Liver & Hepatitis Panel",
+   "description": "Liver function plus Hepatitis B and C screening.",
+   "price": "1800.00",
+   "is_featured": false,
+   "is_active": true,
+   "tests": [
+    "Liver Function Test (LFT)",
+    "Anti-HCV (Hepatitis C)",
+    "HBsAg (Hepatitis B)"
+   ]
+  },
+  {
+   "name": "Master Health Checkup Panel",
+   "description": "Nepal's typical comprehensive executive checkup -- blood count, sugar, liver, kidney, cholesterol, urine, hepatitis B, thyroid and inflammation.",
+   "price": "4200.00",
+   "is_featured": true,
+   "is_active": true,
+   "tests": [
+    "Fasting Blood Sugar (FBS)",
+    "Lipid Profile",
+    "Liver Function Test (LFT)",
+    "Renal Function Test (RFT/KFT)",
+    "Complete Blood Count (CBC)",
+    "Erythrocyte Sedimentation Rate (ESR)",
+    "TSH Only",
+    "HBsAg (Hepatitis B)",
+    "Urine Routine & Microscopy (R/E)"
+   ]
+  },
+  {
+   "name": "Thyroid & Vitamins Panel",
+   "description": "Thyroid function plus the two most commonly deficient vitamins.",
+   "price": "5500.00",
+   "is_featured": false,
+   "is_active": true,
+   "tests": [
+    "Thyroid Profile (TSH, T3, T4)",
+    "Vitamin B12",
+    "Vitamin D (25-OH)"
+   ]
+  }
+ ]
+}

@@ -1,0 +1,58 @@
+{% extends 'accounts/pro_base.html' %}
+{% block title %}New assessment | Sajhya Health{% endblock %}
+{% block extra_css %}
+  main { padding-top: 18px; }
+{% include 'assessments/_styles.html' %}
+{% endblock %}
+{% block main %}
+<p style="margin:0 0 4px"><a class="text-link" href="{% url 'accounts:patient-detail' patient.pk %}?tab=assessments" style="text-decoration:none">← {{ patient.name }}</a></p>
+<h1 style="font-size:20px;margin:0 0 4px">New assessment</h1>
+<p class="hint" style="margin:0 0 12px">Pick a ready-made form, or tick the scales you want to use. You can mix scales from different forms.</p>
+
+<div class="as-group" style="margin-top:0">Ready-made forms</div>
+<div class="as-grid">
+  {% for card in form_cards %}
+  <a class="as-card" href="{% url 'assessments:fill' patient.pk %}?form={{ card.form.pk }}&scales={{ card.scale_ids }}" style="text-decoration:none;color:inherit">
+    <h3>{{ card.form.name }}</h3><div class="sub">{{ card.form.description }}</div>
+    <div class="as-chips">{% for n in card.names %}<span class="as-chip">{{ n }}</span>{% endfor %}</div>
+  </a>
+  {% empty %}<p class="hint">No forms yet. Run <code>python manage.py load_scales</code> or add them in the admin.</p>{% endfor %}
+</div>
+
+<form method="get" action="{% url 'assessments:fill' patient.pk %}" id="pickForm">
+  <input type="hidden" name="scales" id="scalesField">
+  <div class="as-group" style="display:flex;align-items:center;gap:12px">Or choose individual scales
+    <input type="search" id="scaleSearch" placeholder="Search scales..." style="height:32px;border:1px solid var(--line);border-radius:8px;padding:0 10px;text-transform:none;letter-spacing:0;font-weight:400"></div>
+  {% for group, scales in groups.items %}
+  <div class="as-group">{{ group }}</div>
+  <div class="as-pick" data-group-body>
+    {% for s in scales %}
+    <label class="as-scale" data-name="{{ s.name|lower }} {{ s.abbreviation|lower }}"><input type="checkbox" value="{{ s.pk }}"><div><b>{{ s.name }}</b>{% if s.abbreviation %} ({{ s.abbreviation }}){% endif %}<span>{{ s.description|truncatechars:90 }}</span></div></label>
+    {% endfor %}
+  </div>
+  {% endfor %}
+  <div style="margin:18px 0 30px"><button class="primary-btn" type="submit" id="goBtn" disabled>Continue with <span id="count">0</span> selected</button></div>
+</form>
+<script>
+(function () {
+  var boxes = Array.prototype.slice.call(document.querySelectorAll('#pickForm input[type=checkbox]'));
+  var order = [];  // ticked, in the order the clinician chose
+  function sync() {
+    boxes.forEach(function (b) { var i = order.indexOf(b.value); if (b.checked && i < 0) order.push(b.value); if (!b.checked && i >= 0) order.splice(i, 1); });
+    document.getElementById('scalesField').value = order.join(',');
+    document.getElementById('count').textContent = order.length;
+    document.getElementById('goBtn').disabled = !order.length;
+  }
+  boxes.forEach(function (b) { b.addEventListener('change', sync); });
+  document.getElementById('scaleSearch').addEventListener('input', function (e) {
+    var q = e.target.value.trim().toLowerCase();
+    document.querySelectorAll('.as-scale').forEach(function (l) { l.style.display = !q || l.dataset.name.indexOf(q) >= 0 ? '' : 'none'; });
+    document.querySelectorAll('[data-group-body]').forEach(function (body) {
+      var any = Array.prototype.some.call(body.children, function (c) { return c.style.display !== 'none'; });
+      body.style.display = any ? '' : 'none'; body.previousElementSibling.style.display = any ? '' : 'none';
+    });
+  });
+  sync();
+})();
+</script>
+{% endblock %}

@@ -1,0 +1,94 @@
+{% load static %}<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>{% block title %}My dashboard | Sajhya Health{% endblock %}</title>
+<link rel="icon" type="image/png" href="{% static 'images/favicon.png' %}">
+<style>
+  :root { --green: #168653; --green-dark: #116b43; --soft: #e9f7ef; --ink: #18352b; --muted: #6c8178; --line: #e1ebe5; --page: #f5faf7; --warn: #a97510; --bad: #b83b3b; --side: 248px; }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--page); color: var(--ink); font-family: Inter, ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif; font-size: 15px; line-height: 1.5; }
+  a { color: var(--green-dark); }
+  .topbar { height: 64px; background: #fff; border-bottom: 1px solid var(--line); display: flex; align-items: center; gap: 12px; padding: 0 22px; position: sticky; top: 0; z-index: 20; }
+  .topbar img { width: 38px; height: 38px; border-radius: 50%; } .topbar .brand { font-weight: 800; font-size: 17px; letter-spacing: -.3px; }
+  .topbar .who { margin-left: auto; display: flex; align-items: center; gap: 12px; font-size: 14px; color: var(--muted); } .topbar form { margin: 0; }
+  .shell { display: grid; grid-template-columns: var(--side) minmax(0, 1fr); min-height: calc(100vh - 64px); }
+  .side { background: #fff; border-right: 1px solid var(--line); padding: 18px 12px; position: sticky; top: 64px; height: calc(100vh - 64px); overflow-y: auto; }
+  .side .label { font-size: 11px; font-weight: 800; letter-spacing: .08em; color: #8ea39a; text-transform: uppercase; margin: 16px 10px 6px; } .side .label:first-child { margin-top: 0; }
+  .side a.nav { display: flex; align-items: center; gap: 12px; padding: 11px 12px; margin: 2px 0; border-radius: 10px; color: #4d6a5d; font-weight: 650; text-decoration: none; }
+  .side a.nav .ic { width: 22px; text-align: center; font-size: 17px; }
+  .side a.nav:hover { background: #f1f8f4; } .side a.nav.on { background: var(--green); color: #fff; box-shadow: 0 6px 16px rgba(22,134,83,.22); }
+  .side .who-p { margin: 0 6px 6px; padding: 10px 12px; background: var(--soft); border-radius: 10px; font-size: 13px; } .side .who-p b { display: block; font-size: 14px; }
+  .side .who-p select { width: 100%; margin-top: 6px; border: 1px solid var(--line); border-radius: 8px; padding: 6px; font: inherit; background: #fff; }
+  .content { padding: 26px 34px 60px; max-width: 1180px; width: 100%; }
+  h1 { font-size: 26px; margin: 0 0 4px; } h2 { font-size: 17px; margin: 26px 0 10px; } h3 { font-size: 15.5px; margin: 0 0 4px; }
+  .muted { color: var(--muted); font-size: 14px; }
+  .grid { display: grid; gap: 16px; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); margin-bottom: 16px; }
+  .grid.two { grid-template-columns: repeat(2, minmax(0, 1fr)); } .grid.three { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .card { background: #fff; border: 1px solid var(--line); border-radius: 14px; padding: 16px 18px; box-shadow: 0 2px 10px rgba(22,75,49,.04); }
+  .card.link { text-decoration: none; color: inherit; display: block; transition: box-shadow .15s, transform .15s; } .card.link:hover { box-shadow: 0 8px 22px rgba(22,75,49,.1); transform: translateY(-1px); }
+  .svc { display: grid; gap: 8px; align-content: start; } .svc .ico { font-size: 30px; }
+  .btn { display: inline-flex; align-items: center; justify-content: center; min-height: 40px; padding: 0 18px; border-radius: 10px; border: 1px solid var(--green); background: var(--green); color: #fff; font: inherit; font-weight: 700; cursor: pointer; text-decoration: none; }
+  .btn.ghost { background: #fff; color: var(--green-dark); } .btn.small { min-height: 34px; padding: 0 12px; font-size: 14px; }
+  label.f { display: grid; gap: 4px; font-weight: 700; font-size: 14px; margin-bottom: 12px; }
+  input[type=text], input[type=email], input[type=date], select, textarea { width: 100%; min-height: 42px; border: 1px solid var(--line); border-radius: 10px; padding: 8px 12px; font: inherit; background: #fff; }
+  textarea { min-height: 70px; }
+  .msg { padding: 11px 14px; border-radius: 10px; margin-bottom: 14px; font-size: 15px; background: var(--soft); color: var(--green-dark); }
+  .msg.error { background: #fde8e8; color: #8a2a2a; }
+  .pill { display: inline-block; padding: 3px 10px; border-radius: 12px; font-size: 12px; font-weight: 750; background: var(--soft); color: var(--green-dark); }
+  .pill.warn { background: #fff3d6; color: var(--warn); } .pill.bad { background: #fde8e8; color: var(--bad); }
+  .bar { height: 10px; border-radius: 6px; background: #e3efe8; overflow: hidden; margin: 8px 0; } .bar > i { display: block; height: 100%; background: var(--green); }
+  .ex { display: flex; gap: 14px; align-items: flex-start; }
+  .ex .thumb { width: 76px; height: 76px; border-radius: 12px; object-fit: contain; border: 1px solid var(--line); flex: none; display: grid; place-items: center; font-weight: 800; font-size: 22px; color: var(--green-dark); background: var(--soft); }
+  .ex.done h3 { text-decoration: line-through; color: var(--muted); } .ex .grow { flex: 1; min-width: 0; }
+  details summary { cursor: pointer; color: var(--green-dark); font-weight: 700; font-size: 14px; margin-top: 8px; }
+  details img { width: 100%; max-width: 420px; border-radius: 10px; border: 1px solid var(--line); margin: 6px 0; background: #fff; display: block; }
+  .box-do { border-left: 5px solid var(--green); } .box-dont { border-left: 5px solid var(--bad); background: #fffafa; } .box-do p, .box-dont p { white-space: pre-wrap; margin: 6px 0 0; }
+  table { width: 100%; border-collapse: collapse; font-size: 14px; } td, th { padding: 8px 6px; border-bottom: 1px solid #eef3ef; text-align: left; vertical-align: top; }
+  .row { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; } form.inline { display: inline; margin: 0; }
+  .empty { text-align: center; padding: 36px 20px; color: var(--muted); } .empty .big-ic { font-size: 40px; }
+  .stat { font-size: 20px; font-weight: 800; }
+  @media (max-width: 1100px) { .grid.three { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+  @media (max-width: 900px) {
+    .shell { grid-template-columns: 1fr; }
+    .side { position: sticky; top: 64px; z-index: 15; height: auto; display: flex; gap: 6px; overflow-x: auto; padding: 8px 10px; border-right: 0; border-bottom: 1px solid var(--line); }
+    .side .label, .side .who-p { display: none; } .side a.nav { flex: none; padding: 9px 12px; margin: 0; } .side a.nav .tx { font-size: 14px; }
+    .content { padding: 18px 16px 50px; } .grid.two, .grid.three { grid-template-columns: 1fr; } .topbar { padding: 0 14px; } .topbar .who span { display: none; }
+  }
+</style>
+</head>
+<body>
+<header class="topbar">
+  <img src="{% static 'images/logo-64.png' %}" alt=""><span class="brand">Sajhya Health</span>
+  <div class="who"><span>{{ user.get_username }}</span>
+    <form method="post" action="{% url 'accounts:logout' %}">{% csrf_token %}<button class="btn ghost small" type="submit">Log out</button></form></div>
+</header>
+<div class="shell">
+  <nav class="side" aria-label="Dashboard">
+    {% if links %}
+    <div class="who-p"><span class="muted">Viewing</span><b>{{ patient.name }}</b>
+      {% if links|length > 1 %}<select onchange="location.href='?p='+this.value">{% for l in links %}<option value="{{ l.patient_id }}" {% if l.patient_id == patient.pk %}selected{% endif %}>{{ l.patient.name }}</option>{% endfor %}</select>{% endif %}</div>
+    {% endif %}
+    <div class="label">My health</div>
+    <a class="nav {% if section == 'home' %}on{% endif %}" href="{% url 'portal:home' %}{% if patient %}?p={{ patient.pk }}{% endif %}"><span class="ic">⌂</span><span class="tx">Home</span></a>
+    <a class="nav {% if section == 'plan' %}on{% endif %}" href="{% url 'portal:plan' %}{% if patient %}?p={{ patient.pk }}{% endif %}"><span class="ic">▤</span><span class="tx">Treatment plan</span></a>
+    <a class="nav {% if section == 'exercises' %}on{% endif %}" href="{% url 'portal:exercises' %}{% if patient %}?p={{ patient.pk }}{% endif %}"><span class="ic">♧</span><span class="tx">My exercises</span></a>
+    <a class="nav {% if section == 'advice' %}on{% endif %}" href="{% url 'portal:advice' %}{% if patient %}?p={{ patient.pk }}{% endif %}"><span class="ic">✓</span><span class="tx">Do's &amp; don'ts</span></a>
+    <div class="label">Shop &amp; services</div>
+    <a class="nav {% if section == 'services' %}on{% endif %}" href="{% url 'portal:services' %}"><span class="ic">▦</span><span class="tx">All services</span></a>
+    <a class="nav {% if section == 'orders' %}on{% endif %}" href="{% url 'portal:orders' %}"><span class="ic">📦</span><span class="tx">My orders</span></a>
+    <a class="nav {% if section == 'lab' %}on{% endif %}" href="{% url 'portal:lab' %}"><span class="ic">🧪</span><span class="tx">My lab bookings</span></a>
+    <a class="nav" href="{% url 'marketplace:pharmacy' %}"><span class="ic">℞</span><span class="tx">Pharmacy</span></a>
+    <a class="nav" href="{% url 'marketplace:marketplace' %}"><span class="ic">🛒</span><span class="tx">Marketplace</span></a>
+    <a class="nav" href="{% url 'lab:tests' %}"><span class="ic">⚗</span><span class="tx">Lab investigations</span></a>
+    <div class="label">Account</div>
+    <a class="nav {% if section == 'settings' %}on{% endif %}" href="{% url 'portal:settings' %}"><span class="ic">⚙</span><span class="tx">Settings</span></a>
+  </nav>
+  <main class="content">
+    {% for m in messages %}<div class="msg {% if m.tags == 'error' %}error{% endif %}">{{ m }}</div>{% endfor %}
+    {% block content %}{% endblock %}
+  </main>
+</div>
+</body>
+</html>

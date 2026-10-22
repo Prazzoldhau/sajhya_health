@@ -1,0 +1,683 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Sajhya — Nepal's Healthcare Platform</title>
+<meta name="description" content="Sajhya is Nepal's healthcare platform — find and book verified physiotherapists, order medicines from the online pharmacy, and shop braces, supports and rehab equipment, all in one place.">
+
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="Sajhya Healthcare">
+<meta property="og:title" content="Sajhya — Nepal's Healthcare Platform">
+<meta property="og:description" content="Find and book verified physiotherapists, order medicines online, and shop rehab and medical supplies — Nepal's healthcare platform.">
+<meta property="og:url" content="https://sajhya.com/">
+<meta property="og:image" content="https://sajhya.com{% static 'images/icon.png' %}">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:title" content="Sajhya — Nepal's Healthcare Platform">
+<meta name="twitter:description" content="Find and book verified physiotherapists, order medicines online, and shop rehab and medical supplies — Nepal's healthcare platform.">
+<meta name="twitter:image" content="https://sajhya.com{% static 'images/icon.png' %}">
+
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "WebSite",
+  "name": "Sajhya",
+  "alternateName": "Sajhya Healthcare",
+  "url": "https://sajhya.com/"
+}
+</script>
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "Organization",
+  "name": "Sajhya",
+  "alternateName": "Sajhya Healthcare",
+  "url": "https://sajhya.com/",
+  "logo": "https://sajhya.com{% static 'images/icon.png' %}",
+  "description": "Sajhya is a Nepal-based healthcare technology platform connecting patients, physiotherapists, clinics and healthcare products through digital healthcare services."
+}
+</script>
+
+<link rel="icon" type="image/png" href="{% static 'images/favicon.png' %}">
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,700;0,900;1,400;1,700&family=DM+Sans:opsz,wght@9..40,300;9..40,400;9..40,500;9..40,600&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
+<style>
+*,*::before,*::after{margin:0;padding:0;box-sizing:border-box}
+:root{
+  --ink:#0f1117;--snow:#f8f9fc;--frost:#f0f3f9;--mist:#e8edf6;
+  --bd:rgba(15,17,23,0.08);--bd2:rgba(15,17,23,0.13);
+  --teal:#059669;--teal-l:#10b981;--teal-p:#d1fae5;--teal-d:#047857;
+  --blue:#15803d;--blue-p:#f0fdf4;
+  --amber:#c2740b;--amber-p:#fef3c7;
+  --rose:#dc2255;--rose-p:#fff0f4;
+  --sage:#047857;--sage-p:#ecfdf5;
+  --tm:#6b7280;--ts:#374151;--tf:#9ca3af;
+  --sh-sm:0 1px 4px rgba(0,0,0,.06),0 1px 2px rgba(0,0,0,.04);
+  --sh-md:0 4px 20px rgba(0,0,0,.08),0 2px 8px rgba(0,0,0,.04);
+  --sh-lg:0 16px 48px rgba(0,0,0,.1),0 4px 16px rgba(0,0,0,.06);
+  --sh-xl:0 32px 80px rgba(0,0,0,.12),0 8px 24px rgba(0,0,0,.07);
+}
+html{scroll-behavior:smooth}
+body{font-family:'DM Sans',sans-serif;background:#fff;color:var(--ink);overflow-x:hidden;cursor:none}
+
+/* CURSOR */
+.cur{width:9px;height:9px;background:var(--teal);border-radius:50%;position:fixed;top:0;left:0;pointer-events:none;z-index:9999;transform:translate(-50%,-50%)}
+.cur-ring{width:36px;height:36px;border:1.5px solid var(--teal);border-radius:50%;position:fixed;top:0;left:0;pointer-events:none;z-index:9998;transform:translate(-50%,-50%);transition:width .25s,height .25s,opacity .25s;opacity:.3}
+.cur-ring.big{width:56px;height:56px;opacity:.15}
+
+/* NAV */
+nav{position:fixed;inset:0 0 auto;z-index:200;display:flex;align-items:center;justify-content:space-between;padding:0 64px;height:70px;background:rgba(255,255,255,.93);backdrop-filter:blur(20px) saturate(160%);border-bottom:1px solid var(--bd)}
+.logo{font-family:'Playfair Display',serif;font-size:24px;font-weight:700;letter-spacing:-.02em;color:var(--ink);text-decoration:none;display:flex;align-items:center;gap:10px}
+.logo-ico { background: none; border-radius: 0; }
+.logo-ico img { width:50px; height:50px; object-fit:contain; }
+
+.logo em{color:var(--teal);font-style:italic}
+.nav-links{display:flex;align-items:center;gap:32px}
+.nav-links a{font-size:13.5px;font-weight:500;color:var(--tm);text-decoration:none;transition:color .18s}
+.nav-links a:hover{color:var(--ink)}
+.nbtn{padding:9px 20px;border-radius:7px;font-size:13px;font-weight:600;text-decoration:none;display:inline-block;transition:all .2s}
+.nbtn-o{color:var(--ts);border:1.5px solid var(--bd2);background:#fff}
+.nbtn-o:hover{border-color:var(--teal);color:var(--teal)}
+.nbtn-f{background:var(--teal);color:#fff;box-shadow:0 2px 10px rgba(5,150,105,.28)}
+.nbtn-f:hover{background:var(--teal-l);transform:translateY(-1px)}
+.ham{display:none;flex-direction:column;gap:5px;background:none;border:none;cursor:pointer;padding:4px}
+.ham span{display:block;width:22px;height:2px;background:var(--ink);border-radius:2px;transition:all .3s}
+.ham.open span:nth-child(1){transform:rotate(45deg) translate(5px,5px)}
+.ham.open span:nth-child(2){opacity:0}
+.ham.open span:nth-child(3){transform:rotate(-45deg) translate(5px,-5px)}
+.mmenu{display:none;position:fixed;top:70px;inset:auto 0;z-index:199;background:rgba(255,255,255,.97);backdrop-filter:blur(20px);border-bottom:1px solid var(--bd);padding:20px 24px 28px;flex-direction:column;box-shadow:var(--sh-lg)}
+.mmenu.open{display:flex}
+.mmenu a{font-size:16px;font-weight:500;color:var(--ts);text-decoration:none;padding:13px 0;border-bottom:1px solid var(--bd);transition:color .2s}
+.mmenu a:hover{color:var(--teal)}
+.mmenu-ctas{display:flex;gap:10px;margin-top:18px}
+.mmenu-ctas a{flex:1;text-align:center;padding:12px;border-radius:8px;font-size:14px;font-weight:600;text-decoration:none}
+.mc-o{border:1.5px solid var(--bd2);color:var(--ts);background:#fff}
+.mc-f{background:var(--teal);color:#fff}
+
+/* HERO (leftover, no longer used in markup -- hero+stats replaced by the
+   marketplace preview section below; .pill/.hero-sub/.hero-btns/.btn-teal/
+   .btn-ghost were already unused before that change, left as-is) */
+.pill{font-family:'Space Mono',monospace;font-size:10.5px;letter-spacing:.2em;text-transform:uppercase;color:var(--teal);background:var(--teal-p);padding:7px 16px;border-radius:100px;width:fit-content;display:flex;align-items:center;gap:10px;margin-bottom:26px;opacity:0;animation:up .8s .15s ease forwards;border:1px solid rgba(5,150,105,.15)}
+.pill-dot{width:6px;height:6px;border-radius:50%;background:var(--teal);animation:blink 2s infinite;flex-shrink:0}
+.hero-sub{font-size:17px;font-weight:300;line-height:1.82;color:var(--tm);max-width:480px;margin-bottom:44px;opacity:0;animation:up .9s .45s ease forwards}
+.hero-btns{display:flex;align-items:center;gap:14px;flex-wrap:wrap;opacity:0;animation:up .9s .6s ease forwards}
+.btn-teal{background:var(--teal);color:#fff;padding:14px 32px;font-size:14px;font-weight:600;letter-spacing:.04em;border:none;border-radius:8px;cursor:pointer;text-decoration:none;display:inline-block;transition:all .25s;box-shadow:0 4px 22px rgba(5,150,105,.32)}
+.btn-teal:hover{background:var(--teal-l);transform:translateY(-2px)}
+.btn-ghost{color:var(--ts);padding:14px 24px;font-size:14px;font-weight:500;border:1.5px solid var(--bd2);border-radius:8px;cursor:pointer;text-decoration:none;display:inline-flex;align-items:center;gap:9px;transition:all .25s;background:#fff;box-shadow:var(--sh-sm)}
+.btn-ghost:hover{border-color:var(--teal);color:var(--teal)}
+.btn-ghost svg{width:15px;height:15px}
+
+/* MARKETPLACE PREVIEW */
+.mp-sec{padding:158px 64px 88px;background:var(--snow);border-bottom:1px solid var(--bd)}
+.mp-hdr{text-align:center;margin-bottom:44px}
+.mp-hdr p{font-size:15px;color:var(--tm);margin-top:10px}
+.mp-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:20px;max-width:1180px;margin:0 auto}
+.mp-card{border-radius:20px;overflow:hidden;border:1.5px solid var(--bd);background:#fff;text-decoration:none;color:inherit;display:flex;flex-direction:column;transition:all .32s;cursor:pointer}
+.mp-card:hover{transform:translateY(-6px);box-shadow:var(--sh-lg);border-color:transparent}
+.mp-card-img{aspect-ratio:1;overflow:hidden;position:relative;background:#fff}
+.mp-card-img img{width:100%;height:100%;object-fit:cover;transition:transform .6s;display:block}
+.mp-card:hover .mp-card-img img{transform:scale(1.07)}
+.mp-card-body{padding:16px 18px 20px}
+.mp-card-name{font-size:13.5px;font-weight:600;color:var(--ink);line-height:1.4;margin-bottom:8px;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+.mp-card-price{font-family:'Playfair Display',serif;font-size:17px;font-weight:700;color:var(--teal-d)}
+.mp-cta-row{text-align:center;margin-top:40px}
+@media(max-width:1060px){.mp-sec{padding:130px 32px 64px}.mp-grid{grid-template-columns:repeat(3,1fr)}}
+@media(max-width:768px){.mp-sec{padding:96px 20px 48px}.mp-grid{grid-template-columns:repeat(2,1fr);gap:12px}.mp-card-body{padding:12px 14px 16px}.mp-card-name{font-size:12.5px}.mp-card-price{font-size:15px}}
+
+/* SECTION COMMON */
+.sec{padding:108px 64px}
+.lbl{font-family:'Space Mono',monospace;font-size:10.5px;letter-spacing:.22em;text-transform:uppercase;color:var(--teal);margin-bottom:18px;display:flex;align-items:center;gap:12px}
+.lbl::before{content:'';width:26px;height:1.5px;background:var(--teal);flex-shrink:0}
+.lbl.c{justify-content:center}
+.lbl.c::before{display:none}
+.sec-h{font-family:'Playfair Display',serif;font-size:clamp(34px,4vw,60px);font-weight:900;line-height:1.05;letter-spacing:-.03em;color:var(--ink);margin-bottom:18px}
+.sec-h em{font-style:italic;color:var(--teal)}
+
+/* FIND CARE */
+.fc-sec{padding:72px 64px;background:#fff;border-bottom:1px solid var(--bd)}
+.fc-sec-hdr{text-align:center;margin-bottom:48px}
+.fc-sec-hdr p{font-size:15px;color:var(--tm);margin-top:10px}
+.fc-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:18px;max-width:1100px;margin:0 auto}
+.fc-cat{border-radius:20px;overflow:hidden;border:1.5px solid var(--bd);background:var(--snow);text-decoration:none;color:inherit;display:flex;flex-direction:column;transition:all .32s;position:relative;cursor:pointer}
+.fc-cat:hover{transform:translateY(-6px);box-shadow:var(--sh-lg);border-color:transparent}
+.fc-cat-img{height:160px;overflow:hidden;position:relative}
+.fc-cat-img img{width:100%;height:100%;object-fit:cover;transition:transform .6s;display:block}
+.fc-cat:hover .fc-cat-img img{transform:scale(1.07)}
+.fc-cat-ov{position:absolute;inset:0;background:linear-gradient(to bottom,transparent 40%,rgba(8,18,28,.38))}
+.fc-cat-badge{position:absolute;top:11px;right:11px;font-family:'Space Mono',monospace;font-size:9px;letter-spacing:.09em;text-transform:uppercase;padding:3px 9px;border-radius:20px;font-weight:700;backdrop-filter:blur(6px)}
+.fc-cat-body{padding:18px 20px 20px;flex:1;display:flex;flex-direction:column}
+.fc-cat-ico{width:38px;height:38px;border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:18px;margin-bottom:11px;flex-shrink:0}
+.fc-cat-title{font-family:'Playfair Display',serif;font-size:17px;font-weight:700;color:var(--ink);margin-bottom:6px}
+.fc-cat-desc{font-size:12.5px;color:var(--tm);line-height:1.65;flex:1}
+.fc-cat-cta{margin-top:14px;display:inline-flex;align-items:center;gap:6px;font-size:12.5px;font-weight:600;color:var(--teal);font-family:'Space Mono',monospace}
+.fc-cat-cta span{transition:transform .2s}
+.fc-cat:hover .fc-cat-cta span{transform:translate(3px,-2px)}
+@media(max-width:1060px){.fc-sec{padding:60px 32px}.fc-grid{grid-template-columns:repeat(2,1fr)}}
+@media(max-width:768px){.fc-sec{padding:48px 20px}.fc-grid{grid-template-columns:1fr 1fr;gap:12px}.fc-cat-img{height:130px}.fc-cat-body{padding:14px 16px 16px}}
+
+/* SERVICES */
+.svc-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:18px;margin-top:60px}
+.svc-link {display: block;text-decoration: none;color: inherit;}
+.svc{border-radius:22px;overflow:hidden;background:#fff;border:1.5px solid var(--bd);transition:all .35s;position:relative;cursor:pointer}
+.svc:hover{transform:translateY(-7px);box-shadow:var(--sh-lg);border-color:transparent}
+.svc-img{height:190px;overflow:hidden;position:relative}
+.svc-img img{width:100%;height:100%;object-fit:cover;transition:transform .6s;display:block}
+.svc:hover .svc-img img{transform:scale(1.07)}
+.svc-img-ov{position:absolute;inset:0;background:linear-gradient(to bottom,transparent 45%,rgba(8,18,28,.42))}
+.sbadge{position:absolute;top:13px;right:13px;font-family:'Space Mono',monospace;font-size:9.5px;letter-spacing:.09em;text-transform:uppercase;padding:4px 10px;border-radius:20px;font-weight:700;backdrop-filter:blur(6px)}
+.bl{background:rgba(4,120,87,.88);color:#fff}
+.bn{background:rgba(5,150,105,.88);color:#fff}
+.bb{background:rgba(109,40,217,.85);color:#fff}
+.svc-body{padding:22px 26px 26px}
+.svc-ico{width:42px;height:42px;border-radius:11px;margin-bottom:14px;display:flex;align-items:center;justify-content:center;font-size:19px}
+.svc-title{font-family:'Playfair Display',serif;font-size:20px;font-weight:700;margin-bottom:9px;color:var(--ink)}
+.svc-desc{font-size:13px;line-height:1.78;color:var(--tm)}
+.svc-arr{display:inline-block;margin-top:16px;font-size:17px;color:var(--tf);transition:color .2s,transform .2s}
+.svc:hover .svc-arr{color:var(--teal);transform:translate(3px,-3px)}
+
+/* PRICING */
+.pricing{padding:108px 64px;background:#fff}
+.pricing-hdr{text-align:center;margin-bottom:68px}
+.pg{display:grid;grid-template-columns:repeat(3,1fr);gap:20px;max-width:1060px;margin:0 auto}
+.pc{background:var(--snow);border:1.5px solid var(--bd);border-radius:22px;overflow:hidden;position:relative;transition:all .3s}
+.pc:hover{transform:translateY(-5px);box-shadow:var(--sh-lg)}
+.pc.feat{border-color:var(--teal);background:#fff;box-shadow:var(--sh-md),0 0 0 1px rgba(5,150,105,.1)}
+.pc.feat::before{content:'Most Popular';position:absolute;top:-1px;left:50%;transform:translateX(-50%);background:var(--teal);color:#fff;font-family:'Space Mono',monospace;font-size:9.5px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;padding:5px 16px;border-radius:0 0 9px 9px}
+.pc-img{height:130px;overflow:hidden}
+.pc-img img{width:100%;height:100%;object-fit:cover;display:block;transition:transform .6s}
+.pc:hover .pc-img img{transform:scale(1.05)}
+.pc-body{padding:26px 28px 28px}
+.pc-tier{font-family:'Space Mono',monospace;font-size:10.5px;letter-spacing:.14em;text-transform:uppercase;color:var(--tm);margin-bottom:14px}
+.pc-amt{font-family:'Playfair Display',serif;font-size:50px;font-weight:900;letter-spacing:-.03em;color:var(--ink);display:flex;align-items:flex-start;gap:3px;margin-bottom:4px}
+.pc-amt sup{font-size:22px;margin-top:10px}
+.pc-amt .per{font-size:15px;font-family:'DM Sans',sans-serif;font-weight:300;color:var(--tm);align-self:flex-end;margin-bottom:8px}
+.pc-desc{font-size:12.5px;color:var(--tm);margin-bottom:22px;line-height:1.65}
+.pc-feats{list-style:none;margin-bottom:26px;display:flex;flex-direction:column;gap:10px}
+.pc-feats li{font-size:13.5px;color:var(--ts);display:flex;align-items:center;gap:9px}
+.pc-feats li::before{content:'✓';color:var(--sage);font-size:11px;font-weight:700;flex-shrink:0}
+.pc-feats li.dim{color:var(--tf)}
+.pc-feats li.dim::before{content:'–';color:var(--bd2)}
+.pc-btn{width:100%;padding:13px;font-size:13.5px;font-weight:600;letter-spacing:.03em;border-radius:9px;cursor:pointer;border:none;font-family:'DM Sans',sans-serif;transition:all .2s;text-decoration:none;display:block;text-align:center}
+.pc-t{background:var(--teal);color:#fff;box-shadow:0 2px 14px rgba(5,150,105,.28)}
+.pc-t:hover{background:var(--teal-l)}
+.pc-o{background:transparent;color:var(--ts);border:1.5px solid var(--bd2)}
+.pc-o:hover{border-color:var(--teal);color:var(--teal)}
+
+/* TESTIMONIALS */
+.testi{padding:108px 64px;background:var(--mist);border-top:1px solid var(--bd)}
+.testi-hdr{text-align:center;margin-bottom:68px}
+.tg{display:grid;grid-template-columns:repeat(3,1fr);gap:20px}
+.tc{background:#fff;border:1.5px solid var(--bd);border-radius:22px;overflow:hidden;transition:all .3s;box-shadow:var(--sh-sm)}
+.tc:hover{box-shadow:var(--sh-lg);border-color:rgba(5,150,105,.2);transform:translateY(-4px)}
+.tc-hdr{height:150px;position:relative;overflow:hidden}
+.tc-hdr img{width:100%;height:100%;object-fit:cover;display:block}
+.tc-hdr-ov{position:absolute;inset:0;background:linear-gradient(to bottom,transparent 25%,rgba(10,18,28,.55))}
+.tc-av{position:absolute;bottom:-20px;left:22px;width:46px;height:46px;border-radius:50%;border:3px solid #fff;display:flex;align-items:center;justify-content:center;font-size:15px;font-weight:700;box-shadow:var(--sh-md)}
+.tc-body{padding:34px 24px 26px}
+.tc-stars{color:#f59e0b;font-size:13px;margin-bottom:14px;letter-spacing:3px}
+.tc-quote{font-family:'Playfair Display',serif;font-size:15.5px;font-style:italic;line-height:1.78;color:var(--ts);margin-bottom:22px}
+.tc-name{font-size:14px;font-weight:600;color:var(--ink)}
+.tc-role{font-size:11.5px;color:var(--tm);margin-top:2px}
+
+/* CTA */
+.cta{position:relative;overflow:hidden}
+.cta-img{width:100%;height:500px;position:relative}
+.cta-img img{width:100%;height:100%;object-fit:cover;object-position:center 35%;display:block}
+.cta-ov{position:absolute;inset:0;background:linear-gradient(140deg,rgba(7,107,98,.91) 0%,rgba(15,17,23,.88) 100%)}
+.cta-in{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:60px 40px;text-align:center}
+.cta-pill{font-family:'Space Mono',monospace;font-size:10px;letter-spacing:.2em;text-transform:uppercase;color:rgba(255,255,255,.6);background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.14);padding:7px 16px;border-radius:100px;margin-bottom:22px;display:flex;align-items:center;gap:10px}
+.cta-pill::before{content:'';width:6px;height:6px;border-radius:50%;background:var(--teal-l);animation:blink 2s infinite;flex-shrink:0}
+.cta-h{font-family:'Playfair Display',serif;font-size:clamp(36px,5vw,72px);font-weight:900;line-height:1.05;letter-spacing:-.03em;color:#fff;margin-bottom:18px}
+.cta-h em{font-style:italic;color:var(--teal-l)}
+.cta-p{font-size:16.5px;color:rgba(255,255,255,.72);max-width:460px;line-height:1.75;margin-bottom:44px}
+.cta-form{display:flex;gap:12px;flex-wrap:wrap;justify-content:center;width:100%}
+.cta-input{background:rgba(255,255,255,.13);backdrop-filter:blur(8px);border:1.5px solid rgba(255,255,255,.25);border-radius:9px;padding:14px 22px;font-size:14px;font-family:'DM Sans',sans-serif;color:#fff;outline:none;width:300px;transition:border-color .2s}
+.cta-input::placeholder{color:rgba(255,255,255,.4)}
+.cta-input:focus{border-color:rgba(255,255,255,.6)}
+.cta-btn{background:#fff;color:var(--teal-d);padding:14px 32px;font-size:14px;font-weight:700;border:none;border-radius:9px;cursor:pointer;text-decoration:none;display:inline-block;transition:all .25s;box-shadow:0 4px 22px rgba(0,0,0,.22)}
+.cta-btn:hover{transform:translateY(-2px);box-shadow:0 8px 32px rgba(0,0,0,.28)}
+
+/* TRUST */
+.trust{padding:20px 64px;background:#fff;border-top:1px solid var(--bd);display:flex;align-items:center;justify-content:center;gap:44px;flex-wrap:wrap}
+.ti{display:flex;align-items:center;gap:7px;font-size:12.5px;color:var(--tm);font-family:'Space Mono',monospace;letter-spacing:.04em}
+.ti span{color:var(--sage);font-size:14px}
+
+/* FOOTER */
+footer{padding:60px 64px 40px;background:var(--ink)}
+.ft-top{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:48px}
+.ft-logo{font-family:'Playfair Display',serif;font-size:26px;font-weight:700;color:#fff;text-decoration:none;display:flex;align-items:center;gap:10px}
+.ft-logo em{color:var(--teal-l);font-style:italic}
+.ft-ico{width:38px;height:38px;display:flex;align-items:center;justify-content:center}
+.ft-ico img{width:46px;height:46px;object-fit:contain}
+.ft-tag{font-size:12.5px;color:rgba(255,255,255,.3);margin-top:7px}
+.ft-cols{display:flex;gap:72px}
+.ft-col h5{font-family:'Space Mono',monospace;font-size:9.5px;letter-spacing:.18em;text-transform:uppercase;color:rgba(255,255,255,.28);margin-bottom:18px}
+.ft-col ul{list-style:none;display:flex;flex-direction:column;gap:9px}
+.ft-col a{font-size:13.5px;color:rgba(255,255,255,.45);text-decoration:none;transition:color .2s}
+.ft-col a:hover{color:#fff}
+.ft-bot{display:flex;justify-content:space-between;align-items:center;padding-top:28px;border-top:1px solid rgba(255,255,255,.08)}
+.ft-copy{font-size:11.5px;color:rgba(255,255,255,.26)}
+.ft-soc{display:flex;gap:12px}
+.ft-sl{width:32px;height:32px;border:1px solid rgba(255,255,255,.12);border-radius:50%;display:flex;align-items:center;justify-content:center;color:rgba(255,255,255,.38);text-decoration:none;font-size:12px;transition:all .2s}
+.ft-sl:hover{border-color:var(--teal-l);color:var(--teal-l)}
+
+/* ANIMATIONS */
+@keyframes up{from{opacity:0;transform:translateY(26px)}to{opacity:1;transform:translateY(0)}}
+@keyframes blink{0%,100%{opacity:1}50%{opacity:.35}}
+.sr{opacity:0;transform:translateY(22px);transition:opacity .7s ease,transform .7s ease}
+.sr.vis{opacity:1;transform:translateY(0)}
+
+/* ══ TABLET ══ */
+@media(max-width:1060px){
+  nav{padding:0 32px}
+  .sec{padding:80px 32px}
+  .svc-grid{grid-template-columns:repeat(2,1fr)}
+  .pricing{padding:80px 32px}
+  .pg{max-width:100%}
+  .testi{padding:80px 32px}
+  .tg{grid-template-columns:1fr 1fr}
+  .tg .tc:last-child{grid-column:1/-1}
+  .cta-img{height:440px}
+  .trust{padding:20px 32px;gap:22px}
+  footer{padding:48px 32px 32px}
+  .ft-cols{gap:44px}
+}
+
+/* ══ MOBILE ══ */
+@media(max-width:768px){
+  body{cursor:auto}
+  .cur,.cur-ring{display:none}
+  nav{padding:0 20px;height:62px}
+  .nav-links{display:none}
+  .ham{display:flex}
+  .mmenu{top:62px}
+  .hero-sub{font-size:15.5px;margin-bottom:34px}
+  .hero-btns{flex-direction:column;width:100%}
+  .btn-teal,.btn-ghost{width:100%;justify-content:center;text-align:center}
+  .sec{padding:60px 20px}
+  .sec-h{font-size:clamp(26px,7vw,40px)}
+  .svc-grid{grid-template-columns:1fr;margin-top:40px;gap:14px}
+  .svc-img{height:200px}
+  .pricing{padding:60px 20px}
+  .pg{grid-template-columns:1fr}
+  .testi{padding:60px 20px}
+  .tg{grid-template-columns:1fr}
+  .tg .tc:last-child{grid-column:auto}
+  .cta-img{height:600px}
+  .cta-form{flex-direction:column;align-items:stretch;padding:0 8px}
+  .cta-input{width:100%}
+  .cta-btn{text-align:center}
+  .trust{padding:20px;justify-content:flex-start;gap:12px}
+  .ti{font-size:11px}
+  footer{padding:44px 20px 32px}
+  .ft-top{flex-direction:column;gap:36px}
+  .ft-cols{flex-wrap:wrap;gap:28px}
+  .ft-col{min-width:110px}
+  .ft-bot{flex-direction:column;gap:18px;align-items:flex-start}
+  .ft-logo{font-size:20px}
+}
+@media(max-width:375px){
+  .sec-h{font-size:26px}
+}
+.hero{padding:150px 64px 70px;text-align:center}.hero p{max-width:560px;margin:16px auto 28px;color:var(--tm)}.hero-cta{display:flex;gap:12px;justify-content:center}
+</style>
+</head>
+<body>
+
+<div class="cur" id="cur"></div>
+<div class="cur-ring" id="cring"></div>
+
+<!-- NAV -->
+<nav>
+  <a href="#" class="logo">
+    <div class="logo-ico"><img src="{% static 'images/logo-64.png' %}" alt="Sajhya"></div> 
+    Sa:<em>jhya</em>
+  </a>
+  <div class="nav-links">
+    <a href="#find-care">Services</a>
+    <a href="{% url 'marketplace:pharmacy' %}">Pharmacy</a>
+    <a href="{% url 'lab:tests' %}">Lab Tests</a>
+    <a href="{% url 'marketplace:marketplace' %}">Marketplace</a>
+    <a href="#">Tools</a>
+    <a href="#">About</a>
+    {% if user.is_authenticated %}<a href="{% url 'accounts:welcome' %}" class="nbtn nbtn-o">My account</a>{% else %}<a href="{% url 'accounts:login' %}" class="nbtn nbtn-o">Sign in</a>
+    <a href="{% url 'accounts:package' %}" class="nbtn nbtn-o">Get Started</a>{% endif %}
+  </div>
+  <button class="ham" id="ham" aria-label="Menu"><span></span><span></span><span></span></button>
+</nav>
+
+<div class="mmenu" id="mm">
+  <a href="#find-care">Services</a><a href="{% url 'marketplace:pharmacy' %}">Pharmacy</a><a href="{% url 'lab:tests' %}">Lab Tests</a><a href="{% url 'marketplace:marketplace' %}">Marketplace</a><a href="#">Tools</a><a href="#">About</a>
+  <div class="mmenu-ctas">
+    <a href="{% url 'accounts:login' %}" class="mc-o">Sign in</a>
+    <a href="{% url 'accounts:package' %}" class="mc-f">Get Started</a>
+  </div>
+</div>
+
+<!-- MARKETPLACE PREVIEW -->
+<section class="mp-sec sr">
+  <div class="mp-hdr">
+    <div class="lbl c">Marketplace</div>
+    <h1 class="sec-h">Shop what your<br><em>recovery</em> needs.</h1>
+    <p>Braces, supports, therapy equipment and rehab supplies -- browse the full catalogue, no sign-in needed.</p>
+  </div>
+  <div class="mp-grid">
+    {% for p in marketplace_preview %}
+    <a href="{% url 'marketplace:product-detail' p.id %}" class="mp-card">
+      <div class="mp-card-img">
+        {% if p.image_url_path %}
+          <img src="{{ p.image_url_path }}" alt="{{ p.name }}" loading="lazy">
+        {% endif %}
+      </div>
+      <div class="mp-card-body">
+        <p class="mp-card-name">{{ p.name }}</p>
+        <div class="mp-card-price">NPR {{ p.price }}</div>
+      </div>
+    </a>
+    {% endfor %}
+  </div>
+  <div class="mp-cta-row">
+    <a href="{% url 'marketplace:marketplace' %}" class="nbtn nbtn-f">Shop All Products &rarr;</a>
+  </div>
+</section>
+
+<!-- FIND CARE -->
+<section class="fc-sec sr" id="find-care">
+  <div class="fc-sec-hdr">
+    <div class="lbl c">For Patients</div>
+    <h2 class="sec-h">What are you<br><em>looking for?</em></h2>
+    <p>Browse our care categories and connect with the right provider in minutes.</p>
+  </div>
+  <div class="fc-grid">
+    <a href="{% url 'accounts:login' %}" class="fc-cat">
+      <div class="fc-cat-img">
+        <img src="{% static 'pics/physio_activity.jpeg' %}" alt="Physiotherapy" loading="lazy">
+        <div class="fc-cat-ov"></div>
+        <span class="fc-cat-badge" style="background:rgba(5,150,105,.88);color:#fff">● Live</span>
+      </div>
+      <div class="fc-cat-body">
+        <div class="fc-cat-ico" style="background:var(--teal-p)">🦴</div>
+        <div class="fc-cat-title">Find a Physio</div>
+        <p class="fc-cat-desc">Search verified physiotherapists near you. Compare fees, specializations, and book instantly.</p>
+        <div class="fc-cat-cta">Browse Physios <span>↗</span></div>
+      </div>
+    </a>
+    <a href="https://drmadhu.manurya.com/" class="fc-cat" target="_blank" rel="noopener noreferrer">
+      <div class="fc-cat-img">
+        <img src="{% static 'pics/referrals.jpg' %}" alt="Doctors" loading="lazy">
+        <div class="fc-cat-ov"></div>
+        <span class="fc-cat-badge" style="background:rgba(5,150,105,.88);color:#fff">● Live</span>
+      </div>
+      <div class="fc-cat-body">
+        <div class="fc-cat-ico" style="background:var(--blue-p)">🩺</div>
+        <div class="fc-cat-title">Find a Doctor</div>
+        <p class="fc-cat-desc">Browse GPs and specialists by location and expertise. Read reviews from verified patients.</p>
+        <div class="fc-cat-cta">Find Doctors <span>↗</span></div>
+      </div>
+    </a>
+    <a href="{% url 'marketplace:pharmacy' %}" class="fc-cat">
+      <div class="fc-cat-img">
+        <img src="{% static 'pics/pharmacy.jpg' %}" alt="Pharmacy" loading="lazy">
+        <div class="fc-cat-ov"></div>
+        <span class="fc-cat-badge" style="background:rgba(4,120,87,.88);color:#fff">● Live</span>
+      </div>
+      <div class="fc-cat-body">
+        <div class="fc-cat-ico" style="background:var(--sage-p)">💊</div>
+        <div class="fc-cat-title">Pharmacy</div>
+        <p class="fc-cat-desc">Order prescribed medicines online. Delivered across Nepal with real-time tracking.</p>
+        <div class="fc-cat-cta">Shop Medicines <span>↗</span></div>
+      </div>
+    </a>
+    <a href="{% url 'lab:tests' %}" class="fc-cat">
+      <div class="fc-cat-img">
+        <img src="{% static 'pics/nursing_tool.jpg' %}" alt="Lab Tests" loading="lazy">
+        <div class="fc-cat-ov"></div>
+        <span class="fc-cat-badge" style="background:rgba(37,99,235,.85);color:#fff">● Live</span>
+      </div>
+      <div class="fc-cat-body">
+        <div class="fc-cat-ico" style="background:var(--blue-p)">🧪</div>
+        <div class="fc-cat-title">Lab Tests</div>
+        <p class="fc-cat-desc">Book blood tests and bundled panels — Diabetes, Fever, Master Health Checkup and more, with home sample collection.</p>
+        <div class="fc-cat-cta">Book a Test <span>↗</span></div>
+      </div>
+    </a>
+    <a href="{% url 'marketplace:marketplace' %}" class="fc-cat">
+      <div class="fc-cat-img">
+        <img src="{% static 'pics/physio_tool.jpg' %}" alt="Marketplace" loading="lazy">
+        <div class="fc-cat-ov"></div>
+        <span class="fc-cat-badge" style="background:rgba(5,150,105,.88);color:#fff">● Live</span>
+      </div>
+      <div class="fc-cat-body">
+        <div class="fc-cat-ico" style="background:var(--teal-p)">🛒</div>
+        <div class="fc-cat-title">Marketplace</div>
+        <p class="fc-cat-desc">Braces, supports, therapy equipment and rehab supplies — browse the full catalogue, no sign-in needed.</p>
+        <div class="fc-cat-cta">Shop Supplies <span>↗</span></div>
+      </div>
+    </a>
+    <a href="#" class="fc-cat">
+      <div class="fc-cat-img">
+        <img src="{% static 'pics/medico.jpg' %}" alt="Careers at Sajhya" loading="lazy">
+        <div class="fc-cat-ov"></div>
+        <span class="fc-cat-badge" style="background:rgba(5,150,105,.88);color:#fff">● Live</span>
+      </div>
+      <div class="fc-cat-body">
+        <div class="fc-cat-ico" style="background:var(--rose-p)">💼</div>
+        <div class="fc-cat-title">Careers</div>
+        <p class="fc-cat-desc">Join our team building Nepal's healthcare platform — browse open roles and apply online.</p>
+        <div class="fc-cat-cta">View Openings <span>↗</span></div>
+      </div>
+    </a>
+    <a href="#" class="fc-cat">
+      <div class="fc-cat-img">
+        <img src="{% static 'pics/patient.jpg' %}" alt="Donate Mobility Aids" loading="lazy">
+        <div class="fc-cat-ov"></div>
+        <span class="fc-cat-badge" style="background:rgba(220,34,85,.88);color:#fff">🆘 Relief</span>
+      </div>
+      <div class="fc-cat-body">
+        <div class="fc-cat-ico" style="background:var(--rose-p)">🦽</div>
+        <div class="fc-cat-title">Donate</div>
+        <p class="fc-cat-desc">Give your unused wheelchair, crutches, walker or other mobility aid to flood-affected Nepalis with disabilities. We arrange pickup.</p>
+        <div class="fc-cat-cta">Donate Now <span>↗</span></div>
+      </div>
+    </a>
+    <a href="{% url 'accounts:package' %}" class="fc-cat">
+      <div class="fc-cat-img">
+        <img src="{% static 'pics/physio_tool.jpg' %}" alt="Clinical Tools" loading="lazy">
+        <div class="fc-cat-ov"></div>
+        <span class="fc-cat-badge" style="background:rgba(109,40,217,.85);color:#fff">Pro</span>
+      </div>
+      <div class="fc-cat-body">
+        <div class="fc-cat-ico" style="background:var(--blue-p)">🛠️</div>
+        <div class="fc-cat-title">Clinical Tools</div>
+        <p class="fc-cat-desc">SOAP notes, assessment forms, exercise libraries and patient tracking for clinicians.</p>
+        <div class="fc-cat-cta">Explore Tools <span>↗</span></div>
+      </div>
+    </a>
+    <a href="#" class="fc-cat">
+      <div class="fc-cat-img">
+        <img src="{% static 'pics/rehab_team.png' %}" alt="MAPS Summit" loading="lazy">
+        <div class="fc-cat-ov"></div>
+        <span class="fc-cat-badge" style="background:rgba(194,116,11,.85);color:#fff">Event</span>
+      </div>
+      <div class="fc-cat-body">
+        <div class="fc-cat-ico" style="background:var(--amber-p)">🏔️</div>
+        <div class="fc-cat-title">MAPS Summit</div>
+        <p class="fc-cat-desc">Facilitators: choose your table and start the leadership summit worksheet.</p>
+        <div class="fc-cat-cta">Choose Table <span>↗</span></div>
+      </div>
+    </a>
+  </div>
+</section>
+
+<!-- SERVICES -->
+<section class="sec" style="background:var(--snow)">
+  <h2 class="sec-h sr">Complete tools,<br><em>all in one place.</em></h2>
+  <div class="svc-grid sr">
+    <div class="svc">
+      <div class="svc-img"><img src="{% static 'pics/referrals.jpg' %}" alt="Specialist" loading="lazy"><div class="svc-img-ov"></div><span class="sbadge bl">● Live</span></div>
+      <div class="svc-body"><div class="svc-ico" style="background:var(--teal-p)">🩺</div><h3 class="svc-title">Referral Tools</h3><p class="svc-desc">Browse verified specialists and GPs. Book instantly, consult online, manage all your health records in one place.</p><div class="svc-arr">↗</div></div>
+    </div>
+    <a href="#" class="svc-link">
+    <div class="svc">
+      <div class="svc-img"><img src="{% static 'pics/physio_tool.jpg' %}" alt="Physiotherapy" loading="lazy"><div class="svc-img-ov"></div><span class="sbadge bn">New</span></div>
+      <div class="svc-body"><div class="svc-ico" style="background:var(--blue-p)">🦴</div><h3 class="svc-title">Physio Tools</h3><p class="svc-desc">Assessment forms, exercise libraries, SOAP notes, and progress tracking — purpose-built for physiotherapists.</p><div class="svc-arr">↗</div></div>
+    </div>
+    </a>
+    <a href="#" class="svc-link">
+    <div class="svc">
+      <div class="svc-img"><img src="{% static 'pics/occupational_therapy_tool.jpg' %}" alt="Occupational therapy" loading="lazy"><div class="svc-img-ov"></div><span class="sbadge bb">Beta</span></div>
+      <div class="svc-body"><div class="svc-ico" style="background:var(--blue-p)">🧠</div><h3 class="svc-title">OT Tools</h3><p class="svc-desc">ADL evaluations, goal tracking, outcome measures — streamlined for occupational therapists in any setting.</p><div class="svc-arr">↗</div></div>
+    </div>
+    </a>
+    <a href="#" class="svc-link">
+    <div class="svc">
+      <div class="svc-img"><img src="{% static 'pics/speech_therapy_tool.jpg' %}" alt="Speech therapy" loading="lazy"><div class="svc-img-ov"></div></div>
+      <div class="svc-body"><div class="svc-ico" style="background:var(--amber-p)">🗣️</div><h3 class="svc-title">Speech Tools</h3><p class="svc-desc">Articulation assessments, language charts, session logs, and progress dashboards for speech-language pathologists.</p><div class="svc-arr">↗</div></div>
+    </div>
+    </a>
+    <a href="#" class="svc-link">
+    <div class="svc">
+      <div class="svc-img"><img src="{% static 'pics/nursing_tool.jpg' %}" alt="Nursing care" loading="lazy"><div class="svc-img-ov"></div></div>
+      <div class="svc-body"><div class="svc-ico" style="background:var(--rose-p)">💉</div><h3 class="svc-title">Nursing Tools</h3><p class="svc-desc">Vitals monitoring, medication management, care planning, and shift handover tools for clinical nurses.</p><div class="svc-arr">↗</div></div>
+    </div>
+    </a>
+    <a href="{% url 'marketplace:pharmacy' %}" class="svc-link">
+    <div class="svc">
+      <div class="svc-img"><img src="{% static 'pics/pharmacy.jpg' %}"alt="Pharmacy" loading="lazy"><div class="svc-img-ov"></div><span class="sbadge bl">● Live</span></div>
+      <div class="svc-body"><div class="svc-ico" style="background:var(--sage-p)">💊</div><h3 class="svc-title">Pharmacy Tools</h3><p class="svc-desc">Order medicines, track deliveries, set refill reminders across a verified catalogue throughout Nepal.</p><div class="svc-arr">↗</div></div>
+    </div>
+    </a>
+  </div>
+</section>
+
+<!-- PRICING -->
+<section class="pricing">
+  <div class="pricing-hdr sr">
+    <div class="lbl c">Pricing</div>
+    <h2 class="sec-h">Simple. <em>Honest.</em> Accessible.</h2>
+  </div>
+  <div class="pg sr">
+    <div class="pc">
+      <div class="pc-img"><img src="{% static 'pics/patient.jpg' %}" alt="Patient" loading="lazy"></div>
+      <div class="pc-body">
+        <div class="pc-tier">Normal Account</div>
+        {% if plans.client.is_free %}<div class="pc-amt" style="font-size:44px">Free</div>{% else %}<div class="pc-amt"><sup>Rs</sup>{{ plans.client.price_monthly|floatformat:0 }}<span class="per">/mo</span></div>{% endif %}
+        <p class="pc-desc">Free access for everyone seeking care, appointments, and health records.</p>
+        <ul class="pc-feats"><li>Health profile &amp; records</li><li>Browse all doctors</li><li>3 consultations/month</li><li>Pharmacy access</li><li class="dim">Priority booking</li><li class="dim">Clinical tools</li></ul>
+        <a href="{% url 'accounts:package' %}" class="pc-btn pc-o">Get Started Free</a>
+      </div>
+    </div>
+    <div class="pc feat">
+      <div class="pc-img"><img src="{% static 'pics/professional.jpg' %}" alt="Professional" loading="lazy"></div>
+      <div class="pc-body">
+        <div class="pc-tier">Professional</div>
+        {% if plans.professional.is_custom %}{% if plans.clinic.is_custom or plans.enterprise.is_custom %}<div class="pc-amt" style="font-size:34px;margin-top:8px">Custom</div>{% else %}<div class="pc-amt"><sup>Rs</sup>{{ plans.clinic.price_monthly|floatformat:0 }}<span class="per">/mo</span></div>{% endif %}{% else %}<div class="pc-amt"><sup>Rs</sup>{{ plans.professional.price_monthly|floatformat:0 }}<span class="per">/mo</span></div>{% endif %}
+        <p class="pc-desc">For clinicians who need full tools, scheduling, and patient management.</p>
+        <ul class="pc-feats"><li>Unlimited consultations</li><li>All clinical tools</li><li>Patient management</li><li>Prescription tools</li><li>Analytics dashboard</li><li>Priority support</li></ul>
+        <a href="{% url 'accounts:select-type' 'professional' %}" class="pc-btn pc-t">Get Started</a>
+      </div>
+    </div>
+    <div class="pc">
+      <div class="pc-img"><img src="{% static 'pics/institution.jpg' %}" alt="Institution" loading="lazy"></div>
+      <div class="pc-body">
+        <div class="pc-tier">Institution</div>
+        {% if plans.clinic.is_custom or plans.enterprise.is_custom %}<div class="pc-amt" style="font-size:34px;margin-top:8px">Custom</div>{% else %}<div class="pc-amt"><sup>Rs</sup>{{ plans.clinic.price_monthly|floatformat:0 }}<span class="per">/mo</span></div>{% endif %}
+        <p class="pc-desc">For hospitals, clinics and healthcare networks needing advanced features.</p>
+        <ul class="pc-feats"><li>Everything in Pro</li><li>Unlimited clinicians</li><li>EMR integration</li><li>HIPAA compliance</li><li>Dedicated support</li><li>99.9% SLA</li></ul>
+        <a href="{% url 'accounts:package' %}" class="pc-btn pc-o">See Clinic &amp; Enterprise</a>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- TESTIMONIALS -->
+<div class="testi">
+  <div class="testi-hdr sr">
+    <div class="lbl c">Trusted by care teams</div>
+    <h2 class="sec-h">What providers are <em>saying.</em></h2>
+  </div>
+  <div class="tg sr">
+    <div class="tc">
+      <div class="tc-hdr"><img src="{% static 'pics/physiotherapist.jpg' %}"alt="Physio clinic" loading="lazy"><div class="tc-hdr-ov"></div><div class="tc-av" style="background:var(--teal-p);color:var(--teal-d)">A</div></div>
+      <div class="tc-body"><div class="tc-stars">★★★★★</div><p class="tc-quote">"Sajhya has transformed how I manage my physiotherapy patients. The SOAP note tools alone save me hours every week."</p><div class="tc-name">Anita Sharma</div><div class="tc-role">Senior Physiotherapist, Tribhuvan University Hospital</div></div>
+    </div>
+    <div class="tc">
+      <div class="tc-hdr"><img src="{% static 'pics/operation_theatre.jpg' %}" alt="OT clinic" loading="lazy"><div class="tc-hdr-ov"></div><div class="tc-av" style="background:var(--blue-p);color:var(--blue)">R</div></div>
+      <div class="tc-body"><div class="tc-stars">★★★★★</div><p class="tc-quote">"As an OT, structured assessment tools and goal-tracking in one platform makes my workflow so much more efficient."</p><div class="tc-name">Rohan Basnet</div><div class="tc-role">Occupational Therapist, KIST Medical College</div></div>
+    </div>
+    <div class="tc">
+      <div class="tc-hdr"><img src="{% static 'pics/building.jpg' %}" alt="Hospital ward" loading="lazy"><div class="tc-hdr-ov"></div><div class="tc-av" style="background:var(--blue-p);color:var(--blue)">P</div></div>
+      <div class="tc-body"><div class="tc-stars">★★★★★</div><p class="tc-quote">"Our nursing staff uses Sajhya for vitals logging and care planning. The handover feature has reduced medication errors significantly."</p><div class="tc-name">Priya Maharjan</div><div class="tc-role">Head Nurse, Patan Hospital</div></div>
+    </div>
+  </div>
+</div>
+
+<!-- TRUST -->
+<div class="trust sr">
+  <div class="ti"><span>✓</span> HIPAA Compliant</div>
+  <div class="ti"><span>✓</span> Nepal Medical Council Verified</div>
+  <div class="ti"><span>✓</span> End-to-End Encrypted</div>
+  <div class="ti"><span>✓</span> 24/7 Support</div>
+  <div class="ti"><span>✓</span> ISO 27001 Certified</div>
+</div>
+
+<!-- CTA -->
+<section class="cta">
+  <div class="cta-img">
+    <img src="{% static 'pics/operation_staff.jpg' %}" alt="Doctors" loading="lazy">
+    <div class="cta-ov"></div>
+    <div class="cta-in sr">
+      <div class="cta-pill">Start today — it's free</div>
+      <h2 class="cta-h">Better care<br>starts <em>here.</em></h2>
+      <p class="cta-p">Join thousands of patients and clinicians across Nepal already using Sajhya. No credit card needed for patients.</p>
+      <div class="cta-form">
+        <input type="email" class="cta-input" placeholder="your@email.com">
+        <a href="#" class="cta-btn">Join Sajhya Free</a>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- FOOTER -->
+<footer>
+  <div class="ft-top">
+    <div>
+      <a href="#" class="ft-logo"><div class="ft-ico"><img src="{% static 'images/logo-64.png' %}" alt=""></div>Sa:<em>jhya</em></a>
+      <p class="ft-tag">Your complete healthcare platform.</p>
+    </div>
+    <div class="ft-cols">
+      <div class="ft-col"><h5>Services</h5><ul><li><a href="#">Find Physio</a></li><li><a href="#">Physio Tools</a></li><li><a href="#">OT Tools</a></li><li><a href="#">Speech Tools</a></li><li><a href="#">Nursing Tools</a></li><li><a href="{% url 'marketplace:pharmacy' %}">Pharmacy</a></li><li><a href="{% url 'lab:tests' %}">Lab Tests</a></li><li><a href="{% url 'marketplace:marketplace' %}">Marketplace</a></li></ul></div>
+      <div class="ft-col"><h5>Company</h5><ul><li><a href="#">About</a></li><li><a href="#">Blog</a></li><li><a href="#">Careers</a></li><li><a href="#">Press</a></li></ul></div>
+      <div class="ft-col"><h5>Support</h5><ul><li><a href="#">Help Centre</a></li><li><a href="#">Privacy Policy</a></li><li><a href="#">Terms of Use</a></li><li><a href="#">Contact</a></li></ul></div>
+    </div>
+  </div>
+  <div class="ft-bot">
+    <p class="ft-copy">© 2026 Sajhya Healthcare Pvt. Ltd. All rights reserved.</p>
+    <div class="ft-soc"><a href="#" class="ft-sl">𝕏</a><a href="#" class="ft-sl">in</a><a href="#" class="ft-sl">fb</a></div>
+  </div>
+</footer>
+
+<script>
+const cur=document.getElementById('cur'),ring=document.getElementById('cring');
+const touch=window.matchMedia('(hover:none)').matches;
+if(!touch){
+  let mx=0,my=0,rx=0,ry=0;
+  document.addEventListener('mousemove',e=>{mx=e.clientX;my=e.clientY});
+  (function t(){rx+=(mx-rx)*.16;ry+=(my-ry)*.16;
+    cur.style.transform=`translate(${mx}px,${my}px) translate(-50%,-50%)`;
+    ring.style.transform=`translate(${rx}px,${ry}px) translate(-50%,-50%)`;
+    requestAnimationFrame(t)})();
+  document.querySelectorAll('a,button,input').forEach(el=>{
+    el.addEventListener('mouseenter',()=>ring.classList.add('big'));
+    el.addEventListener('mouseleave',()=>ring.classList.remove('big'));
+  });
+}
+const ham=document.getElementById('ham'),mm=document.getElementById('mm');
+ham.addEventListener('click',()=>{ham.classList.toggle('open');mm.classList.toggle('open')});
+mm.querySelectorAll('a').forEach(a=>a.addEventListener('click',()=>{ham.classList.remove('open');mm.classList.remove('open')}));
+document.addEventListener('click',e=>{if(!ham.contains(e.target)&&!mm.contains(e.target)){ham.classList.remove('open');mm.classList.remove('open')}});
+const io=new IntersectionObserver(es=>es.forEach(e=>{if(e.isIntersecting)setTimeout(()=>e.target.classList.add('vis'),80)}),{threshold:.07});
+document.querySelectorAll('.sr').forEach(el=>io.observe(el));
+</script>
+</body>
+</html>

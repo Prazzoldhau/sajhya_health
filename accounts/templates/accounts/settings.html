@@ -1,0 +1,79 @@
+{% extends 'accounts/pro_base.html' %}
+{% block title %}Settings | Sajhya Health{% endblock %}
+{% block extra_css %}
+  main { padding-top: 18px; }
+  .set-card { max-width: 720px; padding: 18px 20px 20px; }
+  .set-card .row { display: grid; gap: 4px; margin-bottom: 14px; }
+  .set-card label { font-size: 12px; font-weight: 700; color: var(--muted); }
+  .set-card input[type=text], .set-card input[type=email], .set-card input[type=number], .set-card input[type=tel], .set-card select {
+    width: 100%; height: 38px; border: 1px solid var(--line); border-radius: 8px; padding: 0 10px; font: inherit; background: #fff; }
+  .set-card ul { list-style: none; padding: 0; margin: 0; display: flex; flex-wrap: wrap; gap: 6px 16px; }
+  .set-card ul label { font-weight: 500; display: flex; gap: 6px; align-items: center; }
+  .set-card .help { font-size: 11px; color: var(--muted); }
+  .set-card .errorlist { color: #b83b3b; font-size: 12px; margin: 0; padding: 0; list-style: none; }
+  .locked { background: #f6fbf8; border: 1px solid var(--line); border-radius: 8px; padding: 10px 12px; font-size: 12.5px; margin-bottom: 14px; }
+  .locked b { display: inline-block; min-width: 130px; color: var(--muted); font-weight: 700; }
+  .set-photo { display: flex; align-items: center; gap: 14px; margin-bottom: 14px; }
+  .set-photo img { width: 64px; height: 64px; border-radius: 50%; object-fit: cover; border: 1px solid var(--line); }
+{% endblock %}
+{% block main %}
+<h1 style="font-size:20px;margin:0 0 12px">Settings</h1>
+<div class="chipbar">
+  {% for key, label in tabs %}<a href="?tab={{ key }}" class="{% if tab == key %}on{% endif %}">{{ label }}</a>{% endfor %}
+</div>
+
+<section class="panel set-card">
+  {% if tab == 'profile' %}
+  <div class="locked">
+    <div><b>Name</b>{{ profile.full_name }}</div>
+    <div><b>Title</b>{{ profile.title }}</div>
+    <div><b>Licence number</b>{{ profile.license_number|default:"-" }}</div>
+    <div class="help" style="margin-top:6px">Name, title and licence details were verified by our staff and cannot be edited here. To correct them, contact support so they can be re-checked.</div>
+  </div>
+  <form method="post" enctype="multipart/form-data">{% csrf_token %}<input type="hidden" name="tab" value="profile">
+    <div class="set-photo">
+      {% if profile.profile_picture %}<img src="{{ profile.profile_picture.url }}" alt="Current photo">{% else %}<span class="avatar" style="width:64px;height:64px;font-size:20px">{{ initials }}</span>{% endif %}
+      <div class="row" style="margin:0"><label for="{{ form.profile_picture.id_for_label }}">Profile photo (JPG or PNG)</label>{{ form.profile_picture }}</div>
+    </div>
+    <div class="row"><label for="{{ form.mobile.id_for_label }}">Mobile number</label>{{ form.mobile }}</div>
+    <div class="row"><label for="{{ form.years_experience.id_for_label }}">Years of experience</label>{{ form.years_experience }}</div>
+    <div class="row"><label>{{ form.focus_areas.label }}</label>{{ form.focus_areas }}</div>
+    <div class="row"><label>{{ form.services.label }}</label>{{ form.services }}</div>
+    <button class="primary-btn" type="submit">Save profile</button>
+  </form>
+
+  {% elif tab == 'practice' %}
+  <form method="post">{% csrf_token %}<input type="hidden" name="tab" value="practice">
+    <div class="row"><label for="{{ form.practice_name.id_for_label }}">{{ form.practice_name.label }}</label>{{ form.practice_name }}</div>
+    <div class="row"><label for="{{ form.practice_address.id_for_label }}">{{ form.practice_address.label }}</label>{{ form.practice_address }}</div>
+    <div class="row"><label for="{{ form.practice_phone.id_for_label }}">{{ form.practice_phone.label }}</label>{{ form.practice_phone }}</div>
+    <div class="row"><label for="{{ form.facility_code.id_for_label }}">{{ form.facility_code.label }}</label>{{ form.facility_code }}<span class="help">{{ form.facility_code.help_text }}</span></div>
+    <div class="row"><label for="{{ form.default_session_minutes.id_for_label }}">{{ form.default_session_minutes.label }}</label>{{ form.default_session_minutes }}<span class="help">Pre-filled when you book an appointment; you can still change it each time.</span></div>
+    <button class="primary-btn" type="submit">Save practice settings</button>
+  </form>
+
+  {% elif tab == 'plan' %}
+  <div class="locked"><div><b>Patients</b><span style="font-weight:800">{{ allowance.used }}</span> of {{ allowance.allowed }} slots used</div>
+    <div><b>Free</b>{{ allowance.free_limit }} patients</div><div><b>Bought</b>{{ allowance.paid_slots }} extra</div><div><b>Left</b>{{ allowance.remaining }}</div></div>
+  <div style="height:10px;background:#e3efe8;border-radius:6px;overflow:hidden;margin:0 0 14px"><i style="display:block;height:100%;width:{% widthratio allowance.used allowance.allowed 100 %}%;background:var(--green)"></i></div>
+  <p class="help" style="margin:0 0 14px">The first {{ allowance.free_limit }} patients are free. Every extra patient costs <b>NPR {{ allowance.rate|floatformat:"0" }}</b>, paid once when you buy the slot. Patients you register inside a clinic are covered by the clinic plan and are not counted here.</p>
+  <form method="post">{% csrf_token %}<input type="hidden" name="tab" value="plan">
+    <div class="row"><label for="{{ form.quantity.id_for_label }}">{{ form.quantity.label }}</label>{{ form.quantity }}<span class="help">Cost = number x NPR {{ allowance.rate|floatformat:"0" }}. Our team collects the payment and adds the slots (no online payment yet).</span></div>
+    <button class="primary-btn" type="submit">Order patient slots</button>
+  </form>
+  {% if slot_orders %}<hr style="border:0;border-top:1px solid var(--line);margin:20px 0"><p style="margin:0 0 8px"><b>My slot orders</b></p>
+    <table style="width:100%;font-size:12.5px;border-collapse:collapse">{% for o in slot_orders %}<tr><td style="padding:6px 0">{{ o.requested_at|date:"M j, Y" }}</td><td>{{ o.quantity }} slots</td><td>NPR {{ o.amount|floatformat:"0" }}</td><td>{{ o.get_status_display }}</td></tr>{% endfor %}</table>{% endif %}
+
+  {% else %}
+  <div class="locked"><div><b>Username</b>{{ user.get_username }}</div><div><b>Account type</b>{{ user.account.account_type|title }}</div><div><b>Verification</b>{{ profile.get_status_display }}</div></div>
+  <form method="post">{% csrf_token %}<input type="hidden" name="tab" value="account">
+    <div class="row"><label for="{{ form.email.id_for_label }}">{{ form.email.label }}</label>{{ form.email }}</div>
+    <button class="primary-btn" type="submit">Save email</button>
+  </form>
+  <hr style="border:0;border-top:1px solid var(--line);margin:20px 0">
+  <p style="margin:0 0 10px"><b>Password</b></p>
+  <a class="secondary-btn" href="{% url 'accounts:password-change' %}" style="text-decoration:none;display:inline-flex;align-items:center">Change password</a>
+  <form method="post" action="{% url 'accounts:logout' %}" style="display:inline">{% csrf_token %}<button class="secondary-btn" type="submit">Log out</button></form>
+  {% endif %}
+</section>
+{% endblock %}

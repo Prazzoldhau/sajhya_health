@@ -1,0 +1,32 @@
+{# The "Assessments" tab of the patient page. Context: summary.sessions, summary.progress (assessments.services.patient_summary). #}
+<div class="section-title" style="padding-top:18px"><span class="bar">Assessments</span>
+  <a class="primary-btn" href="{% url 'assessments:choose' patient.pk %}" style="height:34px;text-decoration:none;display:inline-flex;align-items:center">＋ New assessment</a></div>
+<div class="as-wrap">
+  {% if summary.progress %}
+  <div class="as-group" style="margin-top:4px">Progress by scale</div>
+  <div class="table-wrap" style="padding:0"><table class="as-table">
+    <thead><tr><th>SCALE</th><th>FIRST</th><th>LATEST</th><th>CHANGE</th><th>TREND</th><th>MEANING OF LATEST</th></tr></thead>
+    <tbody>
+    {% for p in summary.progress %}
+      <tr>
+        <td><b>{{ p.name }}</b><div style="font-size:11px;color:var(--muted)">{{ p.count }} reading{{ p.count|pluralize }} · latest {{ p.latest.session.assessed_on|date:"M j, Y" }}</div></td>
+        <td>{{ p.first.score_display }}</td><td><b>{{ p.latest.score_display }}</b></td>
+        <td><span class="tone {{ p.tone }}">{{ p.change }}</span>{% if p.since_last %}<div style="font-size:10.5px;color:var(--muted);margin-top:3px">Since last: {{ p.since_last }}</div>{% endif %}</td>
+        <td>{% if p.spark %}<svg width="90" height="24" viewBox="0 0 90 24" aria-hidden="true"><polyline points="{{ p.spark }}" fill="none" stroke="#1f9d62" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/></svg>{% else %}-{% endif %}</td>
+        <td>{% if p.latest.interpretation %}<span class="tone {{ p.latest.tone }}">{{ p.latest.interpretation }}</span>{% else %}-{% endif %}</td>
+      </tr>
+    {% endfor %}
+    </tbody>
+  </table></div>
+  {% endif %}
+
+  <div class="as-group">History</div>
+  {% for s in summary.sessions %}
+  <a href="{% url 'assessments:detail' s.pk %}" class="as-card" style="text-decoration:none;color:inherit;margin-bottom:10px">
+    <h3>{{ s.form_name|default:"Assessment" }} <span class="sub">· {{ s.assessed_on|date:"M j, Y" }}{% if s.assessor %} · {{ s.assessor }}{% endif %}</span></h3>
+    <div class="as-chips">{% for r in s.results.all %}<span class="as-chip">{{ r.scale_name }}: {{ r.score_display }}</span>{% endfor %}</div>
+  </a>
+  {% empty %}
+  <div style="padding:26px;text-align:center;color:var(--muted)">No assessments yet. Click <b>New assessment</b> to choose scales (Barthel, Berg, FIM, NIHSS, ODI and more) and record the scores.</div>
+  {% endfor %}
+</div>

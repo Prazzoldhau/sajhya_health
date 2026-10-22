@@ -1,0 +1,39 @@
+{% extends 'accounts/base.html' %}
+{% block title %}Welcome - Sajhya Health{% endblock %}
+{% block content %}
+<div class="text-center">
+    <h1 class="fw-bold page-title">Welcome, {{ user.username }}!</h1>
+    <p class="lead page-lead">
+        Your {{ user.account.account_type }} account
+        {% if user.account.profession %}({{ user.account.profession }}){% endif %}
+        {% if user.account.clinic_type %}({{ user.account.clinic_type }}){% endif %}
+        {% if user.account.enterprise_type %}({{ user.account.enterprise_type }}){% endif %}
+        is ready.
+    </p>
+    {% if profile %}
+        {% if next_step %}
+        <div class="form-panel mt-4">
+            <p class="mb-3">Your professional profile is <strong>not finished yet</strong>. Pick up where you left off.</p>
+            <a href="{% url 'accounts:professional-step' next_step %}" class="btn btn-gradient">Continue onboarding</a>
+            <p class="mt-3 mb-0"><a href="{% url 'accounts:profile-picture' %}" class="page-lead">{% if profile.profile_picture %}Change{% else %}Add{% endif %} profile photo</a></p>
+        </div>
+        {% else %}
+        <div class="form-panel mt-4">
+            <p class="mb-0">Verification status: <strong>{{ profile.get_status_display }}</strong></p>
+        </div>
+        {% endif %}
+        {% if profile.status == 'rejected' %}
+        <div class="form-panel mt-3">
+            <p><strong>Reason:</strong> {{ profile.rejection_reason }}</p>
+            <a href="{% url 'accounts:professional-step' 2 %}" class="btn btn-gradient">Update details &amp; resubmit</a>
+        </div>
+        {% endif %}
+    {% endif %}
+    {% if user.is_staff %}<p class="mt-4"><a href="{% url 'accounts:review-list' %}" class="page-lead">Review professional applications &rarr;</a></p>{% endif %}
+    <p class="mt-3 mb-0"><a href="{% url 'accounts:password-change' %}" class="page-lead">Change password</a></p>
+    <form method="post" action="{% url 'accounts:logout' %}" class="mt-4">
+        {% csrf_token %}
+        <button type="submit" class="btn btn-gradient" style="max-width:200px">Log out</button>
+    </form>
+</div>
+{% endblock %}

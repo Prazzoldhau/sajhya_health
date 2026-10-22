@@ -1,0 +1,117 @@
+{% extends 'accounts/pro_base.html' %}
+{% block title %}Billing | Sajhya Health{% endblock %}
+{% block extra_css %}
+  .bill-head { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-bottom: 14px; }
+  .bill-head h1 { margin: 0 10px 0 0; font-size: 24px; }
+  .modes { display: flex; gap: 8px; flex-wrap: wrap; padding: 0 18px 14px; }
+  .mode-chip { background: #f1faf5; border: 1px solid #cfe6d8; border-radius: 14px; padding: 5px 12px; font-size: 11px; font-weight: 700; color: var(--green-dark); }
+  .row-actions { display: flex; gap: 6px; } .row-actions form { margin: 0; }
+  @media (max-width: 800px) { .kpis { grid-template-columns: 1fr 1fr; } }
+  @media print { .kpis, .modes { page-break-inside: avoid; } .row-actions { display: none; } }
+{% endblock %}
+
+{% block main %}
+{% include 'billing/_tabs.html' %}
+<div class="bill-head no-print">
+  <h1>Billing</h1>
+  <a class="pill icon" href="?date={{ prev_date|date:'Y-m-d' }}" aria-label="Previous day">‹</a>
+  <form method="get" style="margin:0"><input type="date" name="date" value="{{ selected|date:'Y-m-d' }}" onchange="this.form.submit()" style="height:34px;border:1px solid #b9dcc9;border-radius:18px;padding:0 12px;background:#f1faf5"></form>
+  <a class="pill icon" href="?date={{ next_date|date:'Y-m-d' }}" aria-label="Next day">›</a>
+  <a class="pill" href="?date={{ today|date:'Y-m-d' }}">Today</a>
+  <button type="button" class="pill solid" id="newEntry">＋ New entry</button>
+  <button type="button" class="pill" onclick="window.print()">Print daily record</button>
+</div>
+
+<div class="kpis">
+  <div class="kpi"><div class="k">Billed on {{ selected|date:"M j, Y" }}</div><div class="v">NPR {{ total }}</div><div class="n">{{ entries|length }} entr{{ entries|length|pluralize:"y,ies" }}</div></div>
+  <div class="kpi"><div class="k">Package payments that day</div><div class="v">NPR {{ package_payments }}</div><div class="n"><a href="{% url 'billing:packages' %}" style="color:inherit">Manage packages →</a></div></div>
+  <div class="kpi"><div class="k">{{ month_label }} total</div><div class="v">NPR {{ month_total }}</div><div class="n">Billing entries only</div></div>
+  <div class="kpi"><div class="k">Package balance due</div><div class="v" style="color:#b78317">NPR {{ packages_due }}</div><div class="n" style="color:#b78317">Across all patients</div></div>
+</div>
+
+<section class="panel">
+  <div class="panel-header"><div class="panel-title"><span class="small-icon">▣</span>Daily billing record</div><span class="patient-id">{{ selected|date:"l, F j, Y" }}</span></div>
+  <div class="modes">{% for label, value in by_mode %}<span class="mode-chip">{{ label }}: NPR {{ value }}</span>{% endfor %}</div>
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>INVOICE</th><th>PATIENT</th><th>SERVICE</th><th>PAYMENT</th><th style="text-align:right">AMOUNT</th><th class="no-print"></th></tr></thead>
+      <tbody>
+      {% for e in entries %}
+        <tr>
+          <td>{{ e.invoice_number }}</td>
+          <td><div class="patient-cell"><span class="patient-avatar">{{ e.patient_name|slice:":2"|upper }}</span><div>{% if e.patient %}<a href="{% url 'accounts:patient-detail' e.patient.pk %}" style="color:inherit;text-decoration:none">{{ e.patient_name }}</a>{% else %}{{ e.patient_name }}{% endif %}<div class="patient-id">{% if e.age %}{{ e.age }} yrs{% endif %}{% if e.sex %} · {{ e.get_sex_display }}{% endif %}{% if e.contact_number %} · {{ e.contact_number }}{% endif %}</div></div></div></td>
+          <td>{{ e.service }}{% if e.notes %}<div class="patient-id">{{ e.notes }}</div>{% endif %}</td>
+          <td>{{ e.get_payment_mode_display }}</td>
+          <td style="text-align:right"><b>NPR {{ e.rate }}</b></td>
+          <td class="no-print"><div class="row-actions">
+            <button type="button" class="table-action" data-edit
+              data-url="{% url 'billing:entry-edit' e.pk %}" data-date="{{ e.entry_date|date:'Y-m-d' }}" data-patient="{{ e.patient_id|default_if_none:'' }}"
+              data-name="{{ e.patient_name }}" data-age="{{ e.age|default_if_none:'' }}" data-sex="{{ e.sex }}" data-contact="{{ e.contact_number }}"
+              data-service="{{ e.service }}" data-rate="{{ e.rate }}" data-mode="{{ e.payment_mode }}" data-notes="{{ e.notes }}">Edit</button>
+            <form method="post" action="{% url 'billing:entry-delete' e.pk %}" onsubmit="return confirm('Delete this entry?')">{% csrf_token %}<button class="table-action" type="submit">Delete</button></form>
+          </div></td>
+        </tr>
+      {% empty %}
+        <tr><td colspan="6" style="padding:28px;text-align:center;color:var(--muted)">Nothing billed on this day. Click <b>New entry</b> to log a payment.</td></tr>
+      {% endfor %}
+      </tbody>
+      {% if entries %}<tfoot><tr><td colspan="4" style="text-align:right;font-weight:800;padding:12px">Day total</td><td style="text-align:right;font-weight:800;padding:12px">NPR {{ total }}</td><td class="no-print"></td></tr></tfoot>{% endif %}
+    </table>
+  </div>
+</section>
+{% endblock %}
+
+{% block modals %}
+<div class="modal-backdrop" id="entryModal" role="dialog" aria-modal="true">
+  <div class="modal-card" style="max-width:520px">
+    <div class="modal-head"><h2 id="entryTitle">New billing entry</h2><button type="button" class="modal-x" data-close aria-label="Close">×</button></div>
+    <form method="post" action="{% url 'billing:entry-create' %}" class="mini-form" id="entryForm" data-create="{% url 'billing:entry-create' %}">
+      {% csrf_token %}
+      <label>Patient (optional - search a registered patient)
+        <span style="position:relative;display:block"><input type="search" id="billSearch" placeholder="Search by name, phone or patient ID..." autocomplete="off"></span>
+      </label>
+      {{ form.patient }}
+      <div class="two"><label>Full name {{ form.patient_name }}</label><label>Date {{ form.entry_date }}</label></div>
+      <div class="two"><label>Age {{ form.age }}</label><label>Sex {{ form.sex }}</label></div>
+      <label>Contact number {{ form.contact_number }}</label>
+      <div class="two"><label>Service {{ form.service }}</label><label>Amount (NPR) {{ form.rate }}</label></div>
+      <label>Payment mode {{ form.payment_mode }}</label>
+      <label>Notes {{ form.notes }}</label>
+      <div class="pf-actions" style="padding:10px 0 0"><button type="button" class="secondary-btn" data-close>Cancel</button><button type="submit" class="primary-btn">Save entry</button></div>
+    </form>
+  </div>
+</div>
+<script>
+(function () {
+  function $(id) { return document.getElementById(id); }
+  var form = $('entryForm');
+  function f(name) { return form.elements[name]; }
+  function open() { SajhyaUI.openModal('entryModal'); }
+  $('newEntry').addEventListener('click', function () {
+    form.reset(); form.action = form.dataset.create; $('entryTitle').textContent = 'New billing entry'; f('patient').value = ''; f('entry_date').value = "{{ selected|date:'Y-m-d' }}"; open();
+  });
+  document.querySelectorAll('[data-edit]').forEach(function (b) {
+    b.addEventListener('click', function () {
+      var d = b.dataset; form.action = d.url; $('entryTitle').textContent = 'Edit billing entry';
+      f('patient').value = d.patient; f('patient_name').value = d.name; f('entry_date').value = d.date; f('age').value = d.age; f('sex').value = d.sex;
+      f('contact_number').value = d.contact; f('service').value = d.service; f('rate').value = d.rate; f('payment_mode').value = d.mode; f('notes').value = d.notes; open();
+    });
+  });
+
+  // optional link to a registered patient: search, then pre-fill the details
+  var input = $('billSearch');
+  SajhyaUI.picker(input, {
+    url: "{% url 'accounts:appointment-patient-search' %}", emptyText: 'No matching patients',
+    render: function (p) { return '<b>' + SajhyaUI.esc(p.name) + '</b> <span style="color:#7c9186">' + SajhyaUI.esc(p.code) + '</span>'; },
+    onPick: function (p) {
+      f('patient').value = p.id; f('patient_name').value = p.name; f('contact_number').value = p.phone || '';
+      if (p.age != null) f('age').value = p.age;
+      if (p.gender) f('sex').value = p.gender;
+      input.value = p.name + ' (' + p.code + ')';
+    },
+    onType: function () { f('patient').value = ''; },
+  });
+  {% if open_new %}$('newEntry').click();{% endif %}
+})();
+</script>
+{% endblock %}

@@ -1,0 +1,209 @@
+{% extends 'accounts/pro_base.html' %}
+{% block title %}SOAP note | Sajhya Health{% endblock %}
+{% block extra_css %}
+{% include 'soapnotes/_styles.html' %}
+{% endblock %}
+{% block main %}
+<div class="sn-wrap">
+<p style="margin:0 0 4px"><a class="text-link" href="{% url 'accounts:patient-detail' patient.pk %}?tab=soap" style="text-decoration:none">← {{ patient.name }}</a></p>
+<div class="sn-head">
+  <h1 style="font-size:20px;margin:0">{% if note.pk %}Edit draft{% else %}New SOAP note{% endif %}</h1>
+  <span class="hint">{{ patient.name }} ({{ patient.patient_code }}){% if patient.age != None %} · {{ patient.age }} yrs{% endif %}</span>
+</div>
+{% if previous and not note.pk %}<div class="sn-banner">Follow-up: the baseline metrics and goals of your last note ({{ previous.note_date|date:"M j, Y" }}) are carried over. Enter today's readings next to the targets.</div>{% endif %}
+{% if errors %}<div class="sn-error"><b>Please fix the following:</b><ul style="margin:6px 0 0;padding:0">{% for e in errors %}<li>{{ e }}</li>{% endfor %}</ul></div>{% endif %}
+
+<form method="post" id="soapForm">
+{% csrf_token %}
+<div class="sn-grid" style="margin-bottom:14px">
+  <label class="sn-f">Date<input type="date" name="note_date" value="{{ v.note_date|default:today }}" max="{{ today }}" required></label>
+  <label class="sn-f">Type of note<select name="note_type">{% for key, label in types %}<option value="{{ key }}" {% if v.note_type == key %}selected{% endif %}>{{ label }}</option>{% endfor %}</select></label>
+</div>
+
+<section class="sn-sec">
+  <header><span class="letter">S</span><div><h3>Subjective</h3><span class="hint">What the patient tells you</span></div></header>
+  <div class="sn-body">
+    <label class="sn-f">Chief complaint<input type="text" name="chief_complaint" maxlength="250" value="{{ v.chief_complaint }}" placeholder="e.g. Right shoulder pain when lifting the arm"></label>
+    <div class="sn-grid">
+      <label class="sn-f">Onset / mechanism of injury<input type="text" name="mechanism" maxlength="250" value="{{ v.mechanism }}" placeholder="e.g. Gradual, 3 weeks; fall on outstretched arm"></label>
+      <label class="sn-f">Pain location<input type="text" name="pain_location" maxlength="200" value="{{ v.pain_location }}"></label>
+      <label class="sn-f">Pain character<input type="text" name="pain_character" list="dl-pain" maxlength="150" value="{{ v.pain_character }}" placeholder="Sharp, dull, burning..."></label>
+    </div>
+    <div class="sn-grid" style="grid-template-columns:repeat(auto-fit,minmax(120px,1fr))">
+      <label class="sn-f">Pain now (0-10)<input type="number" name="pain_now" min="0" max="10" value="{{ v.pain_now }}"></label>
+      <label class="sn-f">Best (0-10)<input type="number" name="pain_best" min="0" max="10" value="{{ v.pain_best }}"></label>
+      <label class="sn-f">Worst (0-10)<input type="number" name="pain_worst" min="0" max="10" value="{{ v.pain_worst }}"></label>
+    </div>
+    <label class="sn-f">History of present condition<textarea name="history">{{ v.history }}</textarea></label>
+    <div class="sn-grid">
+      <label class="sn-f">Aggravating factors<input type="text" name="aggravating" maxlength="300" value="{{ v.aggravating }}"></label>
+      <label class="sn-f">Easing factors<input type="text" name="easing" maxlength="300" value="{{ v.easing }}"></label>
+      <label class="sn-f">24-hour pattern (night, morning stiffness)<input type="text" name="pattern_24h" maxlength="300" value="{{ v.pattern_24h }}"></label>
+    </div>
+    <div><div class="sn-sub">Red-flag screen (tick any present)</div>
+      <div class="sn-checks" style="margin-top:8px">{% for key, label in presets.RED_FLAGS %}<label><input type="checkbox" name="red_flags" value="{{ key }}" {% if key in flags %}checked{% endif %}>{{ label }}</label>{% endfor %}</div></div>
+    <label class="sn-f">Medical history, medications, investigations<textarea name="medical_history">{{ v.medical_history }}</textarea></label>
+    <label class="sn-f">Functional limitations (ADL, work, sport)<textarea name="functional_limits">{{ v.functional_limits }}</textarea></label>
+    <label class="sn-f">Patient's goals and expectations<textarea name="patient_goals">{{ v.patient_goals }}</textarea></label>
+  </div>
+</section>
+
+<section class="sn-sec">
+  <header><span class="letter">O</span><div><h3>Objective</h3><span class="hint">What you find. For standard scales (Berg, Barthel, ODI...) use the Assessments tab as well.</span></div></header>
+  <div class="sn-body">
+    <div class="sn-grid">
+      <label class="sn-f">Observation and posture<textarea name="observation">{{ v.observation }}</textarea></label>
+      <label class="sn-f">Palpation<textarea name="palpation">{{ v.palpation }}</textarea></label>
+    </div>
+    <label class="sn-f">Vitals (BP, HR, SpO2 if relevant)<input type="text" name="vitals" maxlength="150" value="{{ v.vitals }}"></label>
+    <div><div class="sn-sub">Range of motion</div><div id="romBox" class="sn-rows"></div></div>
+    <div><div class="sn-sub">Muscle strength (manual muscle test 0-5)</div><div id="strengthBox" class="sn-rows"></div></div>
+    <label class="sn-f">Neurological screen (sensation, reflexes, myotomes / dermatomes)<textarea name="neuro">{{ v.neuro }}</textarea></label>
+    <div><div class="sn-sub">Special tests</div><div id="testsBox" class="sn-rows"></div></div>
+    <label class="sn-f">Gait, balance and functional tests<textarea name="gait_function">{{ v.gait_function }}</textarea></label>
+  </div>
+</section>
+
+<section class="sn-sec">
+  <header><span class="letter">A</span><div><h3>Assessment</h3><span class="hint">Your clinical reasoning</span></div></header>
+  <div class="sn-body">
+    <label class="sn-f">Clinical impression / physiotherapy diagnosis<textarea name="impression" id="impression">{{ v.impression }}</textarea></label>
+    <div class="sn-grid">
+      <label class="sn-f">ICD-10 code<input type="text" name="icd10_code" id="icdCode" maxlength="20" value="{{ v.icd10_code }}" placeholder="Search a code, e.g. M54" autocomplete="off"></label>
+      <label class="sn-f">Stage<select name="stage">{% for key, label in stages %}<option value="{{ key }}" {% if v.stage == key %}selected{% endif %}>{{ label }}</option>{% endfor %}</select></label>
+      <label class="sn-f">Irritability<select name="irritability">{% for key, label in irritabilities %}<option value="{{ key }}" {% if v.irritability == key %}selected{% endif %}>{{ label }}</option>{% endfor %}</select></label>
+      <label class="sn-f">Prognosis<select name="prognosis">{% for key, label in prognoses %}<option value="{{ key }}" {% if v.prognosis == key %}selected{% endif %}>{{ label }}</option>{% endfor %}</select></label>
+    </div>
+    <label class="sn-f">Problem list (impairments, activity limits, participation restrictions)<textarea name="problem_list">{{ v.problem_list }}</textarea></label>
+    <label class="sn-f">Contributing factors<textarea name="contributing">{{ v.contributing }}</textarea></label>
+  </div>
+</section>
+
+<section class="sn-sec">
+  <header><span class="letter">P</span><div><h3>Plan</h3><span class="hint">Treatment, baseline metrics and clinical goals - the same format as the treatment plan, which can start from this note</span></div></header>
+  <div class="sn-body">
+    <label class="sn-f">Treatment given today<textarea name="treatment_today" placeholder="Modalities, manual therapy, exercises performed, response to treatment">{{ v.treatment_today }}</textarea></label>
+    <div><div class="sn-sub">Baseline metrics</div>
+      <div class="sn-chips" id="measureChips" style="margin:8px 0"></div>
+      <div id="measuresBox" class="sn-rows"></div></div>
+    <div><div class="sn-sub">Clinical goals (SMART: specific, measurable, achievable, relevant, time-bound)</div><div id="goalsBox" class="sn-rows" style="margin-top:8px"></div></div>
+    <div class="sn-grid">
+      <label class="sn-f">Sessions per week<input type="number" name="frequency_per_week" min="0" max="14" value="{{ v.frequency_per_week }}"></label>
+      <label class="sn-f">For how many weeks<input type="number" name="duration_weeks" min="0" max="104" value="{{ v.duration_weeks }}"></label>
+      <label class="sn-f">Next review<input type="date" name="next_review" value="{{ v.next_review }}"></label>
+    </div>
+    <label class="sn-f">Home exercise programme<textarea name="hep">{{ v.hep }}</textarea></label>
+    <div class="sn-grid">
+      <label class="sn-f">Patient education and advice<textarea name="education">{{ v.education }}</textarea></label>
+      <label class="sn-f">Precautions / contraindications<textarea name="precautions">{{ v.precautions }}</textarea></label>
+    </div>
+    <label class="sn-f">Referral / follow-up with other professionals<input type="text" name="referral" maxlength="300" value="{{ v.referral }}"></label>
+  </div>
+</section>
+
+<input type="hidden" name="rom_json" id="romJson"><input type="hidden" name="strength_json" id="strengthJson"><input type="hidden" name="tests_json" id="testsJson">
+<input type="hidden" name="measures_json" id="measuresJson"><input type="hidden" name="goals_json" id="goalsJson">
+
+<div class="sn-actions">
+  <button class="secondary-btn" type="submit" name="action" value="draft">Save draft</button>
+  <button class="primary-btn" type="submit" name="action" value="final" onclick="return confirm('Finalise this note? It will be locked; later changes are added as dated addenda.')">Finalise note</button>
+  {% if not note.visit_id %}<label style="display:flex;gap:6px;align-items:center;font-size:12.5px"><input type="checkbox" name="record_visit" value="1" {% if posted.record_visit %}checked{% endif %}> Also record this as a visit (counts a package session)</label>{% endif %}
+  <a class="text-link" href="{% url 'accounts:patient-detail' patient.pk %}?tab=soap" style="text-decoration:none">Cancel</a>
+</div>
+</form>
+</div>
+
+<datalist id="dl-pain">{% for p in presets.PAIN_CHARACTERS %}<option value="{{ p }}">{% endfor %}</datalist>
+<datalist id="dl-rom">{% for p in presets.ROM_MOVEMENTS %}<option value="{{ p }}">{% endfor %}</datalist>
+<datalist id="dl-muscle">{% for p in presets.MUSCLES %}<option value="{{ p }}">{% endfor %}</datalist>
+<datalist id="dl-test">{% for p in presets.SPECIAL_TESTS %}<option value="{{ p }}">{% endfor %}</datalist>
+<datalist id="dl-measure">{% for name, unit in measure_presets %}<option value="{{ name }}">{% endfor %}</datalist>
+{{ state|json_script:"soap-state" }}
+{{ presets.SIDES|json_script:"soap-sides" }}
+{{ presets.MANUAL_GRADES|json_script:"soap-grades" }}
+<script>
+(function () {
+  var S = JSON.parse(document.getElementById('soap-state').textContent);
+  var SIDES = JSON.parse(document.getElementById('soap-sides').textContent), GRADES = JSON.parse(document.getElementById('soap-grades').textContent);
+  var PRESETS = [{% for name, unit in measure_presets %}["{{ name|escapejs }}", "{{ unit|escapejs }}"]{% if not forloop.last %}, {% endif %}{% endfor %}];
+  function $(id) { return document.getElementById(id); }
+
+  // A small editable table: cols = [{key, label, type, width, list, options, ph}], rows = array of objects kept in sync with a hidden JSON field
+  function table(box, hidden, rows, cols, addText, blank, onRow) {
+    var grid = cols.map(function (c) { return c.width || '1fr'; }).join(' ') + ' 28px';
+    function sync() { hidden.value = JSON.stringify(rows); }
+    function draw() {
+      box.innerHTML = '';
+      if (rows.length) {
+        var head = document.createElement('div'); head.className = 'sn-row head'; head.style.gridTemplateColumns = grid;
+        cols.forEach(function (c) { var d = document.createElement('div'); d.textContent = c.label; head.appendChild(d); });
+        head.appendChild(document.createElement('div')); box.appendChild(head);
+      }
+      rows.forEach(function (row, i) {
+        var line = document.createElement('div'); line.className = 'sn-row'; line.style.gridTemplateColumns = grid;
+        cols.forEach(function (c) {
+          var node;
+          if (c.type === 'select') {
+            node = document.createElement('select');
+            c.options.forEach(function (o) { var op = document.createElement('option'); op.value = o; op.textContent = o || '-'; node.appendChild(op); });
+            node.value = row[c.key] || '';
+          } else if (c.type === 'checkbox') {
+            var lab = document.createElement('label'); lab.className = 'cb'; node = document.createElement('input'); node.type = 'checkbox'; node.checked = !!row[c.key]; lab.appendChild(node);
+            node.addEventListener('change', function () { row[c.key] = node.checked; sync(); });
+            line.appendChild(lab); return;
+          } else {
+            node = document.createElement('input'); node.type = c.type || 'text'; node.value = row[c.key] == null ? '' : row[c.key];
+            if (c.list) node.setAttribute('list', c.list); if (c.ph) node.placeholder = c.ph; if (c.step) node.step = c.step;
+          }
+          var handler = function () { row[c.key] = node.value; if (onRow) onRow(row, c.key, line); sync(); };
+          node.addEventListener('input', handler); node.addEventListener('change', handler);
+          line.appendChild(node);
+        });
+        var x = document.createElement('button'); x.type = 'button'; x.className = 'x'; x.textContent = '✕'; x.title = 'Remove';
+        x.addEventListener('click', function () { rows.splice(i, 1); draw(); sync(); }); line.appendChild(x);
+        box.appendChild(line);
+      });
+      var add = document.createElement('button'); add.type = 'button'; add.className = 'sn-add'; add.textContent = addText;
+      add.addEventListener('click', function () { rows.push(JSON.parse(JSON.stringify(blank))); draw(); sync(); });
+      box.appendChild(add);
+    }
+    draw(); sync();
+    return { draw: draw, sync: sync };
+  }
+
+  table($('romBox'), $('romJson'), S.rom, [
+    { key: 'movement', label: 'Movement', list: 'dl-rom', ph: 'e.g. Shoulder abduction', width: '2fr' }, { key: 'side', label: 'Side', type: 'select', options: SIDES, width: '90px' },
+    { key: 'active', label: 'Active', ph: 'e.g. 120°', width: '90px' }, { key: 'passive', label: 'Passive', ph: 'e.g. 150°', width: '90px' },
+    { key: 'pain', label: 'Pain', type: 'checkbox', width: '46px' }, { key: 'note', label: 'Note / end-feel', width: '1.5fr' }], '+ Add movement', { movement: '', side: '', active: '', passive: '', pain: false, note: '' });
+  table($('strengthBox'), $('strengthJson'), S.strength, [
+    { key: 'muscle', label: 'Muscle / group', list: 'dl-muscle', width: '2fr' }, { key: 'side', label: 'Side', type: 'select', options: SIDES, width: '100px' },
+    { key: 'grade', label: 'Grade', type: 'select', options: [''].concat(GRADES), width: '90px' }], '+ Add muscle', { muscle: '', side: '', grade: '' });
+  table($('testsBox'), $('testsJson'), S.tests, [
+    { key: 'name', label: 'Test', list: 'dl-test', width: '2fr' }, { key: 'result', label: 'Result', type: 'select', options: ['', 'positive', 'negative', 'inconclusive'], width: '130px' },
+    { key: 'note', label: 'Note', width: '1.5fr' }], '+ Add special test', { name: '', result: '', note: '' });
+
+  var measures = table($('measuresBox'), $('measuresJson'), S.measures, [
+    { key: 'name', label: 'Measure', list: 'dl-measure', width: '2fr', ph: 'e.g. Shoulder abduction ROM' }, { key: 'unit', label: 'Unit', width: '70px', ph: '°' },
+    { key: 'baseline', label: 'Baseline / now', type: 'number', step: 'any', width: '110px' }, { key: 'target', label: 'Target', type: 'number', step: 'any', width: '110px' }],
+    '+ Add custom measure', { name: '', unit: '', baseline: '', target: '' }, function (row, key, line) {
+      if (key === 'name') { PRESETS.forEach(function (p) { if (p[0] === row.name && !row.unit) { row.unit = p[1]; line.children[1].value = p[1]; } }); }
+    });
+  var chips = $('measureChips');
+  PRESETS.forEach(function (p) {
+    var b = document.createElement('button'); b.type = 'button'; b.className = 'sn-chip'; b.textContent = '+ ' + p[0];
+    b.addEventListener('click', function () { S.measures.push({ name: p[0], unit: p[1], baseline: '', target: '' }); measures.draw(); measures.sync(); });
+    chips.appendChild(b);
+  });
+  table($('goalsBox'), $('goalsJson'), S.goals, [
+    { key: 'text', label: 'Goal', width: '3fr', ph: 'e.g. Achieve 170° pain-free abduction' }, { key: 'term', label: 'Term', type: 'select', options: ['short', 'long'], width: '100px' },
+    { key: 'target_date', label: 'Target date', type: 'date', width: '150px' }], '+ Add goal', { text: '', term: 'short', target_date: '' });
+
+  // ICD-10 lookup on the code box
+  if (window.SajhyaUI) {
+    SajhyaUI.picker($('icdCode'), { url: "{% url 'accounts:icd10-search' %}",
+      render: function (r) { return '<b>' + SajhyaUI.esc(r.code) + '</b> ' + SajhyaUI.esc(r.title); },
+      onPick: function (r) { $('icdCode').value = r.code; var imp = $('impression'); if (!imp.value.trim()) imp.value = r.title; } });
+  }
+})();
+</script>
+{% endblock %}

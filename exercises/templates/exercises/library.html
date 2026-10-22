@@ -1,0 +1,247 @@
+{% extends 'accounts/pro_base.html' %}
+{% block title %}Exercise Library | Sajhya Health{% endblock %}
+{% block extra_css %}
+  .lib-head { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; margin-bottom: 14px; }
+  .lib-head h1 { margin: 0 8px 0 0; font-size: 24px; }
+  .lib-head form { display: flex; gap: 8px; flex-wrap: wrap; flex: 1; min-width: 260px; }
+  .lib-head input[type=search] { flex: 1; min-width: 180px; height: 38px; border: 1px solid #dce8e0; border-radius: 8px; padding: 0 12px; background: #fff; outline: none; }
+  .lib-head select { height: 38px; border: 1px solid #dce8e0; border-radius: 8px; padding: 0 10px; background: #fff; max-width: 180px; }
+  .lib-layout { display: grid; grid-template-columns: 230px minmax(0, 1fr); gap: 14px; align-items: start; }
+  .regions { background: #fff; border: 1px solid var(--line); border-radius: 12px; padding: 10px; position: sticky; top: 86px; max-height: calc(100vh - 110px); overflow-y: auto; }
+  .regions a { display: flex; justify-content: space-between; gap: 8px; padding: 7px 10px; border-radius: 8px; color: #426052; text-decoration: none; font-size: 12px; font-weight: 600; }
+  .regions a:hover { background: #f2f8f4; }
+  .regions a.on { background: var(--green); color: #fff; }
+  .regions a small { opacity: .7; }
+  .regions .rh { font-size: 10px; letter-spacing: 1px; text-transform: uppercase; color: #91a198; font-weight: 800; padding: 12px 10px 4px; }
+  .ex-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(210px, 1fr)); gap: 14px; }
+  .ex-card { background: #fff; border: 1px solid var(--line); border-radius: 12px; overflow: hidden; display: flex; flex-direction: column; position: relative; transition: box-shadow .2s, transform .2s; }
+  .ex-card:hover { box-shadow: 0 8px 22px #16865326; transform: translateY(-2px); }
+  .ex-card.sel { border-color: var(--green); box-shadow: 0 0 0 2px #16865333; }
+  .ex-img { aspect-ratio: 4 / 3; background: #eef6f1; display: grid; place-items: center; cursor: pointer; overflow: hidden; }
+  .ex-img img { width: 100%; height: 100%; object-fit: contain; background: #fff; }
+  .ex-img span { font-size: 34px; color: #9ccdb2; }
+  .ex-body { padding: 10px 12px 12px; display: grid; gap: 6px; flex: 1; align-content: start; }
+  .ex-name { font-weight: 700; font-size: 13px; cursor: pointer; line-height: 1.3; }
+  .ex-meta { display: flex; flex-wrap: wrap; gap: 5px; }
+  .tag { font-size: 10px; font-weight: 700; padding: 3px 8px; border-radius: 10px; background: #e7f7ed; color: #16834f; }
+  .tag.l2 { background: #eaf3ff; color: #3d6fb0; } .tag.l3 { background: #fff3d6; color: #a97510; } .tag.l4 { background: #fde8e8; color: #b83b3b; }
+  .ex-dose { font-size: 11px; color: var(--muted); }
+  .pick { position: absolute; top: 8px; right: 8px; width: 28px; height: 28px; border-radius: 50%; border: 2px solid #cfe0d6; background: #ffffffe6; color: #fff; cursor: pointer; font-size: 14px; line-height: 1; padding: 0; }
+  .ex-card.sel .pick { background: var(--green); border-color: var(--green); }
+  .pager { display: flex; gap: 6px; justify-content: center; margin: 18px 0 70px; flex-wrap: wrap; }
+  .pager a, .pager span { min-width: 32px; height: 32px; display: grid; place-items: center; border: 1px solid #dce9e0; border-radius: 8px; color: var(--green); text-decoration: none; background: #fff; padding: 0 8px; font-size: 12px; }
+  .pager span.cur { background: var(--green); color: #fff; border-color: var(--green); }
+  .basket { position: fixed; left: 50%; bottom: 18px; transform: translateX(-50%); background: #123f2c; color: #fff; border-radius: 14px; padding: 10px 14px; display: none; align-items: center; gap: 14px; box-shadow: 0 10px 30px #0004; z-index: 30; }
+  .basket.show { display: flex; }
+  .basket button { border: 0; border-radius: 8px; height: 34px; padding: 0 14px; font-weight: 700; cursor: pointer; }
+  .basket .go { background: #52b788; color: #fff; } .basket .clr { background: #ffffff26; color: #fff; }
+  .rx-table { width: 100%; border-collapse: collapse; font-size: 12px; }
+  .rx-table th { text-align: left; font-size: 10px; text-transform: uppercase; color: #789084; padding: 6px 4px; background: transparent; border: 0; }
+  .rx-table td { padding: 5px 4px; border-bottom: 1px solid #edf2ee; vertical-align: middle; white-space: normal; }
+  .rx-table input[type=number] { width: 56px; padding: 5px 6px; border: 1px solid #dce8e0; border-radius: 6px; font: inherit; }
+  .rx-table .x { border: 0; background: transparent; color: #a0b0a6; cursor: pointer; font-size: 15px; }
+  .d-gallery { background: #f6faf7; text-align: center; position: relative; }
+  .d-gallery img { max-width: 100%; max-height: 300px; object-fit: contain; display: block; margin: 0 auto; }
+  .d-gallery button { position: absolute; top: 50%; transform: translateY(-50%); border: 0; width: 34px; height: 34px; border-radius: 50%; background: #123f2ccc; color: #fff; cursor: pointer; }
+  .d-gallery .pv { left: 10px; } .d-gallery .nx { right: 10px; }
+  .d-gallery .count { position: absolute; bottom: 8px; right: 10px; background: #123f2ccc; color: #fff; font-size: 10px; padding: 2px 8px; border-radius: 10px; }
+  .d-body { padding: 16px 24px 4px; font-size: 13px; line-height: 1.55; }
+  .d-body p { margin: 0 0 10px; white-space: pre-line; }
+  .d-actions { display: flex; gap: 8px; padding: 6px 24px 22px; flex-wrap: wrap; }
+  .pt-note { background: #ecfdf5; border: 1px solid #c8ead7; border-radius: 10px; padding: 9px 12px; color: var(--green-dark); font-weight: 600; font-size: 12px; margin-bottom: 14px; }
+  @media (max-width: 900px) { .lib-layout { grid-template-columns: 1fr; } .regions { position: static; max-height: none; } }
+{% endblock %}
+
+{% block main %}
+{% if patient %}<div class="pt-note">Prescribing for <b>{{ patient.name }}</b> ({{ patient.patient_code }}){% if prescription %} — adding to the current prescription{% endif %}. <a href="{% url 'accounts:patient-detail' patient.pk %}?tab=exercises" style="color:inherit">Back to patient</a></div>{% endif %}
+<div class="lib-head">
+  <h1>Exercise Library</h1>
+  <form method="get" id="libForm">
+    {% if patient %}<input type="hidden" name="patient" value="{{ patient.pk }}">{% endif %}{% if prescription %}<input type="hidden" name="prescription" value="{{ prescription.pk }}">{% endif %}
+    {% if sub %}<input type="hidden" name="sub" value="{{ sub }}">{% elif region %}<input type="hidden" name="region" value="{{ region }}">{% endif %}
+    <input type="search" name="q" value="{{ q }}" placeholder="Search {{ total }} exercises...">
+    <select name="type" onchange="this.form.submit()"><option value="">All types</option>{% for t in types %}<option value="{{ t }}" {% if type == t %}selected{% endif %}>{{ t }}</option>{% endfor %}</select>
+    <select name="level" onchange="this.form.submit()"><option value="">All levels</option>{% for v, l in levels %}<option value="{{ v }}" {% if level == v|stringformat:'s' %}selected{% endif %}>{{ l }}</option>{% endfor %}</select>
+    <button class="primary-btn" type="submit">Search</button>
+  </form>
+</div>
+
+<div class="lib-layout">
+  <aside class="regions">
+    <a href="?{% if patient %}patient={{ patient.pk }}{% endif %}" class="{% if not sub and not region %}on{% endif %}">All exercises <small>{{ total }}</small></a>
+    {% for r in regions %}
+      <div class="rh">{{ r.label }}</div>
+      {% for s in r.subregions.all %}<a href="?sub={{ s.pk }}{% if patient %}&patient={{ patient.pk }}{% endif %}{% if prescription %}&prescription={{ prescription.pk }}{% endif %}" class="{% if sub == s.pk|stringformat:'s' %}on{% endif %}">{{ s.sub_region_name|capfirst }} <small>{{ s.n }}</small></a>{% endfor %}
+    {% endfor %}
+  </aside>
+
+  <section>
+    <p class="subtitle" style="margin:0 0 12px">{{ page_obj.paginator.count }} exercise{{ page_obj.paginator.count|pluralize }}{% if q or type or level or sub or region %} matching your filters{% endif %}. Tick the circle on any exercise to add it to a prescription.</p>
+    <div class="ex-grid">
+    {% for e in page_obj %}
+      <article class="ex-card" data-id="{{ e.pk }}" data-name="{{ e.exercise_name }}" data-cover="{{ e.cover }}" data-sets="{{ e.default_sets }}" data-reps="{{ e.default_reps }}" data-hold="{{ e.hold_time_sec }}" data-rest="{{ e.default_rest_time_sec }}">
+        <button type="button" class="pick" aria-label="Select exercise">✓</button>
+        <div class="ex-img" data-detail="{{ e.pk }}">{% if e.cover %}<img src="{{ e.cover }}" alt="{{ e.exercise_name }}" loading="lazy">{% else %}<span>{{ e.exercise_name|slice:':1'|upper }}</span>{% endif %}</div>
+        <div class="ex-body">
+          <div class="ex-name" data-detail="{{ e.pk }}">{{ e.exercise_name }}</div>
+          <div class="ex-meta"><span class="tag">{{ e.exercise_type }}</span><span class="tag l{{ e.difficulty_level }}">{{ e.get_difficulty_level_display }}</span></div>
+          <div class="ex-dose">{{ e.dose_label }} · {{ e.sub_region_fk.sub_region_name|capfirst }}</div>
+        </div>
+      </article>
+    {% empty %}
+      <p style="grid-column:1/-1;text-align:center;color:var(--muted);padding:40px">No exercises match. Try clearing a filter.</p>
+    {% endfor %}
+    </div>
+    {% if page_obj.paginator.num_pages > 1 %}
+    <div class="pager">
+      {% if page_obj.has_previous %}<a href="?{{ querystring }}&page={{ page_obj.previous_page_number }}">‹</a>{% endif %}
+      {% for n in page_obj.paginator.page_range %}
+        {% if n == page_obj.number %}<span class="cur">{{ n }}</span>
+        {% elif n <= 2 or n > page_obj.paginator.num_pages|add:"-2" or n >= page_obj.number|add:"-2" and n <= page_obj.number|add:"2" %}<a href="?{{ querystring }}&page={{ n }}">{{ n }}</a>{% endif %}
+      {% endfor %}
+      {% if page_obj.has_next %}<a href="?{{ querystring }}&page={{ page_obj.next_page_number }}">›</a>{% endif %}
+    </div>
+    {% endif %}
+  </section>
+</div>
+
+<div class="basket" id="basket"><span><b id="bCount">0</b> selected</span><button class="clr" id="bClear" type="button">Clear</button><button class="go" id="bGo" type="button">Prescribe →</button></div>
+{% endblock %}
+
+{% block modals %}
+<div class="modal-backdrop" id="detailModal" role="dialog" aria-modal="true">
+  <div class="modal-card" style="max-width:640px">
+    <div class="modal-head"><h2 id="dName">Exercise</h2><button type="button" class="modal-x" data-close aria-label="Close">×</button></div>
+    <div class="d-gallery" id="dGallery" hidden><button class="pv" type="button" id="dPrev">‹</button><img id="dImg" alt=""><button class="nx" type="button" id="dNext">›</button><span class="count" id="dCount"></span></div>
+    <div class="d-body">
+      <div class="ex-meta" id="dTags" style="margin-bottom:10px"></div>
+      <p><b>Default dose:</b> <span id="dDose"></span> · rest <span id="dRest"></span>s</p>
+      <p id="dDesc"></p>
+      <p id="dDescNe" lang="ne" hidden></p>
+      <p id="dVideo"></p>
+    </div>
+    <div class="d-actions"><button type="button" class="primary-btn" id="dPick">Add to selection</button><button type="button" class="secondary-btn" data-close>Close</button></div>
+  </div>
+</div>
+
+<div class="modal-backdrop" id="rxModal" role="dialog" aria-modal="true">
+  <div class="modal-card" style="max-width:720px">
+    <div class="modal-head"><h2>Prescribe exercises</h2><button type="button" class="modal-x" data-close aria-label="Close">×</button></div>
+    <div class="mini-form">
+      <div id="rxErr" class="pt-note" style="background:#fde8e8;border-color:#f0c5c5;color:#9b2c2c" hidden></div>
+      <label>Patient
+        <span style="position:relative;display:block">
+          <input type="search" id="rxPatient" placeholder="Search by name, phone or patient ID..." autocomplete="off">
+          <span class="patient-id" id="rxPatientChosen" style="display:block;margin-top:4px"></span>
+        </span>
+      </label>
+      <label id="rxLabelWrap">Condition / body part <input type="text" id="rxLabel" placeholder="e.g. Post-op knee"></label>
+      <p id="rxAppend" class="patient-id" hidden></p>
+      <div style="overflow-x:auto"><table class="rx-table"><thead><tr><th>Exercise</th><th>Sets</th><th>Reps</th><th>Hold s</th><th>Rest s</th><th title="Morning">M</th><th title="Day">D</th><th title="Evening">E</th><th></th></tr></thead><tbody id="rxRows"></tbody></table></div>
+      <div class="pf-actions" style="padding:10px 0 0"><button type="button" class="secondary-btn" data-close>Cancel</button><button type="button" class="primary-btn" id="rxSubmit">Prescribe to patient</button></div>
+    </div>
+  </div>
+</div>
+
+{{ patient_json|json_script:"patient-data" }}
+{{ prescription_json|json_script:"rx-data" }}
+<script>
+(function () {
+  var PATIENT = JSON.parse(document.getElementById('patient-data').textContent), PRESCRIPTION = JSON.parse(document.getElementById('rx-data').textContent);
+  var CSRF = "{{ csrf_token }}", KEY = 'sajhyaExBasket';
+  var urls = { detail: "{% url 'exercises:detail' 0 %}", prescribe: "{% url 'exercises:prescribe' %}", patients: "{% url 'accounts:appointment-patient-search' %}" };
+  function $(id) { return document.getElementById(id); }
+  var esc = SajhyaUI.esc, open = SajhyaUI.openModal;
+
+  // ---- basket (kept in sessionStorage so it survives paging/filtering) ----
+  var basket = {};
+  try { basket = JSON.parse(sessionStorage.getItem(KEY) || '{}'); } catch (e) { basket = {}; }
+  function persist() { try { sessionStorage.setItem(KEY, JSON.stringify(basket)); } catch (e) {} }
+  function refresh() {
+    var n = Object.keys(basket).length;
+    $('bCount').textContent = n; $('basket').classList.toggle('show', n > 0);
+    document.querySelectorAll('.ex-card').forEach(function (c) { c.classList.toggle('sel', !!basket[c.dataset.id]); });
+    persist();
+  }
+  function toggle(item) { if (basket[item.id]) delete basket[item.id]; else basket[item.id] = item; refresh(); }
+  function cardItem(c) { var d = c.dataset; return { id: d.id, name: d.name, cover: d.cover, sets: +d.sets, reps: +d.reps, hold: +d.hold, rest: +d.rest, morning: true, day: false, evening: false }; }
+  document.querySelectorAll('.ex-card').forEach(function (c) { c.querySelector('.pick').addEventListener('click', function () { toggle(cardItem(c)); }); });
+  $('bClear').addEventListener('click', function () { basket = {}; refresh(); });
+  refresh();
+
+  // ---- detail modal ----
+  var current = null, imgs = [], at = 0;
+  function showImg() { $('dImg').src = imgs[at] || ''; $('dCount').textContent = (at + 1) + ' / ' + imgs.length; $('dPrev').style.display = $('dNext').style.display = imgs.length > 1 ? '' : 'none'; }
+  $('dPrev').addEventListener('click', function () { at = (at - 1 + imgs.length) % imgs.length; showImg(); });
+  $('dNext').addEventListener('click', function () { at = (at + 1) % imgs.length; showImg(); });
+  document.querySelectorAll('[data-detail]').forEach(function (el) {
+    el.addEventListener('click', function () {
+      fetch(urls.detail.replace('/0/', '/' + el.dataset.detail + '/'), { credentials: 'same-origin' }).then(function (r) { return r.json(); }).then(function (e) {
+        current = { id: String(e.id), name: e.name, cover: e.cover, sets: e.sets, reps: e.reps, hold: e.hold, rest: e.rest, morning: true, day: false, evening: false };
+        $('dName').textContent = e.name; imgs = e.images; at = 0;
+        $('dGallery').hidden = !imgs.length; if (imgs.length) showImg();
+        $('dTags').innerHTML = '<span class="tag">' + esc(e.type) + '</span><span class="tag l' + e.level + '">' + esc(e.level_label) + '</span><span class="tag">' + esc(e.region) + ' · ' + esc(e.sub_region) + '</span>';
+        $('dDose').textContent = e.dose; $('dRest').textContent = e.rest;
+        $('dDesc').textContent = e.description || 'No description available.';
+        $('dDescNe').textContent = e.description_ne; $('dDescNe').hidden = !e.description_ne;
+        var link = e.video_url || e.youtube_url;
+        $('dVideo').innerHTML = link ? '<a href="' + esc(link) + '" target="_blank" rel="noopener" style="color:var(--green);font-weight:700">▶ Watch demonstration</a>' : '';
+        $('dPick').textContent = basket[current.id] ? 'Remove from selection' : 'Add to selection';
+        open('detailModal');
+      });
+    });
+  });
+  $('dPick').addEventListener('click', function () { toggle(current); $('dPick').textContent = basket[current.id] ? 'Remove from selection' : 'Add to selection'; });
+
+  // ---- prescribe modal ----
+  var patient = PATIENT;
+  var pInput = $('rxPatient');
+  function setPatient(p) {
+    patient = p; pInput.value = p ? p.name : '';
+    $('rxPatientChosen').textContent = p ? p.code : '';
+    if (p && !$('rxLabel').value && p.condition) $('rxLabel').value = p.condition;
+  }
+  if (PATIENT) { pInput.readOnly = true; setPatient(PATIENT); }
+  if (PRESCRIPTION) { $('rxLabelWrap').hidden = true; $('rxAppend').hidden = false; $('rxAppend').textContent = 'These exercises will be added to the current prescription' + (PRESCRIPTION.label ? ' (' + PRESCRIPTION.label + ')' : '') + '.'; }
+
+  // patient search (not needed when the page was opened from a patient)
+  if (!PATIENT) {
+    SajhyaUI.picker(pInput, {
+      url: urls.patients, minChars: 0, emptyText: 'No matching patients',
+      render: function (p) { return '<b>' + esc(p.name) + '</b> <span style="color:#7c9186">' + esc(p.code) + '</span>'; },
+      onPick: function (p) { setPatient({ id: p.id, name: p.name, code: p.code, condition: '' }); },
+      onType: function () { patient = null; $('rxPatientChosen').textContent = ''; },
+    });
+  }
+
+  function renderRows() {
+    var body = $('rxRows'); body.innerHTML = '';
+    Object.keys(basket).forEach(function (id) {
+      var it = basket[id], tr = document.createElement('tr');
+      function num(key) { return '<td><input type="number" min="0" data-k="' + key + '" value="' + it[key] + '"></td>'; }
+      function chk(key) { return '<td><input type="checkbox" data-k="' + key + '"' + (it[key] ? ' checked' : '') + '></td>'; }
+      tr.innerHTML = '<td><span class="ex-cell">' + SajhyaUI.thumb(it.name, it.cover) + '<b>' + esc(it.name) + '</b></span></td>' + num('sets') + num('reps') + num('hold') + num('rest') + chk('morning') + chk('day') + chk('evening') + '<td><button type="button" class="x" title="Remove">✕</button></td>';
+      tr.querySelectorAll('input').forEach(function (inp) {
+        inp.addEventListener('input', function () { it[inp.dataset.k] = inp.type === 'checkbox' ? inp.checked : (parseInt(inp.value, 10) || 0); persist(); });
+      });
+      tr.querySelector('.x').addEventListener('click', function () { delete basket[id]; refresh(); renderRows(); if (!Object.keys(basket).length) $('rxModal').classList.remove('open'); });
+      body.appendChild(tr);
+    });
+  }
+  $('bGo').addEventListener('click', function () { $('rxErr').hidden = true; renderRows(); open('rxModal'); });
+  $('rxSubmit').addEventListener('click', function () {
+    var err = $('rxErr'); err.hidden = true;
+    if (!patient) { err.textContent = 'Choose a patient from the list.'; err.hidden = false; return; }
+    var rows = Object.keys(basket).map(function (id) { var b = basket[id]; return { id: b.id, sets: b.sets, reps: b.reps, hold: b.hold, rest: b.rest, morning: b.morning, day: b.day, evening: b.evening }; });
+    fetch(urls.prescribe, { method: 'POST', credentials: 'same-origin', headers: { 'Content-Type': 'application/json', 'X-CSRFToken': CSRF },
+      body: JSON.stringify({ patient_id: patient.id, condition_label: $('rxLabel').value, prescription_id: PRESCRIPTION ? PRESCRIPTION.id : null, exercises: rows }) })
+      .then(function (r) { return r.json().then(function (d) { return { ok: r.ok, d: d }; }); })
+      .then(function (res) {
+        if (res.ok && res.d.ok) { basket = {}; persist(); window.location = res.d.redirect; }
+        else { err.textContent = res.d.error || 'Could not save the prescription.'; err.hidden = false; }
+      })
+      .catch(function () { err.textContent = 'Network error - nothing was saved.'; err.hidden = false; });
+  });
+})();
+</script>
+{% endblock %}

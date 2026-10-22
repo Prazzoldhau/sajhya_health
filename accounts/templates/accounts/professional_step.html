@@ -1,0 +1,19 @@
+{% extends 'accounts/base.html' %}
+{% block title %}Professional onboarding - Sajhya Health{% endblock %}
+{% block content %}
+{% include 'accounts/_progress.html' %}
+<div class="text-center mb-4">
+    <h1 class="fw-bold page-title">
+        {% if step == 2 %}Professional identity &amp; licensing
+        {% elif step == 3 %}Required documents
+        {% else %}Practice &amp; specialisation{% endif %}
+    </h1>
+    {% if step == 3 %}<p class="page-lead">Files are stored privately and are only visible to you and our verification team.</p>{% endif %}
+</div>
+<form method="post" enctype="multipart/form-data" class="form-panel" style="max-width:640px">
+    {% csrf_token %}
+    {{ form.as_p }}
+    <button type="submit" name="action" value="continue" class="btn btn-gradient">Save &amp; continue</button>
+    <button type="submit" name="action" value="later" class="btn btn-outline-success w-100 mt-2" formnovalidate>Save &amp; finish later</button>
+</form>
+{% endblock %}

@@ -1,0 +1,73 @@
+{% extends 'accounts/pro_base.html' %}
+{% block title %}Reports | Sajhya Health{% endblock %}
+{% block extra_css %}
+  main { padding-top: 18px; }
+  .rep-head { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; margin-bottom: 12px; }
+  .rep-head h1 { font-size: 20px; margin: 0; }
+  .rep-nav { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-bottom: 14px; }
+  .rep-nav .label { font-weight: 800; font-size: 14px; padding: 0 6px; }
+  .rep-nav a.step { text-decoration: none; padding: 6px 12px; border: 1px solid #cfe6d8; border-radius: 8px; background: #fff; color: var(--green-dark); font-weight: 700; font-size: 12px; }
+  .rep-range { display: flex; gap: 8px; align-items: end; flex-wrap: wrap; margin-bottom: 14px; }
+  .rep-range label { font-size: 11px; color: var(--muted); display: grid; gap: 3px; }
+  .rep-range input { height: 34px; border: 1px solid var(--line); border-radius: 8px; padding: 0 8px; }
+  .rep-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; }
+  .rep-grid .wide { grid-column: 1 / -1; }
+  .rep-note { padding: 0 16px 10px; font-size: 11px; color: var(--muted); }
+  .rep-table { width: 100%; border-collapse: collapse; font-size: 12.5px; }
+  .rep-table th { text-align: left; font-size: 10.5px; color: var(--muted); padding: 8px 10px; border-bottom: 1px solid var(--line); }
+  .rep-table td { padding: 8px 10px; border-bottom: 1px solid #eef3ef; }
+  .rep-table td:not(:first-child), .rep-table th:not(:first-child) { text-align: right; }
+  .rep-table tr.total td { font-weight: 800; background: #f6fbf8; }
+  .rep-empty { padding: 18px; text-align: center; color: var(--muted); font-size: 12px; }
+  .kpis.five { grid-template-columns: repeat(5, minmax(0, 1fr)); }
+  @media (max-width: 900px) { .rep-grid { grid-template-columns: 1fr; } .kpis.five { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+{% endblock %}
+{% block main %}
+<div class="rep-head no-print">
+  <h1>Reports</h1>
+  <div class="chipbar" style="margin:0 0 0 auto">
+    <a href="{{ this_week }}" class="{% if kind == 'week' %}on{% endif %}">Weekly</a>
+    <a href="{{ this_month }}" class="{% if kind == 'month' %}on{% endif %}">Monthly</a>
+    <a href="?period=custom" class="{% if kind == 'custom' %}on{% endif %}">Custom range</a>
+  </div>
+  <a class="secondary-btn" href="{{ csv_link }}" style="text-decoration:none;display:inline-flex;align-items:center">⬇ Download CSV</a>
+  <button type="button" class="secondary-btn" onclick="window.print()">Print</button>
+</div>
+
+{% if kind == 'custom' %}
+<form method="get" class="rep-range no-print">
+  <input type="hidden" name="period" value="custom">
+  <label>From<input type="date" name="start" value="{{ start|date:'Y-m-d' }}" max="{{ today|date:'Y-m-d' }}"></label>
+  <label>To<input type="date" name="end" value="{{ end|date:'Y-m-d' }}"></label>
+  <button class="primary-btn" type="submit">Show report</button>
+</form>
+{% endif %}
+
+<div class="rep-nav">
+  {% if prev_link %}<a class="step no-print" href="{{ prev_link }}">‹ Previous</a>{% endif %}
+  <span class="label">{{ label }}</span>{% if report.practice %}<span class="hint">{{ report.practice }}</span>{% endif %}
+  {% if next_link %}<a class="step no-print" href="{{ next_link }}">Next ›</a>{% endif %}
+</div>
+
+<div class="kpis five">
+  {% for name, value in report.kpis %}<div class="kpi"><div class="k">{{ name }}</div><div class="v">{{ value }}</div></div>{% endfor %}
+</div>
+
+<div class="rep-grid">
+  {% for s in report.sections %}
+  <section class="panel{% if s.rows|length > 8 or s.columns|length > 4 %} wide{% endif %}">
+    <div class="panel-header"><div class="panel-title">{{ s.title }}</div></div>
+    {% if s.empty %}
+      <div class="rep-empty">Nothing recorded for this period.</div>
+    {% else %}
+    <div class="table-wrap"><table class="rep-table">
+      <thead><tr>{% for c in s.columns %}<th>{{ c }}</th>{% endfor %}</tr></thead>
+      <tbody>{% for row in s.rows %}<tr{% if row.0 == 'Total' %} class="total"{% endif %}>{% for cell in row %}<td>{{ cell }}</td>{% endfor %}</tr>{% endfor %}</tbody>
+    </table></div>
+    {% endif %}
+    {% if s.note %}<div class="rep-note">{{ s.note }}</div>{% endif %}
+  </section>
+  {% endfor %}
+</div>
+<p class="hint" style="margin-top:14px">Reports contain only your own patients and records. The age/sex tables are aggregated counts with no names, so they can be copied into facility returns.</p>
+{% endblock %}

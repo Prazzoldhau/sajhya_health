@@ -1,0 +1,240 @@
+{% extends 'marketplace/base.html' %}
+{% load static %}
+{% load marketplace_extras %}
+
+{% block title %}Lab Tests — Sajhya{% endblock %}
+{% block meta_description %}Book blood tests and lab panels from Sajhya — individual tests or bundled packages like the Diabetes Panel, Fever Panel and Master Health Checkup.{% endblock %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="{{ 'css/marketplace-store.css'|plain_static }}">
+{% endblock %}
+
+{% block content %}
+<div class="store">
+
+    {% include 'lab/_lab_header.html' %}
+
+    <form method="POST" action="" id="lab-select-form">
+        {% csrf_token %}
+
+        <div class="store-wrap">
+            <section class="store-section" style="padding-bottom:0.5rem">
+                <div class="store-section-head">
+                    <h1>Lab Tests</h1>
+                    <span class="store-sub">Home sample collection available — pick as many as you need</span>
+                </div>
+
+                {% if search %}<p class="store-sub">Results for "{{ search }}"</p>{% endif %}
+            </section>
+
+            <!-- Panels -->
+            {% if panels %}
+            <section class="store-section" id="panels">
+                <div class="store-section-head">
+                    <h2>Test Panels</h2>
+                    <span class="store-sub">Bundled tests at a discount</span>
+                </div>
+                <div class="store-lab-grid">
+                    {% for panel in panels %}
+                    <div class="store-lab-card store-lab-selectable">
+                        <label class="store-lab-check">
+                            <input type="checkbox" name="items" value="panel-{{ panel.id }}" data-name="{{ panel.name }}" data-price="{{ panel.price }}">
+                            <span></span>
+                        </label>
+                        <a href="{% url 'lab:panel-detail' panel.id %}" class="store-lab-card-link">
+                            <p class="store-lab-card-name">{{ panel.name }}</p>
+                            <p class="store-lab-card-meta">{{ panel.tests.count }} tests{% if panel.is_featured %} · Popular{% endif %}{% if panel.savings > 0 %} · Save NPR {{ panel.savings }}{% endif %}</p>
+                            <div class="store-lab-card-price">NPR {{ panel.price }}</div>
+                        </a>
+                    </div>
+                    {% endfor %}
+                </div>
+            </section>
+            {% endif %}
+
+            <!-- Individual tests, grouped by category -->
+            {% if categorized_tests %}
+            <section class="store-section" id="all-tests">
+                <div class="store-section-head">
+                    <h2>Individual Tests</h2>
+                </div>
+                {% for category_label, tests in categorized_tests %}
+                <div class="store-lab-category">
+                    <h3 class="store-lab-category-title">{{ category_label }}</h3>
+                    <div class="store-lab-grid">
+                        {% for test in tests %}
+                        <div class="store-lab-card store-lab-selectable">
+                            <label class="store-lab-check">
+                                <input type="checkbox" name="items" value="test-{{ test.id }}" data-name="{{ test.name }}" data-price="{{ test.price }}">
+                                <span></span>
+                            </label>
+                            <a href="{% url 'lab:test-detail' test.id %}" class="store-lab-card-link">
+                                <p class="store-lab-card-name">{{ test.name }}</p>
+                                {% if test.turnaround_time %}<p class="store-lab-card-meta">{{ test.turnaround_time }}</p>{% endif %}
+                            </a>
+                            <div class="store-lab-card-price">NPR {{ test.price }}</div>
+                        </div>
+                        {% endfor %}
+                    </div>
+                </div>
+                {% endfor %}
+            </section>
+            {% endif %}
+
+            {% if not panels and not categorized_tests %}
+            <section class="store-section">
+                <div class="store-empty">
+                    <p>No tests found{% if search %} matching "{{ search }}"{% endif %}. Try a different search.</p>
+                </div>
+            </section>
+            {% endif %}
+
+            <!-- Request form -- a normal in-page section by default (so it
+                 still works with JS off, exactly as if this modal styling
+                 didn't exist), promoted to a popup via .store-lab-modal-open
+                 when "Review & Request" is clicked (see extra_js below). -->
+            <section class="store-section" id="request">
+                <div class="store-summary" style="max-width:480px;margin:0 auto">
+                    <button type="button" class="store-lab-modal-close" id="lab-modal-close" aria-label="Close">&times;</button>
+                    <h3 class="store-summary-title">Request Selected Tests</h3>
+
+                    <div id="lab-empty-msg" class="store-sub" style="margin-bottom:1rem">Nothing selected yet — tick the tests or panels above you'd like to book.</div>
+                    <div id="lab-selected-list" class="store-lab-selected-list"></div>
+
+                    
+                    <div class="store-form-group">
+                        <label class="store-label">Full Name <span class="store-required">*</span></label>
+                        <input type="text" name="customer_name" class="store-input" placeholder="Your full name" required
+                               value="{{ prefill.name }}">
+                    </div>
+
+                    <div class="store-form-group">
+                        <label class="store-label">Phone Number <span class="store-required">*</span></label>
+                        <input type="tel" name="customer_phone" class="store-input" placeholder="98XXXXXXXX" required
+                               value="{{ prefill.phone }}">
+                    </div>
+
+                    <div class="store-form-group">
+                        <label class="store-label">Email Address <span class="store-required">*</span></label>
+                        <input type="email" name="customer_email" class="store-input" placeholder="your@email.com" required
+                               value="{{ prefill.email }}">
+                    </div>
+
+                    <div class="store-form-group">
+                        <label class="store-label">Sample Collection Address <span class="store-required">*</span></label>
+                        <textarea name="delivery_address" class="store-input store-textarea" rows="2"
+                                  placeholder="Where should our phlebotomist collect your sample?" required>{{ prefill.address }}</textarea>
+                    </div>
+                    
+
+                    <div class="store-form-group">
+                        <label class="store-label">Notes</label>
+                        <textarea name="notes" class="store-input store-textarea" rows="2"
+                                  placeholder="Preferred time, existing conditions, etc."></textarea>
+                    </div>
+
+                    <button type="submit" class="store-btn-primary store-btn-full" id="lab-submit-btn" disabled>
+                        Select tests to continue
+                    </button>
+                </div>
+            </section>
+        </div>
+
+        <!-- Sticky running total while scrolling -->
+        <div class="store-lab-sticky-bar" id="lab-sticky-bar">
+            <span><strong id="lab-count">0</strong> selected — NPR <strong id="lab-total">0</strong></span>
+            <button type="button" class="store-lab-sticky-cta" id="lab-review-btn">Review &amp; Request →</button>
+        </div>
+    </form>
+
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+(function () {
+    var checkboxes = Array.prototype.slice.call(document.querySelectorAll('input[name="items"]'));
+    var countEl = document.getElementById('lab-count');
+    var totalEl = document.getElementById('lab-total');
+    var listEl = document.getElementById('lab-selected-list');
+    var emptyMsg = document.getElementById('lab-empty-msg');
+    var submitBtn = document.getElementById('lab-submit-btn');
+    var stickyBar = document.getElementById('lab-sticky-bar');
+    var requestSection = document.getElementById('request');
+    var reviewBtn = document.getElementById('lab-review-btn');
+    var closeBtn = document.getElementById('lab-modal-close');
+
+    // #request is a normal in-page section by default (works with JS off,
+    // exactly as before) -- this class promotes it to a full-screen popup.
+    // Toggled here rather than always-on so nothing regresses without JS.
+    function openRequestModal() {
+        requestSection.classList.add('store-lab-modal-open');
+        document.body.classList.add('store-lab-modal-lock');
+    }
+
+    function closeRequestModal() {
+        requestSection.classList.remove('store-lab-modal-open');
+        document.body.classList.remove('store-lab-modal-lock');
+    }
+
+    reviewBtn.addEventListener('click', openRequestModal);
+    closeBtn.addEventListener('click', closeRequestModal);
+
+    // Click on the dimmed backdrop itself (not the white card) closes it.
+    requestSection.addEventListener('click', function (e) {
+        if (e.target === requestSection) closeRequestModal();
+    });
+
+    document.addEventListener('keydown', function (e) {
+        if (e.key === 'Escape' && requestSection.classList.contains('store-lab-modal-open')) {
+            closeRequestModal();
+        }
+    });
+
+    function update() {
+        var selected = checkboxes.filter(function (cb) { return cb.checked; });
+        var total = 0;
+        listEl.innerHTML = '';
+
+        selected.forEach(function (cb) {
+            total += parseFloat(cb.dataset.price) || 0;
+            var row = document.createElement('div');
+            row.className = 'store-lab-selected-row';
+            row.innerHTML = '<span>' + cb.dataset.name + '</span><span>NPR ' + cb.dataset.price + '</span>';
+            listEl.appendChild(row);
+        });
+
+        countEl.textContent = selected.length;
+        totalEl.textContent = total.toFixed(2);
+        emptyMsg.style.display = selected.length ? 'none' : '';
+        stickyBar.classList.toggle('is-visible', selected.length > 0);
+
+        if (selected.length > 0) {
+            submitBtn.disabled = false;
+            submitBtn.textContent = 'Request ' + selected.length + ' Selected Test' + (selected.length === 1 ? '' : 's') + ' — NPR ' + total.toFixed(2);
+        } else {
+            submitBtn.disabled = true;
+            submitBtn.textContent = 'Select tests to continue';
+        }
+    }
+
+    checkboxes.forEach(function (cb) {
+        cb.addEventListener('change', update);
+    });
+
+    // Coming from a test/panel detail page's "Select This Test" link --
+    // pre-check it here so it's not lost, since selection state only lives
+    // in this page's checkboxes (there's no cart to carry it across pages).
+    var preselect = new URLSearchParams(window.location.search).get('add');
+    if (preselect) {
+        var match = checkboxes.filter(function (cb) { return cb.value === preselect; })[0];
+        if (match) {
+            match.checked = true;
+            openRequestModal();
+        }
+    }
+
+    update();
+}());
+</script>
+{% endblock %}

@@ -1,0 +1,27 @@
+  .prof-nav { display: flex; gap: 6px; flex-wrap: wrap; padding: 14px 24px 0; border-bottom: 1px solid var(--line); }
+  .prof-nav a { padding: 8px 14px; border-radius: 8px 8px 0 0; color: #5d7568; text-decoration: none; font-weight: 700; font-size: 12px; border-bottom: 2px solid transparent; }
+  .prof-nav a small { background: #e7f7ed; color: #16834f; border-radius: 9px; padding: 1px 7px; margin-left: 4px; font-size: 10px; }
+  .prof-nav a.on { color: var(--green); border-bottom-color: var(--green); }
+  .prof-body { padding: 18px 24px 24px; }
+  .prof-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; }
+  .prof-head h3 { margin: 0; font-size: 15px; }
+  .prof-empty { padding: 26px; text-align: center; color: var(--muted); }
+  .prof-actions { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; }
+  .prof-actions form { margin: 0; display: flex; gap: 4px; }
+  .prof-note { background: #fff8e6; border: 1px solid #f0dca0; border-radius: 10px; padding: 10px 14px; margin-bottom: 14px; font-size: 12px; line-height: 1.6; }
+  .prof-form label { display: grid; gap: 6px; font-size: 12px; font-weight: 700; color: #426052; }
+  .prof-form textarea { width: 100%; border: 1px solid #dce8e0; border-radius: 8px; padding: 10px 12px; background: #fbfdfb; outline: none; font: inherit; }
+  .prof-two { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+  .rehab-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 14px; align-items: start; }
+  .rehab-card { border: 1px solid var(--line); border-radius: 10px; padding: 14px 16px; background: #fff; }
+  .rehab-card h4 { margin: 0 0 10px; font-size: 13px; color: var(--green-dark); border-left: 3px solid var(--green); padding-left: 8px; }
+  .rehab-card .line { padding: 8px 0; border-bottom: 1px solid #edf2ee; font-size: 12px; }
+  .rehab-card .line:last-of-type { border-bottom: 0; }
+  .rehab-card ul { margin: 4px 0 0; padding-left: 18px; }
+  .rehab-card p { margin: 6px 0; font-size: 12px; }
+  table.mini { width: 100%; font-size: 11px; }
+  table.mini th, table.mini td { padding: 5px 4px; white-space: normal; }
+  .chk-row { display: flex; gap: 14px; flex-wrap: wrap; }
+  .chk-inline { display: inline-flex !important; grid-auto-flow: column; align-items: center; gap: 6px !important; font-weight: 600 !important; }
+  .chk-inline input { width: auto !important; }
+  @media (max-width: 900px) { .rehab-grid, .prof-two { grid-template-columns: 1fr; } }

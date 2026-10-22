@@ -1,0 +1,48 @@
+{% extends 'accounts/pro_base.html' %}
+{% block title %}Edit {{ patient.name }} | Sajhya Health{% endblock %}
+{% block main %}
+<a href="{% url 'accounts:patient-detail' patient.pk %}" style="color:var(--green);font-size:12px;font-weight:700;text-decoration:none;display:inline-block;margin-bottom:14px">← Back to {{ patient.name }}</a>
+<div class="modal-card" style="margin:0 auto">
+  <div class="modal-head"><h2>Edit Patient</h2></div>
+  <form method="post" class="pf" enctype="multipart/form-data" novalidate>
+    {% csrf_token %}
+    {% if form.non_field_errors %}<ul class="errorlist">{% for e in form.non_field_errors %}<li>{{ e }}</li>{% endfor %}</ul>{% endif %}
+    <h3 class="pf-section">Personal &amp; Contact</h3>
+    <div class="pf-field"><label>Profile picture</label>{{ form.photo }}{{ form.photo.errors }}</div>
+    <div class="pf-row">
+      <div class="pf-field"><label>Full Name <i>*</i></label>{{ form.name }}{{ form.name.errors }}</div>
+      <div class="pf-field"><label>Date of Birth <i>*</i></label>{{ form.date_of_birth }}{{ form.date_of_birth.errors }}</div>
+    </div>
+    <div class="pf-row">
+      <div class="pf-field"><label>Gender <i>*</i></label>{{ form.gender }}{{ form.gender.errors }}</div>
+      {% if show_contact %}<div class="pf-field"><label>Phone Number <i>*</i></label>{{ form.phone }}{{ form.phone.errors }}</div>{% endif %}
+    </div>
+    <div class="pf-row">
+      {% if show_contact %}<div class="pf-field"><label>Email</label>{{ form.email }}{{ form.email.errors }}</div>{% endif %}
+      <div class="pf-field"><label>Occupation</label>{{ form.occupation }}{{ form.occupation.errors }}</div>
+    </div>
+      {% if show_contact %}<div class="pf-field"><label>Address</label>{{ form.address }}{{ form.address.errors }}</div>{% endif %}
+
+    <h3 class="pf-section">Clinical</h3>
+    <div class="pf-row">
+      <div class="pf-field"><label>Diagnosis</label>{{ form.diagnosis }}{{ form.diagnosis.errors }}</div>
+      <div class="pf-field"><label>ICD-10 code</label>{{ form.icd10_code }}{{ form.icd10_code.errors }}</div>
+    </div>
+    <div class="pf-row">
+      <div class="pf-field"><label>Status</label>{{ form.status }}{{ form.status.errors }}</div>
+      <div class="pf-field"><label>Next appointment</label>{{ form.next_appointment }}{{ form.next_appointment.errors }}</div>
+    </div>
+    <div class="pf-row">
+      <div class="pf-field"><label>Insurance</label>{{ form.insurance }}{{ form.insurance.errors }}</div>
+      <div class="pf-field"><label>How did they hear about us?</label>{{ form.referral_source }}{{ form.referral_source.errors }}</div>
+    </div>
+    <div class="pf-field"><label>Notes</label>{{ form.notes }}{{ form.notes.errors }}</div>
+
+    <div class="pf-actions">
+      <a href="{% url 'accounts:patient-detail' patient.pk %}" class="secondary-btn" style="text-decoration:none;display:inline-flex;align-items:center">Cancel</a>
+      <button type="submit" class="primary-btn">Save Changes</button>
+    </div>
+  </form>
+  {% include 'accounts/_icd_picker.html' %}
+</div>
+{% endblock %}

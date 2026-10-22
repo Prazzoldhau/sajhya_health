@@ -1,0 +1,34 @@
+{% extends 'accounts/pro_base.html' %}
+{% block title %}Assessment | Sajhya Health{% endblock %}
+{% block extra_css %}
+  main { padding-top: 18px; }
+{% include 'assessments/_styles.html' %}
+{% endblock %}
+{% block main %}
+<p class="no-print" style="margin:0 0 4px"><a class="text-link" href="{% url 'accounts:patient-detail' patient.pk %}?tab=assessments" style="text-decoration:none">← {{ patient.name }}</a></p>
+<div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:12px">
+  <h1 style="font-size:20px;margin:0">{{ session.form_name|default:"Assessment" }}</h1>
+  <span class="hint">{{ patient.name }} ({{ patient.patient_code }}) · {{ session.assessed_on|date:"F j, Y" }}{% if session.assessor %} · {{ session.assessor }}{% endif %}</span>
+  <span class="no-print" style="margin-left:auto;display:flex;gap:8px">
+    <button type="button" class="secondary-btn" onclick="window.print()">Print</button>
+    <form method="post" action="{% url 'assessments:delete' session.pk %}" onsubmit="return confirm('Remove this whole assessment? This cannot be undone.')" style="margin:0">{% csrf_token %}<button class="secondary-btn" type="submit">Remove</button></form>
+  </span>
+</div>
+{% if session.notes %}<p class="hint">{{ session.notes }}</p>{% endif %}
+
+{% for r in results %}
+<section class="as-q">
+  <header>
+    <h3>{{ r.scale_name }}</h3>
+    <span class="total">{{ r.score_display }}</span>
+    {% if r.interpretation %}<span class="tone {{ r.tone }}">{{ r.interpretation }}</span>{% endif %}
+  </header>
+  <table class="as-table">
+    <thead><tr><th>ITEM</th><th style="width:70px">SCORE</th><th>ANSWER</th></tr></thead>
+    <tbody>{% for a in r.answers %}<tr><td>{{ a.label }}</td><td><b>{{ a.value }}</b></td><td>{{ a.value_label|default:"" }}</td></tr>{% endfor %}</tbody>
+  </table>
+  {% if r.notes %}<div class="instr" style="padding-bottom:10px">Notes: {{ r.notes }}</div>{% endif %}
+  <div class="instr" style="padding-bottom:10px">Scale version {{ r.scale_version }}{% if r.mcid %} · minimal important change {{ r.mcid|floatformat:"-2" }}{% endif %}</div>
+</section>
+{% endfor %}
+{% endblock %}
