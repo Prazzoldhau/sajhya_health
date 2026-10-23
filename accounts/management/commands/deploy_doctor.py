@@ -19,19 +19,19 @@ OK, WARN, FAIL = 'OK  ', 'WARN', 'FAIL'
 
 
 def raw_env_file(base_dir):
-    """{name: value} exactly as written in .env (first occurrence wins, like the loader)."""
+    """{name: value} of the .env file parsed by the same loader the settings use, in isolation (so shell variables do not mix in)."""
+    import environ
+
     path = Path(base_dir) / '.env'
-    values = {}
     if not path.exists():
         return None
-    for line in path.read_text(encoding='utf-8', errors='replace').splitlines():
-        m = re.match(r'\s*(?:export\s+)?([A-Za-z_][A-Za-z_0-9]*)=(.*)$', line)
-        if m and m.group(1) not in values:
-            v = m.group(2).strip()
-            if len(v) >= 2 and v[0] == v[-1] and v[0] in '"\'':
-                v = v[1:-1]
-            values[m.group(1)] = v
-    return values
+    saved, fresh = environ.Env.ENVIRON, {}
+    environ.Env.ENVIRON = fresh
+    try:
+        environ.Env.read_env(path)
+    finally:
+        environ.Env.ENVIRON = saved
+    return fresh
 
 
 class Command(BaseCommand):

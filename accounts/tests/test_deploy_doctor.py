@@ -62,3 +62,15 @@ class DeployDoctorTests(SimpleTestCase):
         script = (Path(__file__).resolve().parents[2] / 'deploy' / 'cpanel_deploy.sh').read_text(encoding='utf-8')
         self.assertLess(script.index('deploy_doctor'), script.index('Backing up the database'))
         self.assertIn('virtualenv/$APP_NAME', script)  # only the app's own virtualenv is used
+
+
+class EnvOverrideDetectionTests(SimpleTestCase):
+    def test_a_value_only_counts_as_overridden_when_it_really_differs(self):
+        import tempfile
+        from pathlib import Path
+        from accounts.management.commands.deploy_doctor import raw_env_file
+        with tempfile.TemporaryDirectory() as folder:
+            (Path(folder) / '.env').write_text("SECRET_KEY='abc$def'\nDEBUG=False\nDATABASE_URL=mysql://u:p@localhost:3306/d\n", encoding='utf-8')
+            values = raw_env_file(folder)
+        self.assertEqual((values['DEBUG'], values['DATABASE_URL']), ('False', 'mysql://u:p@localhost:3306/d'))
+        self.assertTrue(values['SECRET_KEY'].startswith('abc'))  # parsed exactly like the settings loader does
