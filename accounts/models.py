@@ -58,6 +58,8 @@ class Account(models.Model):
     profession = models.ForeignKey(Profession, null=True, blank=True, on_delete=models.PROTECT)
     clinic_type = models.ForeignKey(ClinicType, null=True, blank=True, on_delete=models.PROTECT)
     enterprise_type = models.ForeignKey(EnterpriseType, null=True, blank=True, on_delete=models.PROTECT)
+    personal_code = models.CharField(max_length=15, null=True, blank=True, unique=True, help_text='Short code of the person on the live site (physios shared it for pairing).')
+    pairing_token = models.CharField(max_length=32, null=True, blank=True, unique=True, help_text='Token for pairing a patient app with this professional.')
     created_at = models.DateTimeField(auto_now_add=True)
 
     def __str__(self):
@@ -197,6 +199,14 @@ class Patient(models.Model):
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default=ACTIVE)
     clinic = models.ForeignKey('clinics.Clinic', null=True, blank=True, on_delete=models.SET_NULL, related_name='patients',
                                help_text='The clinic this patient was registered under (optional).')
+    # Carried over from the live site's patient record (see docs/LIVE_DATABASE.md); not used by the screens yet.
+    qr_code = models.CharField(max_length=200, blank=True, help_text='Path of the patient QR image on the live site.')
+    qr_token = models.CharField(max_length=32, null=True, blank=True, unique=True, help_text='Token behind the patient QR code (pairing by scan).')
+    legacy_username = models.CharField(max_length=50, null=True, blank=True, unique=True, help_text='Username the patient used to sign in to the old patient app.')
+    legacy_password_hash = models.CharField(max_length=128, blank=True, help_text='Old patient-app password hash (never shown). New sign-in uses the portal code flow.')
+    activation_expires_at = models.DateTimeField(null=True, blank=True, help_text='When the old patient-app activation ended.')
+    enterprise = models.ForeignKey('extras.Enterprise', null=True, blank=True, on_delete=models.SET_NULL, related_name='patients',
+                                   help_text='The hospital / enterprise this patient was registered under (optional).')
     last_visit = models.DateField(null=True, blank=True)
     last_activity = models.DateTimeField(null=True, blank=True, help_text='Last time the patient was added, opened or seen; drives "Recent patients".')
     created_at = models.DateTimeField(auto_now_add=True)

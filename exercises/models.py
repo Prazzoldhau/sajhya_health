@@ -112,6 +112,7 @@ class Prescription(models.Model):
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default=ACTIVE)
     start_date = models.DateField(default=timezone.localdate)
     end_date = models.DateField(null=True, blank=True)
+    prescription_date = models.DateTimeField(null=True, blank=True, help_text='The date printed on the prescription (live site).')
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
@@ -158,6 +159,9 @@ class PrescriptionExercise(models.Model):
     schedule_evening = models.BooleanField(default=False)
     is_completed = models.BooleanField(default=False)
     completed_at = models.DateTimeField(null=True, blank=True)
+    library_exercise_id = models.IntegerField(null=True, blank=True, help_text='Id of the library exercise at the time (live site kept it as a plain number).')
+    created_at = models.DateTimeField(null=True, blank=True)
+    updated_at = models.DateTimeField(null=True, blank=True)
 
     class Meta:
         ordering = ['order', 'id']

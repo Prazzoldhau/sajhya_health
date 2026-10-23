@@ -101,7 +101,7 @@ environment active (`venv\Scripts\activate` on Windows). On a server, use the sa
 The reference data ships as fixtures and is loaded by commands. They are safe to re-run (they update, not duplicate):
 
 ```
-python manage.py load_exercises      # 788 exercises, regions, step images
+python manage.py load_exercises      # 790 exercises, regions, step images, YouTube + hosted video links (add --prune once if an older library is loaded)
 python manage.py load_pharmacy       # 35 pharmacy products
 python manage.py load_lab_catalog    # 33 lab tests + 10 panels
 python manage.py load_icd10          # ~12,000 WHO ICD-10 codes (diagnosis lookup)
@@ -162,6 +162,7 @@ python manage.py load_catalog        # 259 marketplace products + 16 categories
 - **A patient cannot see an earlier order in My orders**: it was placed as a guest. They can claim it with the order number and the email used (My orders -> *Placed one before you had an account?*).
 - **Patient cannot link / sees nothing in the portal**: see [PORTAL.md](PORTAL.md) (codes expire after 7 days and work once; drafts are not shown).
 - **SOAP note cannot be saved / edited**: see the troubleshooting list in [SOAP_NOTES.md](SOAP_NOTES.md) (drafts are author-only; final notes are locked).
+- **`audit_live_dump` says UNMAPPED**: the live schema changed or a model field was renamed; see [LIVE_DATABASE.md](LIVE_DATABASE.md).
 - **"You have used all your patient slots"** / a clinic owes money for extra patients: see [PRICING.md](PRICING.md) (staff mark slot orders / monthly dues paid in the admin).
 - **Too many orders/bookings/accounts from this connection**: the per-IP limit on public forms (15 orders/hour, 15 lab bookings/hour, 10 sign-ups/hour); wait an hour or set `THROTTLE_ENABLED=False` while testing. Behind a proxy make sure `BEHIND_PROXY=True`, otherwise everyone shares one IP.
 - **A professional says they paid for the Clinic plan but cannot create a clinic**: activate it in the admin (Clinics -> Clinic subscriptions -> action). See [CLINICS.md](CLINICS.md).
@@ -169,7 +170,7 @@ python manage.py load_catalog        # 259 marketplace products + 16 categories
 - **A user cannot change their name/licence in Settings**: by design (see DECISIONS). Staff edit it in the Django admin -> Professional profiles.
 - **Report numbers look wrong**: check the definitions in `accounts/reports.py` (a patient only counts as *seen* if a Visit exists; package dues use the stored `amount_paid`). Diagnoses group by the ICD-10 code, so patients entered without a code are grouped by their free-text diagnosis.
 - **A patient is missing from Recent patients**: the list is ordered by `Patient.last_activity` (added/opened/visit). Patients not touched for long fall off the top 4-5; use the search or *View all*.
-- **Exercise shows a grey-green letter instead of a picture**: that library exercise has no image (only ~243 of 788 do).
+- **Exercise shows a grey-green letter instead of a picture**: that library exercise has no image file here (about 770 of 790 have one). After a deploy make sure `static/exercises/` came across and run `collectstatic`.
   Add one in the admin (Exercises -> *Image path* or step images); it shows everywhere immediately.
 - **403 CSRF failed**: the form was open too long, cookies are blocked, or the site is served on a domain not in
   `CSRF_TRUSTED_ORIGINS` (needed for HTTPS behind a proxy: `CSRF_TRUSTED_ORIGINS=https://your.domain`).

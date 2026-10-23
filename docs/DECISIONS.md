@@ -145,6 +145,12 @@ posts to the same search), and each form keeps its own validation (the rules dif
   scales from different forms. Item wording for long instruments (Berg, ODI, SARA) uses general grade anchors, not the full
   published text, to avoid reproducing copyrighted material; clinicians grade against the official instrument. FIM is
   trademarked - ship with a licence note and make it easy to deactivate. Per-muscle/side scales are one assessment each.
+- **Live database coverage**: the real sajhya.com export (85 tables) is mapped table-by-table (`extras/live_map.py`). Tables that matched an
+  existing model got their missing columns added; the others became faithful models in the `extras` app (columns, lengths, nullability and
+  unique keys copied from the live schema by a generator, so no hand-typing errors). Soft-deleted patients, session/admin-log tables and
+  empty legacy tables are intentionally not carried over. Only the *structure* is committed (`live_schema.json`); the dump itself
+  contains patient data and is git-ignored. Loading rows is a separate step (see LIVE_DATABASE.md). `audit_live_dump` is a test, so the
+  mapping cannot silently go stale.
 - **Pricing (Professional / Clinic)**: Professional gets 10 free patients, then pays NPR 200 per extra patient by buying **slots**
   in advance (paid slots stored on `PatientAllowance`; staff add them when the order is marked paid) - chosen over blocking-until-
   subscription because there is no monthly fee and it matches "200 for each patient". Clinic patients are exempt from the
@@ -199,7 +205,10 @@ posts to the same search), and each form keeps its own validation (the rules dif
   are only the content of the package page and the 500-patient limit; paying for an account plan inside the app was built and
   then removed on request.
 - **Time zone Asia/Kathmandu**, and datetime filtering by ranges (MySQL has no time-zone tables by default).
-- **Exercise library**: 788 exercises copied; only ~243 have pictures because that is all the old repository contained.
+- **Exercise library**: rebuilt from the live sajhya.com export on 2026-10-22 (the earlier copy was an older, smaller snapshot): 790 exercises, 30
+  sub-regions, 1,928 step-image rows, 155 YouTube links, 26 hosted videos (Supabase URLs), 221 Nepali descriptions. About 2,500 picture files are
+  referenced; those present in this repository are loaded, the rest (about 90 files that exist only on the live server) are skipped at load time so nothing
+  shows broken. `load_exercises --prune` removes entries of the older library. The picture files add roughly 480 MB to `static/` (see OPERATIONS.md).
 
 ## Known gaps and open questions
 

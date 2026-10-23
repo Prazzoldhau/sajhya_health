@@ -60,6 +60,8 @@ class LabTestRequest(models.Model):
     STATUS_CHOICES = [('pending', 'Pending'), ('sample_collected', 'Sample Collected'), ('completed', 'Completed'), ('cancelled', 'Cancelled')]
 
     request_number = models.CharField(max_length=20, unique=True, editable=False)
+    patient = models.ForeignKey('accounts.Patient', null=True, blank=True, on_delete=models.SET_NULL, related_name='lab_requests',
+                                help_text='The patient record the booking was made for (when a physio books for a patient).')
     user = models.ForeignKey('auth.User', on_delete=models.SET_NULL, null=True, blank=True, related_name='lab_requests',
                              help_text='The signed-in account that booked it (empty for a guest booking).')
     customer_name = models.CharField(max_length=200)

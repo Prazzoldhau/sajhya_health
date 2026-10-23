@@ -57,6 +57,7 @@ INSTALLED_APPS = [
     'clinics',
     'soapnotes',
     'portal',
+    'extras',
 ]
 
 MIDDLEWARE = [

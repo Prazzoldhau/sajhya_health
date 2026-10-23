@@ -168,6 +168,8 @@ class OrderItem(models.Model):
     product = models.ForeignKey(Product, on_delete=models.SET_NULL, null=True, blank=True)
     pharmacy_product = models.ForeignKey(PharmacyProduct, on_delete=models.SET_NULL, null=True, blank=True)
     variant = models.ForeignKey(ProductVariant, on_delete=models.SET_NULL, null=True, blank=True)
+    lab_test = models.ForeignKey('lab.LabTest', null=True, blank=True, on_delete=models.SET_NULL, related_name='+')
+    lab_panel = models.ForeignKey('lab.LabTestPanel', null=True, blank=True, on_delete=models.SET_NULL, related_name='+')
     product_name = models.CharField(max_length=200)
     quantity = models.PositiveIntegerField(default=1)
     unit_price = models.DecimalField(max_digits=10, decimal_places=2)

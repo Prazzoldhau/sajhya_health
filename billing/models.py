@@ -178,6 +178,7 @@ class PackagePayment(models.Model):
     amount = models.DecimalField(max_digits=10, decimal_places=2)
     payment_mode = models.CharField(max_length=10, choices=PAYMENT_MODE_CHOICES, default='cash')
     notes = models.CharField(max_length=255, blank=True, default='')
+    recorded_by = models.ForeignKey(settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.SET_NULL, related_name='+')
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:

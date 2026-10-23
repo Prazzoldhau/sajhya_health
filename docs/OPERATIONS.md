@@ -25,6 +25,8 @@ variable with comments. The important ones:
 | `CLINIC_MONTHLY_PATIENT_CAP`, `CLINIC_OVERAGE_RATE` | 400, 200 | 400, 200 | Clinic pricing: new patients per month included, NPR per extra patient. |
 | `THROTTLE_ENABLED` | automatic | `True` (default) | Per-IP limits on public forms (checkout 15/h, lab booking 15/h, sign-up 10/h). |
 
+> **On cPanel hosting** follow [DEPLOY_CPANEL.md](DEPLOY_CPANEL.md) (plain git clone in the Terminal + `deploy/cpanel_deploy.sh`; not cPanel's Git screen). The generic steps below are for a server you control.
+
 ## 2. First deployment
 
 ```
@@ -125,3 +127,12 @@ Nothing else needs a scheduler: statuses such as package "Expired", medicine "Co
 **Staff tasks that happen in the admin** (no scheduler involved): activating a Clinic plan request (Clinics -> Clinic subscriptions),
 marking patient-slot orders paid (Billing -> Slot orders -> *Mark paid and add the slots*), marking clinic monthly dues paid, and
 processing orders / lab bookings. Check these lists daily - customers are waiting on them.
+
+## 9. The exercise library on a new server
+
+`python manage.py load_exercises` loads **everything** the library has, from `exercises/fixtures/library.json` (built from the live site): 790
+exercises, regions, 1,928 step-image rows, the main picture path, the **YouTube link** and the **hosted video link** of each exercise, and the Nepali
+descriptions. It only loads a picture path if the file really exists under `static/exercises/` (the command reports how many it skipped), so make
+sure the folder is deployed first (it is about 750 MB; consider rsync / an object store / Git LFS rather than a plain `git push`). Run it on a
+**fresh** database; on a database that held an older library add `--prune` once to remove the old entries. Videos are not files here: the YouTube
+and hosted (Supabase) links are stored as URLs and played from there.

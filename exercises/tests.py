@@ -175,3 +175,48 @@ class ThumbnailTests(LibraryBase):
         profile_page = self.client.get(reverse('accounts:patient-detail', args=[self.patient.pk]), {'tab': 'profile', 'section': 'rehab'})
         self.assertContains(profile_page, 'ex-thumb')
         self.assertContains(self.client.get(reverse('exercises:library')), 'data-cover="/static/exercises/knee/squat.png"')
+
+
+class LibraryFixtureTests(TestCase):
+    """`manage.py load_exercises` must carry the whole library: pictures, step images, YouTube and hosted video links, Nepali text."""
+
+    def load(self, *args):
+        from io import StringIO
+        from django.core.management import call_command
+        out = StringIO()
+        call_command('load_exercises', *args, stdout=out)
+        return out.getvalue()
+
+    def test_the_full_live_library_is_loaded_with_links(self):
+        output = self.load()
+        self.assertEqual(ExerciseMain.objects.count(), 790)
+        self.assertEqual(SubRegion.objects.count(), 30)
+        self.assertEqual(ExerciseMain.objects.exclude(youtube_url='').count(), 155)
+        self.assertEqual(ExerciseMain.objects.exclude(hosted_video_url='').count(), 26)
+        self.assertEqual(ExerciseMain.objects.exclude(exercise_description_nepali='').count(), 221)
+        self.assertGreater(ExerciseMain.objects.exclude(exercise_url='').count(), 700)  # main pictures (a few files are not in this repository)
+        self.assertGreater(ExerciseStepImage.objects.count(), 1800)
+        self.assertIn('155 YouTube links, 26 hosted videos', output)
+        pelvic = ExerciseMain.objects.get(exercise_name='Supine Pelvic Tilt')
+        self.assertTrue(pelvic.youtube_url.startswith('https://youtu.be/'))
+        self.assertTrue(pelvic.hosted_video_url.endswith('.mp4'))
+        self.assertTrue(pelvic.cover.startswith('/static/exercises/'))
+
+    def test_every_loaded_picture_exists_on_disk(self):
+        """Nothing is shown broken: a path whose file is missing is dropped at load time."""
+        from pathlib import Path
+        from django.conf import settings
+        self.load()
+        root = Path(settings.STATICFILES_DIRS[0])
+        urls = list(ExerciseMain.objects.exclude(exercise_url='').values_list('exercise_url', flat=True)) + list(ExerciseStepImage.objects.values_list('image_url', flat=True))
+        missing = [u for u in urls if not (root / u.removeprefix('/static/')).exists()]
+        self.assertEqual(missing, [])
+
+    def test_loading_twice_changes_nothing_and_prune_removes_old_entries(self):
+        self.load()
+        stray = ExerciseMain.objects.create(sub_region_fk=SubRegion.objects.first(), exercise_name='Old library entry', exercise_type='x', difficulty_level=1, default_sets=3, default_reps=10, hold_time_sec=0)
+        self.load()
+        self.assertEqual(ExerciseMain.objects.count(), 791)  # a plain load never deletes
+        self.assertIn('Pruned 1', self.load('--prune'))
+        self.assertEqual(ExerciseMain.objects.count(), 790)
+        self.assertFalse(ExerciseMain.objects.filter(pk=stray.pk).exists())

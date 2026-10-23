@@ -30,3 +30,7 @@ private_uploads/
 logs/
 *.log
 cache/
+
+# Database dumps contain real patient data - never commit them
+*.sql
+*.sql.gz

@@ -1,0 +1,879 @@
+{
+ "source": "madhyapu_sajhya_db export of live sajhya.com, 2026-10-22 (structure only, no data)",
+ "tables": {
+  "account_app_user": [
+   "id",
+   "password",
+   "last_login",
+   "is_superuser",
+   "username",
+   "first_name",
+   "last_name",
+   "email",
+   "is_staff",
+   "is_active",
+   "date_joined",
+   "phone",
+   "user_type",
+   "personal_code",
+   "created_at",
+   "license_number",
+   "pairing_token",
+   "license_verified"
+  ],
+  "account_app_user_groups": [
+   "id",
+   "user_id",
+   "group_id"
+  ],
+  "account_app_user_user_permissions": [
+   "id",
+   "user_id",
+   "permission_id"
+  ],
+  "assessment_app_patientscaleassessment": [
+   "id",
+   "created_at",
+   "scale",
+   "items",
+   "total_score",
+   "interpretation",
+   "notes",
+   "created_by_id",
+   "patient_id"
+  ],
+  "assessment_app_regionalassessment": [
+   "id",
+   "created_at",
+   "updated_at",
+   "region",
+   "chief_complaint",
+   "observation",
+   "range_of_motion",
+   "palpation",
+   "special_tests",
+   "neurovascular_screen",
+   "clinical_impression",
+   "plan",
+   "created_by_id",
+   "patient_id"
+  ],
+  "assessment_app_specialtestreference": [
+   "id",
+   "region",
+   "name",
+   "purpose",
+   "procedure",
+   "positive_sign",
+   "order",
+   "is_active"
+  ],
+  "auth_group": [
+   "id",
+   "name"
+  ],
+  "auth_group_permissions": [
+   "id",
+   "group_id",
+   "permission_id"
+  ],
+  "auth_permission": [
+   "id",
+   "name",
+   "content_type_id",
+   "codename"
+  ],
+  "billing_app_billingentry": [
+   "id",
+   "invoice_number",
+   "entry_date",
+   "patient_name",
+   "age",
+   "sex",
+   "contact_number",
+   "service",
+   "rate",
+   "payment_mode",
+   "notes",
+   "created_at",
+   "updated_at",
+   "physio_id"
+  ],
+  "billing_app_packagepayment": [
+   "id",
+   "amount",
+   "payment_mode",
+   "notes",
+   "created_at",
+   "package_id",
+   "recorded_by_id"
+  ],
+  "billing_app_patientpackage": [
+   "id",
+   "duration",
+   "total_sessions",
+   "total_amount",
+   "sessions_used",
+   "start_date",
+   "status",
+   "notes",
+   "created_at",
+   "patient_id",
+   "physio_id",
+   "amount_paid"
+  ],
+  "careers_app_vacancy": [
+   "id",
+   "title",
+   "department",
+   "location",
+   "employment_type",
+   "description",
+   "requirements",
+   "is_active",
+   "posted_at",
+   "closing_date",
+   "organization"
+  ],
+  "careers_app_vacancyapplication": [
+   "id",
+   "full_name",
+   "email",
+   "whatsapp_number",
+   "resume",
+   "cover_note",
+   "status",
+   "admin_notes",
+   "applied_at",
+   "vacancy_id"
+  ],
+  "clinic_account_clinic": [
+   "id",
+   "clinic_name",
+   "clinic_code",
+   "address",
+   "phone",
+   "pan_number",
+   "created_at",
+   "updated_at",
+   "created_by_id"
+  ],
+  "clinic_account_clinicphysio": [
+   "id",
+   "joined_at",
+   "is_active",
+   "clinic_id",
+   "physio_id"
+  ],
+  "clinic_account_queueentry": [
+   "id",
+   "status",
+   "joined_at",
+   "called_at",
+   "clinic_id",
+   "patient_id"
+  ],
+  "delivery_app_delivery": [
+   "id",
+   "status",
+   "cod_amount",
+   "cod_collected",
+   "cod_collected_at",
+   "assigned_at",
+   "picked_up_at",
+   "delivered_at",
+   "failure_reason",
+   "created_at",
+   "order_id",
+   "rider_id",
+   "drop_zone_id",
+   "pickup_zone_id"
+  ],
+  "delivery_app_rider": [
+   "id",
+   "rider_code",
+   "vehicle_type",
+   "status",
+   "created_at",
+   "updated_at",
+   "user_id",
+   "current_zone_id"
+  ],
+  "delivery_app_zone": [
+   "id",
+   "name"
+  ],
+  "django_admin_log": [
+   "id",
+   "action_time",
+   "object_id",
+   "object_repr",
+   "action_flag",
+   "change_message",
+   "content_type_id",
+   "user_id"
+  ],
+  "django_content_type": [
+   "id",
+   "app_label",
+   "model"
+  ],
+  "django_migrations": [
+   "id",
+   "app",
+   "name",
+   "applied"
+  ],
+  "django_session": [
+   "session_key",
+   "session_data",
+   "expire_date"
+  ],
+  "donate_app_donatablecategory": [
+   "id",
+   "name",
+   "description",
+   "image",
+   "is_active",
+   "sort_order"
+  ],
+  "donate_app_donationpledge": [
+   "id",
+   "pledge_number",
+   "donor_name",
+   "phone_number",
+   "address",
+   "notes",
+   "status",
+   "created_at"
+  ],
+  "donate_app_donationpledge_items": [
+   "id",
+   "donationpledge_id",
+   "donatablecategory_id"
+  ],
+  "enterprise_account_enterprise": [
+   "id",
+   "enterprise_name",
+   "enterprise_code",
+   "pan_number",
+   "address",
+   "phone",
+   "created_at",
+   "updated_at",
+   "created_by_id"
+  ],
+  "enterprise_account_enterprisestaff": [
+   "id",
+   "joined_at",
+   "is_active",
+   "enterprise_id",
+   "physio_id"
+  ],
+  "enterprise_account_physiorequest": [
+   "id",
+   "patient_name",
+   "bed_number",
+   "reason",
+   "urgency",
+   "status",
+   "created_at",
+   "status_updated_at",
+   "ward_id",
+   "physio_message",
+   "status_updated_by_id"
+  ],
+  "enterprise_account_ward": [
+   "id",
+   "ward_type",
+   "created_at",
+   "created_by_id",
+   "enterprise_id",
+   "access_token",
+   "pin",
+   "pin_hash"
+  ],
+  "exercise_app_exercisemain": [
+   "id",
+   "exercise_name",
+   "exercise_type",
+   "difficulty_level",
+   "default_sets",
+   "default_reps",
+   "hold_time_sec",
+   "exercise_description",
+   "sub_region_fk_id",
+   "exercise_url",
+   "default_rest_time_sec",
+   "exercise_description_nepali",
+   "youtube_url",
+   "hosted_video_url"
+  ],
+  "exercise_app_exercisestepimage": [
+   "id",
+   "order",
+   "image_url",
+   "label",
+   "exercise_id"
+  ],
+  "exercise_app_region": [
+   "id",
+   "region_name"
+  ],
+  "exercise_app_subregion": [
+   "id",
+   "sub_region_name",
+   "region_fk_id"
+  ],
+  "exercise_feedback": [
+   "id",
+   "feedback_type",
+   "note",
+   "logged_at",
+   "prescription_exercise_id"
+  ],
+  "find_physio_app_bookingrequest": [
+   "id",
+   "patient_name",
+   "patient_contact",
+   "patient_email",
+   "condition",
+   "preferred_date",
+   "preferred_time",
+   "booking_type",
+   "address",
+   "status",
+   "notes",
+   "created_at",
+   "physio_id"
+  ],
+  "find_physio_app_physioavailability": [
+   "id",
+   "day_of_week",
+   "start_time",
+   "end_time",
+   "is_home",
+   "physio_id"
+  ],
+  "find_physio_app_physioprofile": [
+   "id",
+   "bio",
+   "photo",
+   "experience_years",
+   "location",
+   "consultation_fee",
+   "home_visit_fee",
+   "platform_fee",
+   "travel_cost",
+   "is_home_visit",
+   "is_clinic_visit",
+   "is_public",
+   "avg_rating",
+   "total_reviews",
+   "created_at",
+   "updated_at",
+   "physio_id"
+  ],
+  "find_physio_app_physioprofile_specializations": [
+   "id",
+   "physioprofile_id",
+   "specialization_id"
+  ],
+  "find_physio_app_physioreview": [
+   "id",
+   "reviewer_name",
+   "rating",
+   "comment",
+   "is_approved",
+   "created_at",
+   "booking_id",
+   "physio_id"
+  ],
+  "find_physio_app_specialization": [
+   "id",
+   "name",
+   "slug"
+  ],
+  "lab_app_labtest": [
+   "id",
+   "name",
+   "category",
+   "price",
+   "sample_type",
+   "prep_instructions",
+   "turnaround_time",
+   "is_active"
+  ],
+  "lab_app_labtestpanel": [
+   "id",
+   "name",
+   "description",
+   "price",
+   "is_featured",
+   "is_active"
+  ],
+  "lab_app_labtestpanel_tests": [
+   "id",
+   "labtestpanel_id",
+   "labtest_id"
+  ],
+  "lab_app_labtestrequest": [
+   "id",
+   "request_number",
+   "status",
+   "notes",
+   "total_amount",
+   "created_at",
+   "updated_at",
+   "patient_id",
+   "collection_address",
+   "customer_email",
+   "customer_name",
+   "customer_phone"
+  ],
+  "lab_app_labtestrequestitem": [
+   "id",
+   "test_name",
+   "price",
+   "lab_test_id",
+   "request_id",
+   "lab_panel_id"
+  ],
+  "marketplace_app_category": [
+   "id",
+   "name",
+   "icon",
+   "description"
+  ],
+  "marketplace_app_commission": [
+   "id",
+   "patient_code",
+   "order_amount",
+   "commission_rate",
+   "commission_amount",
+   "status",
+   "created_at",
+   "order_id",
+   "physio_id"
+  ],
+  "marketplace_app_commissionrate": [
+   "id",
+   "rate",
+   "physio_id"
+  ],
+  "marketplace_app_diagnosisproductmap": [
+   "id",
+   "keyword",
+   "label"
+  ],
+  "marketplace_app_diagnosisproductmap_products": [
+   "id",
+   "diagnosisproductmap_id",
+   "product_id"
+  ],
+  "marketplace_app_order": [
+   "id",
+   "order_number",
+   "customer_name",
+   "customer_email",
+   "customer_phone",
+   "delivery_address",
+   "notes",
+   "status",
+   "total_amount",
+   "created_at",
+   "user_id",
+   "order_type"
+  ],
+  "marketplace_app_orderitem": [
+   "id",
+   "product_name",
+   "quantity",
+   "unit_price",
+   "order_id",
+   "product_id",
+   "variant_id",
+   "pharmacy_product_id",
+   "lab_panel_id",
+   "lab_test_id"
+  ],
+  "marketplace_app_patientproductrecommendation": [
+   "id",
+   "note",
+   "created_at",
+   "patient_id",
+   "product_id",
+   "recommended_by_id"
+  ],
+  "marketplace_app_pharmacyproduct": [
+   "id",
+   "name",
+   "category",
+   "description",
+   "price",
+   "unit",
+   "image",
+   "in_stock",
+   "is_featured",
+   "requires_prescription",
+   "created_at",
+   "image_upload"
+  ],
+  "marketplace_app_product": [
+   "id",
+   "name",
+   "description",
+   "price",
+   "unit",
+   "image",
+   "in_stock",
+   "is_featured",
+   "created_at",
+   "category_id",
+   "brand",
+   "image_upload"
+  ],
+  "marketplace_app_productimage": [
+   "id",
+   "order",
+   "image",
+   "product_id"
+  ],
+  "marketplace_app_productvariant": [
+   "id",
+   "label",
+   "price",
+   "image",
+   "in_stock",
+   "sort_order",
+   "product_id"
+  ],
+  "patient_app_appopenevent": [
+   "id",
+   "opened_on",
+   "first_opened_at",
+   "ping_count",
+   "patient_id"
+  ],
+  "patient_app_pushsubscription": [
+   "id",
+   "endpoint",
+   "p256dh",
+   "auth",
+   "created_at",
+   "patient_id"
+  ],
+  "patient_app_videoclickevent": [
+   "id",
+   "exercise_id_in_library",
+   "exercise_name",
+   "clicked_at",
+   "prescription_exercise_id"
+  ],
+  "personal_account_activationcard": [
+   "id",
+   "code",
+   "qr_code",
+   "duration_days",
+   "is_used",
+   "used_at",
+   "created_at",
+   "used_by_id"
+  ],
+  "personal_account_addpatient": [
+   "id",
+   "patient_code",
+   "patient_name",
+   "patient_contact",
+   "patient_diagnosis",
+   "created_by_id",
+   "created_at",
+   "origin_clinic_id",
+   "completed_session",
+   "qr_code",
+   "qr_token",
+   "origin_enterprise_id",
+   "activation_expires_at",
+   "password",
+   "is_deleted",
+   "deleted_at",
+   "diagnosis_code_id",
+   "username"
+  ],
+  "personal_account_diagnosiscode": [
+   "id",
+   "code",
+   "label",
+   "chapter",
+   "is_active"
+  ],
+  "personal_account_patientaid": [
+   "id",
+   "custom_name",
+   "notes",
+   "created_at",
+   "patient_id",
+   "product_id",
+   "recorded_by_id"
+  ],
+  "personal_account_patientassessmententry": [
+   "id",
+   "notes",
+   "created_at",
+   "patient_id",
+   "reference_id",
+   "recorded_by_id"
+  ],
+  "personal_account_patientbloodtest": [
+   "id",
+   "custom_name",
+   "notes",
+   "created_at",
+   "lab_test_id",
+   "patient_id",
+   "recorded_by_id"
+  ],
+  "personal_account_patientconsultation": [
+   "id",
+   "doctor_name",
+   "visit_date",
+   "notes",
+   "follow_up_date",
+   "created_at",
+   "patient_id",
+   "recorded_by_id"
+  ],
+  "personal_account_patientdietentry": [
+   "id",
+   "meal_time",
+   "food_item",
+   "notes",
+   "created_at",
+   "patient_id",
+   "recorded_by_id"
+  ],
+  "personal_account_patientexercise": [
+   "id",
+   "created_at",
+   "exercise_id",
+   "patient_id"
+  ],
+  "personal_account_patientmedicalprofile": [
+   "id",
+   "allergies",
+   "medical_history",
+   "updated_at",
+   "patient_id",
+   "nursing_mobility_assistance",
+   "nursing_vitals",
+   "nursing_wound_catheter_care",
+   "last_updated_by_id"
+  ],
+  "personal_account_patientmedication": [
+   "id",
+   "time_of_day",
+   "custom_name",
+   "instructions",
+   "created_at",
+   "patient_id",
+   "pharmacy_product_id",
+   "recorded_by_id"
+  ],
+  "personal_account_patientphysiopairing": [
+   "id",
+   "source",
+   "paired_at",
+   "clinic_id",
+   "enterprise_id",
+   "patient_id",
+   "physio_id"
+  ],
+  "personal_account_rx": [
+   "id",
+   "custom_name",
+   "dosage",
+   "time_of_day",
+   "start_date",
+   "duration_days",
+   "status",
+   "notes",
+   "created_at",
+   "issued_by_id",
+   "patient_id",
+   "pharmacy_product_id"
+  ],
+  "prescription_app_modality": [
+   "id",
+   "name",
+   "category",
+   "is_active"
+  ],
+  "prescription_app_treatmentsession": [
+   "id",
+   "session_number",
+   "session_date",
+   "pre_notes",
+   "treatment_response",
+   "session_note",
+   "created_at",
+   "updated_at",
+   "patient_id"
+  ],
+  "prescription_app_treatmentsessionmodality": [
+   "id",
+   "parameters",
+   "modality_id",
+   "session_id"
+  ],
+  "prescription_exercises": [
+   "id",
+   "exercise_id_in_library",
+   "exercise_name",
+   "difficulty_level",
+   "order",
+   "is_completed",
+   "completed_at",
+   "created_at",
+   "updated_at",
+   "exercise_id",
+   "prescription_id",
+   "hold_time_sec",
+   "reps",
+   "rest_time_sec",
+   "sets",
+   "schedule_day",
+   "schedule_evening",
+   "schedule_morning"
+  ],
+  "prescriptions": [
+   "id",
+   "prescription_date",
+   "status",
+   "created_at",
+   "updated_at",
+   "created_by_id",
+   "patient_id",
+   "condition_label",
+   "end_date",
+   "start_date"
+  ],
+  "referral_app_referral": [
+   "id",
+   "referral_code",
+   "patient_name",
+   "patient_contact",
+   "patient_diagnosis",
+   "reason",
+   "notes",
+   "status",
+   "created_at",
+   "updated_at",
+   "patient_id",
+   "referred_to_id",
+   "referred_to_clinic_id",
+   "referred_by_id"
+  ],
+  "summit_app_sessionsubmission": [
+   "id",
+   "session_key",
+   "facilitator_name",
+   "data",
+   "current_step",
+   "is_complete",
+   "submitted_at",
+   "created_at",
+   "updated_at",
+   "table_id"
+  ],
+  "summit_app_table": [
+   "id",
+   "number",
+   "label",
+   "pin_hash",
+   "created_at",
+   "claimed_at",
+   "is_claimed",
+   "pin"
+  ],
+  "upload_app_apkrelease": [
+   "id",
+   "version",
+   "file",
+   "uploaded_at",
+   "is_latest",
+   "release_notes"
+  ],
+  "visit_notes_app_visitnote": [
+   "id",
+   "created_at",
+   "updated_at",
+   "chief_complaint_today",
+   "pain_score",
+   "pain_at_rest",
+   "pain_with_activity",
+   "pain_worst_24hr",
+   "pain_quality_location",
+   "hep_adherence",
+   "hep_adherence_reason",
+   "changes_since_last_visit",
+   "changes_description",
+   "current_function_adls",
+   "medication_changes",
+   "new_concerns_alerts",
+   "vitals_hr",
+   "vitals_bp",
+   "vitals_rr",
+   "rom_active",
+   "rom_passive",
+   "strength_mmt",
+   "palpation_swelling",
+   "special_tests",
+   "functional_test_baseline",
+   "outcome_measure",
+   "primary_impairment_today",
+   "contraindications_precautions",
+   "patient_goals_session",
+   "post_pain_score",
+   "post_rom",
+   "post_strength",
+   "post_functional_test",
+   "assessment",
+   "plan",
+   "created_by_id",
+   "patient_id",
+   "case_type",
+   "geri_appetite",
+   "geri_bp_seated",
+   "geri_bp_standing_post",
+   "geri_bp_standing_pre",
+   "geri_cognition",
+   "geri_dyspnea_borg_post",
+   "geri_dyspnea_borg_pre",
+   "geri_new_medications",
+   "geri_orthostatic_dizziness_post",
+   "geri_orthostatic_dizziness_pre",
+   "geri_patient_report_post",
+   "geri_recovery_vitals",
+   "geri_skin_check_pre",
+   "geri_spo2_post",
+   "geri_spo2_pre",
+   "geri_tug_post",
+   "geri_tug_pre",
+   "neuro_balance_sitting",
+   "neuro_balance_standing",
+   "neuro_bladder_bowel_status",
+   "neuro_fatigue_level",
+   "neuro_fatigue_post",
+   "neuro_gait_post",
+   "neuro_gait_pre",
+   "neuro_motor_control",
+   "neuro_sensation",
+   "neuro_skin_check_post",
+   "neuro_skin_check_pre",
+   "neuro_spasm_frequency",
+   "neuro_tone_post",
+   "neuro_tone_pre",
+   "treatment_provided"
+  ]
+ }
+}

@@ -21,7 +21,7 @@ A Django platform for healthcare professionals and their patients.
 | **Treatment plans** | Baseline measures, goals, phased interventions, progress readings, printable |
 | **Reports** | Weekly, monthly or custom-range reports: KPIs, day-by-day activity, **new vs follow-up clients by age and sex** (HMIS-style aggregates), top ICD-10 diagnoses, appointments, money by payment mode, packages and dues, exercise adherence, referral sources; **CSV download** and print |
 | **Settings** | Edit your mobile, photo, experience, focus areas and services; practice name/address/phone, facility (HMIS) code and default appointment length; email and password. Name, title and licence stay locked (verified by staff) |
-| **Exercise library** | 788 exercises by region, with images; prescribe to patients and track completion; also feeds the plan builder |
+| **Exercise library** | 790 exercises by region (from the live site), with pictures, step-by-step images, 155 YouTube and 26 hosted videos; prescribe to patients and track completion; also feeds the plan builder |
 | **Billing** | Daily billing book, plus **patient packages**: sell a patient a 1, 2, 3 or 4 week package with a set number of sessions and a price, take instalment payments; every completed session uses up a package session |
 | **Marketplace, Pharmacy, Lab tests** | Public shop and pharmacy with carts and checkout; public lab-test booking; orders and bookings are managed in the Django admin |
 
@@ -41,7 +41,7 @@ python manage.py runserver
 
 In development, emails (for example the password-reset link) are **printed in the `runserver` console**.
 
-Tests (334 of them; they run on in-memory SQLite, so no MySQL privileges are needed):
+Tests (346 of them; they run on in-memory SQLite, so no MySQL privileges are needed):
 
 ```
 python manage.py test

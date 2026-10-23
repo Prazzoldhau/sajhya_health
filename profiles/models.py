@@ -30,6 +30,7 @@ class PatientProfile(models.Model):
     allergies = models.TextField(blank=True, help_text='Drug, food or other allergies and the reaction')
     medical_history = models.TextField(blank=True, help_text='Past surgeries, chronic conditions, hospital stays, family history')
     wound_catheter_care = models.TextField(blank=True, help_text='Wound dressing, catheter or ostomy care needs')
+    nursing_vitals = models.TextField(blank=True, help_text='Free-text vitals note kept on the live site.')
     mobility_assistance = models.TextField(blank=True, help_text='Help needed with transfers, walking, toileting')
     updated_at = models.DateTimeField(auto_now=True)
     updated_by = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True, related_name='+')
