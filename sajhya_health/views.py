@@ -1,9 +1,13 @@
+import logging
+
 from django.db import connection
 from django.http import JsonResponse
 from django.shortcuts import render
 
 from billing.models import Plan
 from marketplace.models import Product
+
+logger = logging.getLogger(__name__)
 
 
 def landing_page(request):
@@ -24,6 +28,7 @@ def healthz(request):
         with connection.cursor() as cursor:
             cursor.execute('SELECT 1')
     except Exception:
+        logger.exception('Health check: the database is not reachable')  # the traceback lands in logs/sajhya.log
         return JsonResponse({'status': 'error'}, status=503)
     return JsonResponse({'status': 'ok'})
 
