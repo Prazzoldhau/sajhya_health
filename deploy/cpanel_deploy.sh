@@ -28,6 +28,10 @@ chmod 755 "$APP_DIR"   # the web server's app process must be able to enter this
 
 say "Python: $PY ($($PY --version 2>&1))   app folder: $APP_DIR"
 
+# ---- 0. pre-flight: settings, database login, folders, virtualenv. Stops here with a plain explanation if anything is wrong.
+say "Checking the server (deploy_doctor)"
+cd "$APP_DIR" && "$PY" manage.py deploy_doctor || die "The server is not ready: fix the FAIL lines above, then run this again."
+
 # ---- 1. backup the database (skipped with a warning if it is not MySQL or mysqldump is missing)
 say "Backing up the database"
 eval "$($PY - "$APP_DIR/.env" <<'PYEOF'

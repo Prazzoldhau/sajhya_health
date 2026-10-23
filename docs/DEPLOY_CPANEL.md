@@ -13,6 +13,19 @@ you run two commands in the Terminal.
 > **Never point this project at the live `madhyapu_sajhya_db`.** It shares Django's own tables (`django_migrations`, `auth_*`, sessions)
 > with the old site and would clash. Create a **new database** and, first, deploy to a **test subdomain** (for example `app.sajhya.com`).
 
+## Cheat sheet for this server (use these exact lines)
+
+```
+cd ~/sajhya_health
+source ~/virtualenv/sajhya_health/3.12/bin/activate     # the folder name under ~/virtualenv/ shows the Python version
+python manage.py deploy_doctor                          # checks everything and says in plain words what is wrong
+git pull
+bash deploy/cpanel_deploy.sh                            # runs the doctor again, backs up, migrates, restarts
+```
+`deploy_doctor` checks the `.env` file (and warns if a cPanel variable overrides it), the database login (and tells you if the cPanel account prefix is
+missing from the user/database name), the folders, the virtual environment (refuses another app's) and cPanel's `passenger_wsgi.py` template problem.
+**Run it first, and fix every FAIL line before deploying.** Never run `cp .env.example .env` a second time: it replaces your real settings with the blank template.
+
 ## One-time setup (about 30 minutes)
 
 1. **Database** - cPanel > *MySQL Databases*: create a database (e.g. `madhyapu_shealth`) and a new user with a strong password, add the user to
