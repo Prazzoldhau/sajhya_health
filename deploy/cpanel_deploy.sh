@@ -51,11 +51,15 @@ else
 fi
 
 # ---- 2. copy the code (the server-only files are never touched)
-say "Copying code to $APP_DIR"
-rsync -a --delete-after \
-    --exclude '.git/' --exclude '.cpanel.yml' --exclude '.env' --exclude 'venv/' --exclude '__pycache__/' \
-    --exclude 'media/' --exclude 'private_uploads/' --exclude 'logs/' --exclude 'cache/' --exclude 'tmp/' --exclude 'staticfiles/' \
-    "$REPO_DIR/" "$APP_DIR/"
+if [ "$REPO_DIR" = "$APP_DIR" ]; then
+    say "The git checkout is the app folder itself: nothing to copy"
+else
+    say "Copying code to $APP_DIR"
+    rsync -a --delete-after \
+        --exclude '.git/' --exclude '.cpanel.yml' --exclude '.env' --exclude 'venv/' --exclude '__pycache__/' \
+        --exclude 'media/' --exclude 'private_uploads/' --exclude 'logs/' --exclude 'cache/' --exclude 'tmp/' --exclude 'staticfiles/' \
+        "$REPO_DIR/" "$APP_DIR/"
+fi
 
 cd "$APP_DIR"
 chmod 600 "$APP_DIR/.env" 2>/dev/null || true
