@@ -7,7 +7,17 @@ For gunicorn use:  gunicorn sajhya_health.wsgi:application --bind 127.0.0.1:8000
 """
 import os
 import sys
+from urllib.parse import unquote
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))  # Passenger does not always put the app folder on the path
 
-from sajhya_health.wsgi import application  # noqa: E402,F401
+from sajhya_health.wsgi import application as django_application  # noqa: E402
+
+
+def application(environ, start_response):
+    # This host passes PATH_INFO still percent-encoded, so pictures with spaces or brackets in their names ("9 (023).png", sent as 9%20%28023%29.png) are
+    # not found by the static file server. Decode it for file requests only; a decoded path never contains '%' unless the file name does.
+    path = environ.get('PATH_INFO', '')
+    if '%' in path and path.startswith(('/static/', '/media/')):
+        environ['PATH_INFO'] = unquote(path)
+    return django_application(environ, start_response)
