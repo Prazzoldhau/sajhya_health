@@ -89,6 +89,8 @@ approval prompt on for that command.
 ## Troubleshooting
 
 - *Every URL gives a plain 404 / nothing is logged*: the app folder is not enterable (`ls -ld ~/sajhya_health` must not be `drwx------`; run `chmod 755 ~/sajhya_health`) or it sits under `~/repositories/`. Also `cat ~/sajhya_health/passenger_wsgi.py` - if it contains `imp.load_source` it is cPanel's template: run the deploy script again.
+- *Another app's packages changed*: the script only ever uses `~/virtualenv/<application root name>/` (here `sajhya_health`) and refuses otherwise; never run `pip` with a different app's environment active.
+- *"Access denied for user 'suser'@'localhost'"*: cPanel prefixes database and user names with your account name. Use the full names in `DATABASE_URL`, e.g. `mysql://madhyapu_suser:PASSWORD@localhost:3306/madhyapu_shealth`, and make sure the user is added to the database with all privileges.
 - *"No cPanel Python virtualenv found"*: create the app first (step 3). *"Missing .env"*: step 4 (the file lives in the application root).
 - *500 error on the site*: `~/sajhya_health/logs/sajhya.log` has the traceback; also cPanel > *Errors*.
 - *Static files/pictures missing*: the deploy ran `collectstatic`? Is `static/exercises/` on the server? Is the subdomain's `/static/` served by Passenger/WhiteNoise (it is, via WhiteNoise)?

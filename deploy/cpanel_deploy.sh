@@ -16,14 +16,17 @@ say() { printf '\n==> %s\n' "$*"; }
 die() { printf '\nERROR: %s\n' "$*" >&2; exit 1; }
 
 # The Python of the cPanel "Setup Python App" virtualenv (e.g. ~/virtualenv/sajhya_health/3.11/bin/python)
-PY="${PY:-$(ls -d "$HOME"/virtualenv/*/*/bin/python 2>/dev/null | head -1 || true)}"
-[ -n "$PY" ] && [ -x "$PY" ] || die "No cPanel Python virtualenv found. Create the app first: cPanel > Setup Python App (see docs/DEPLOY_CPANEL.md)."
+# cPanel names the virtualenv after the app's "Application root" folder. NEVER pick another app's virtualenv: pip would change that site's packages.
+APP_NAME="$(basename "$APP_DIR")"
+PY="${PY:-$(ls -d "$HOME/virtualenv/$APP_NAME"/*/bin/python 2>/dev/null | sort -V | tail -1 || true)}"
+[ -n "$PY" ] && [ -x "$PY" ] || die "No Python virtualenv for the app '$APP_NAME' (looked in ~/virtualenv/$APP_NAME/). Create the app in cPanel > Setup Python App with Application root '$APP_NAME' first (see docs/DEPLOY_CPANEL.md)."
+case "$PY" in "$HOME/virtualenv/$APP_NAME/"*) ;; *) die "Refusing to use $PY: it does not belong to the app '$APP_NAME'.";; esac
 case "$APP_DIR" in */repositories/*) die "APP_DIR must not be inside ~/repositories: cPanel makes that folder private (mode 700) and the web server then cannot start the app.";; esac
 mkdir -p "$APP_DIR" "$BACKUP_DIR"
 chmod 755 "$APP_DIR"   # the web server's app process must be able to enter this folder
 [ -f "$APP_DIR/.env" ] || die "Missing $APP_DIR/.env - copy .env.example there and fill in the production values first."
 
-say "Python: $($PY --version 2>&1)   app folder: $APP_DIR"
+say "Python: $PY ($($PY --version 2>&1))   app folder: $APP_DIR"
 
 # ---- 1. backup the database (skipped with a warning if it is not MySQL or mysqldump is missing)
 say "Backing up the database"
