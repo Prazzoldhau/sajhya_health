@@ -76,15 +76,18 @@ say "Installing requirements"
 say "Checking the project"
 "$PY" manage.py check
 say "Migrating the database"
+"$PY" manage.py convert_db_utf8mb4 || true   # cPanel databases often start as latin1; Nepali text needs utf8mb4
 "$PY" manage.py migrate --noinput
+"$PY" manage.py convert_db_utf8mb4 || true   # tables created by this migrate
 say "Collecting static files"
 "$PY" manage.py collectstatic --noinput --verbosity 0
 
 # ---- 4. one-time catalogue load (exercises, pharmacy, labs, shop, ICD-10, assessment scales); all are safe to repeat
 if [ ! -f "$APP_DIR/.catalogs_loaded" ] || [ "${LOAD_CATALOGS:-0}" = 1 ]; then
     say "Loading reference data (first deploy)"
-    "$PY" manage.py load_icd10 && "$PY" manage.py load_exercises && "$PY" manage.py load_pharmacy \
-        && "$PY" manage.py load_lab_catalog && "$PY" manage.py load_catalog && "$PY" manage.py load_scales
+    for loader in load_icd10 load_exercises load_pharmacy load_lab_catalog load_catalog load_scales; do
+        "$PY" manage.py "$loader" || die "$loader failed - fix the error above and run this script again (the data load is repeated until it all succeeds)."
+    done
     date > "$APP_DIR/.catalogs_loaded"
 fi
 
