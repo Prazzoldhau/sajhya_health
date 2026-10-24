@@ -135,18 +135,17 @@ class CredentialsForm(forms.ModelForm):
 class DocumentsForm(forms.ModelForm):
     class Meta:
         model = ProfessionalProfile
-        fields = ('id_document', 'license_document', 'indemnity_document', 'degree_document')
+        fields = ('id_document', 'license_document', 'degree_document')
         labels = {
             'id_document': 'Government-issued ID (passport, driving licence or national ID)',
             'license_document': 'Proof of professional licence',
-            'indemnity_document': 'Professional indemnity / malpractice insurance',
             'degree_document': 'Academic degrees / certifications (e.g. BPT, DPT, specialisations)',
         }
         help_texts = {'id_document': 'PDF, JPEG or PNG, up to 5 MB each.'}
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        for name in ('id_document', 'license_document', 'indemnity_document', 'degree_document'):
+        for name in ('id_document', 'license_document', 'degree_document'):
             f = self.fields[name]
             f.validators.append(validate_document)
             f.widget.attrs['accept'] = '.pdf,.jpg,.jpeg,.png'

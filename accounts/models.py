@@ -106,7 +106,7 @@ class ProfessionalProfile(models.Model):
         (DRAFT, 'Draft'), (SUBMITTED, 'Submitted - awaiting verification'),
         (APPROVED, 'Approved'), (REJECTED, 'Rejected'),
     ]
-    DOCUMENT_FIELDS = ('id_document', 'license_document', 'indemnity_document', 'degree_document')
+    DOCUMENT_FIELDS = ('id_document', 'license_document', 'degree_document')
 
     account = models.OneToOneField(Account, on_delete=models.CASCADE, related_name='profile')
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default=DRAFT)
@@ -132,7 +132,6 @@ class ProfessionalProfile(models.Model):
     # Step 3 - documents
     id_document = models.FileField(upload_to=document_path, storage=get_private_storage, blank=True)
     license_document = models.FileField(upload_to=document_path, storage=get_private_storage, blank=True)
-    indemnity_document = models.FileField(upload_to=document_path, storage=get_private_storage, blank=True)
     degree_document = models.FileField(upload_to=document_path, storage=get_private_storage, blank=True)
 
     # Step 4 - practice

@@ -50,8 +50,7 @@ class FullJourneyTests(TestCase):
         self.assertContains(c.get(reverse('accounts:welcome')), 'Continue onboarding')
         with private_storage():
             c.post(reverse('accounts:professional-step', args=[2]), {'action': 'continue', 'license_number': 'N-1', 'issuing_authority': 'NHPC', 'license_expiry': '2031-01-01'})
-            c.post(reverse('accounts:professional-step', args=[3]), {'action': 'continue', 'id_document': pdf('i.pdf'), 'license_document': pdf('l.pdf'), 'indemnity_document': pdf('n.pdf'),
-                                                                    'degree_document': pdf('d.pdf')})
+            c.post(reverse('accounts:professional-step', args=[3]), {'action': 'continue', 'id_document': pdf('i.pdf'), 'license_document': pdf('l.pdf'),                                                                    'degree_document': pdf('d.pdf')})
             c.post(reverse('accounts:professional-step', args=[4]), {'action': 'continue', 'years_experience': 6, 'focus_areas': [ClinicalFocus.objects.first().pk], 'services': [ServiceType.objects.first().pk]})
             c.post(reverse('accounts:professional-step', args=[5]))
             profile = ProfessionalProfile.objects.get(account__user=user)

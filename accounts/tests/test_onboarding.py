@@ -39,6 +39,23 @@ class SignupTests(TestCase):
         self.assertEqual(profile.completed_step, 1)
         self.assertEqual(self.client.session['_auth_user_id'], str(profile.account.user_id))  # logged in
 
+    def test_photo_uploaded_at_signup_is_kept_and_shown_after_approval(self):
+        import io
+        from PIL import Image
+        buf = io.BytesIO()
+        Image.new('RGB', (30, 30), 'green').save(buf, 'PNG')
+        with override_settings(MEDIA_ROOT=tempfile.mkdtemp()):
+            r = self.client.post(reverse('accounts:signup', args=['professional', Profession.objects.first().pk]),
+                                 {**SIGNUP, 'profile_picture': SimpleUploadedFile('me.png', buf.getvalue(), content_type='image/png')})
+            self.assertEqual(r.status_code, 302)
+            profile = ProfessionalProfile.objects.get(account__user__username='asha')
+            self.assertTrue(profile.profile_picture)
+            profile.status = 'approved'
+            profile.completed_step = 4
+            profile.save()
+            page = self.client.get(reverse('accounts:dashboard'))
+            self.assertContains(page, profile.profile_picture.url)
+
     def test_signup_rejects_weak_password_and_duplicate_username(self):
         url = reverse('accounts:signup', args=['professional', Profession.objects.first().pk])
         weak = self.client.post(url, {**SIGNUP, 'password1': '12345', 'password2': '12345'})
@@ -124,14 +141,14 @@ class OnboardingFlowTests(TestCase):
 
     def complete_through_step_4(self):
         self.post_step(2, {'license_number': 'N1', 'issuing_authority': 'NHPC', 'license_expiry': '2030-01-01'})
-        docs = {'id_document': pdf('id.pdf'), 'license_document': pdf('l.pdf'), 'indemnity_document': pdf('i.pdf'), 'degree_document': pdf('d.pdf')}
+        docs = {'id_document': pdf('id.pdf'), 'license_document': pdf('l.pdf'), 'degree_document': pdf('d.pdf')}
         self.assertRedirects(self.post_step(3, docs), reverse('accounts:professional-step', args=[4]))
         practice = {'years_experience': 5, 'focus_areas': [ClinicalFocus.objects.first().pk], 'services': [ServiceType.objects.first().pk]}
         self.assertRedirects(self.post_step(4, practice), reverse('accounts:professional-step', args=[5]))
 
     def test_document_validation(self):
         self.post_step(2, {'license_number': 'N1', 'issuing_authority': 'NHPC', 'license_expiry': '2030-01-01'})
-        base = {'license_document': pdf(), 'indemnity_document': pdf(), 'degree_document': pdf()}
+        base = {'license_document': pdf(), 'degree_document': pdf()}
         with private_storage():
             bad_ext = self.post_step(3, {**base, 'id_document': SimpleUploadedFile('id.exe', b'MZ')})
             fake_pdf = self.post_step(3, {**base, 'id_document': SimpleUploadedFile('id.pdf', b'<html>not a pdf</html>')})

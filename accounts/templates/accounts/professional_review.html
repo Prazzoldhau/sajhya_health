@@ -15,7 +15,6 @@
     <ul>
         {% if profile.id_document %}<li><a href="{% url 'accounts:professional-document' 'id_document' %}" target="_blank">Government ID</a></li>{% endif %}
         {% if profile.license_document %}<li><a href="{% url 'accounts:professional-document' 'license_document' %}" target="_blank">Licence proof</a></li>{% endif %}
-        {% if profile.indemnity_document %}<li><a href="{% url 'accounts:professional-document' 'indemnity_document' %}" target="_blank">Indemnity insurance</a></li>{% endif %}
         {% if profile.degree_document %}<li><a href="{% url 'accounts:professional-document' 'degree_document' %}" target="_blank">Degrees / certifications</a></li>{% endif %}
     </ul>
     <h5>Practice</h5>

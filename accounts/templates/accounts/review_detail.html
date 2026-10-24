@@ -19,7 +19,6 @@
     <ul>
         {% if profile.id_document %}<li><a href="{% url 'accounts:professional-document-staff' profile.pk 'id_document' %}" target="_blank">Government ID</a></li>{% endif %}
         {% if profile.license_document %}<li><a href="{% url 'accounts:professional-document-staff' profile.pk 'license_document' %}" target="_blank">Licence proof</a></li>{% endif %}
-        {% if profile.indemnity_document %}<li><a href="{% url 'accounts:professional-document-staff' profile.pk 'indemnity_document' %}" target="_blank">Indemnity insurance</a></li>{% endif %}
         {% if profile.degree_document %}<li><a href="{% url 'accounts:professional-document-staff' profile.pk 'degree_document' %}" target="_blank">Degrees / certifications</a></li>{% endif %}
     </ul>
 
