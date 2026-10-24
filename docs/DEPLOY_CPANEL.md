@@ -45,6 +45,7 @@ missing from the user/database name), the folders, the virtual environment (refu
    BEHIND_PROXY=True
    SECURE_SSL_REDIRECT=True
    SECURE_HSTS_SECONDS=0            # raise to 31536000 only after HTTPS works everywhere
+   SERVE_MEDIA=True                # profile and product photos: Django serves /media/ itself on this host
    PRIVATE_MEDIA_ROOT=/home/madhyapu/sajhya_private      # outside the web root; create the folder
    ADMIN_URL=office-7k2/            # pick your own
    EMAIL_BACKEND=django.core.mail.backends.smtp.EmailBackend  + the EMAIL_* lines from .env.example (use a cPanel mailbox)

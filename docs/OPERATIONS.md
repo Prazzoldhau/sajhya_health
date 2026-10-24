@@ -15,7 +15,7 @@ variable with comments. The important ones:
 | `BEHIND_PROXY` | - | `True` if nginx/Passenger/load balancer terminates TLS | Trusts `X-Forwarded-Proto` and `X-Forwarded-For`. Wrong value = redirect loops or everyone sharing one IP for lockouts. |
 | `SECURE_SSL_REDIRECT`, `SECURE_HSTS_SECONDS` | - | `True`, `31536000` | HSTS: once enabled, browsers insist on HTTPS for a year. |
 | `PRIVATE_MEDIA_ROOT` | blank (= `private_uploads/`) | folder **outside** the code | Credentials, patient pictures, lab reports. Back it up. |
-| `SERVE_MEDIA` | automatic | `False` if the web server serves `/media/` | `True` makes Django serve `/media/` itself. |
+| `SERVE_MEDIA` | `True` | `False` only if the web server serves `/media/` | Django serves `/media/` itself (profile and product photos). |
 | `CACHE_DIR` | blank (= `cache/`) | writable folder | Counters for the password-reset throttle, shared by all workers. |
 | `LOGIN_FAILURE_LIMIT` | 5 | 5 | Failed sign-ins before a 15-minute lockout. |
 | `EMAIL_*`, `DEFAULT_FROM_EMAIL` | console | SMTP | See TROUBLESHOOTING -> Email. |

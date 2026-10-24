@@ -128,14 +128,11 @@ class ProfessionalProfile(models.Model):
     license_number = models.CharField(max_length=100, blank=True)
     issuing_authority = models.CharField(max_length=200, blank=True)
     license_expiry = models.DateField(null=True, blank=True)
-    npi = models.CharField('National Provider Identifier (NPI)', max_length=20, blank=True)
 
     # Step 3 - documents
     id_document = models.FileField(upload_to=document_path, storage=get_private_storage, blank=True)
     license_document = models.FileField(upload_to=document_path, storage=get_private_storage, blank=True)
     indemnity_document = models.FileField(upload_to=document_path, storage=get_private_storage, blank=True)
-    indemnity_policy_number = models.CharField(max_length=100, blank=True)
-    indemnity_expiry = models.DateField(null=True, blank=True)
     degree_document = models.FileField(upload_to=document_path, storage=get_private_storage, blank=True)
 
     # Step 4 - practice

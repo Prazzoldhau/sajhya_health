@@ -90,6 +90,8 @@ class Command(BaseCommand):
         report(OK if hosts else FAIL, f'ALLOWED_HOSTS: {", ".join(hosts) or "(empty)"}', '' if hosts else 'Set ALLOWED_HOSTS=app.sajhya.com in .env')
         report(OK if len(settings.SECRET_KEY) >= 40 else FAIL, f'SECRET_KEY is {len(settings.SECRET_KEY)} characters long.',
                '' if len(settings.SECRET_KEY) >= 40 else 'It must be 40+ random characters: python -c "import secrets; print(secrets.token_urlsafe(60))"')
+        if not settings.SERVE_MEDIA:
+            report(WARN, 'SERVE_MEDIA is off: profile and product photos will not show unless the web server serves /media/.', 'On cPanel set SERVE_MEDIA=True in .env.')
         if not settings.DEBUG and not getattr(settings, 'CSRF_TRUSTED_ORIGINS', []):
             report(WARN, 'CSRF_TRUSTED_ORIGINS is empty.', 'Behind HTTPS set CSRF_TRUSTED_ORIGINS=https://app.sajhya.com or forms will fail with 403.')
 

@@ -124,15 +124,14 @@ class OnboardingFlowTests(TestCase):
 
     def complete_through_step_4(self):
         self.post_step(2, {'license_number': 'N1', 'issuing_authority': 'NHPC', 'license_expiry': '2030-01-01'})
-        docs = {'id_document': pdf('id.pdf'), 'license_document': pdf('l.pdf'), 'indemnity_document': pdf('i.pdf'), 'degree_document': pdf('d.pdf'),
-                'indemnity_policy_number': 'P1', 'indemnity_expiry': '2030-01-01'}
+        docs = {'id_document': pdf('id.pdf'), 'license_document': pdf('l.pdf'), 'indemnity_document': pdf('i.pdf'), 'degree_document': pdf('d.pdf')}
         self.assertRedirects(self.post_step(3, docs), reverse('accounts:professional-step', args=[4]))
         practice = {'years_experience': 5, 'focus_areas': [ClinicalFocus.objects.first().pk], 'services': [ServiceType.objects.first().pk]}
         self.assertRedirects(self.post_step(4, practice), reverse('accounts:professional-step', args=[5]))
 
     def test_document_validation(self):
         self.post_step(2, {'license_number': 'N1', 'issuing_authority': 'NHPC', 'license_expiry': '2030-01-01'})
-        base = {'license_document': pdf(), 'indemnity_document': pdf(), 'degree_document': pdf(), 'indemnity_policy_number': 'P', 'indemnity_expiry': '2030-01-01'}
+        base = {'license_document': pdf(), 'indemnity_document': pdf(), 'degree_document': pdf()}
         with private_storage():
             bad_ext = self.post_step(3, {**base, 'id_document': SimpleUploadedFile('id.exe', b'MZ')})
             fake_pdf = self.post_step(3, {**base, 'id_document': SimpleUploadedFile('id.pdf', b'<html>not a pdf</html>')})

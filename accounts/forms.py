@@ -120,12 +120,11 @@ class SignupForm(UserCreationForm):
 class CredentialsForm(forms.ModelForm):
     class Meta:
         model = ProfessionalProfile
-        fields = ('license_number', 'issuing_authority', 'license_expiry', 'npi')
+        fields = ('license_number', 'issuing_authority', 'license_expiry')
         widgets = {'license_expiry': date_widget()}
         labels = {'license_number': 'Licence / registration number',
                   'issuing_authority': 'Issuing authority / board',
                   'license_expiry': 'Licence expiry date'}
-        help_texts = {'npi': 'Optional -- mainly for US/North America insurance billing.'}
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -136,15 +135,11 @@ class CredentialsForm(forms.ModelForm):
 class DocumentsForm(forms.ModelForm):
     class Meta:
         model = ProfessionalProfile
-        fields = ('id_document', 'license_document', 'indemnity_document',
-                  'indemnity_policy_number', 'indemnity_expiry', 'degree_document')
-        widgets = {'indemnity_expiry': date_widget()}
+        fields = ('id_document', 'license_document', 'indemnity_document', 'degree_document')
         labels = {
             'id_document': 'Government-issued ID (passport, driving licence or national ID)',
             'license_document': 'Proof of professional licence',
             'indemnity_document': 'Professional indemnity / malpractice insurance',
-            'indemnity_policy_number': 'Insurance policy number',
-            'indemnity_expiry': 'Insurance expiry date',
             'degree_document': 'Academic degrees / certifications (e.g. BPT, DPT, specialisations)',
         }
         help_texts = {'id_document': 'PDF, JPEG or PNG, up to 5 MB each.'}
@@ -156,8 +151,6 @@ class DocumentsForm(forms.ModelForm):
             f.validators.append(validate_document)
             f.widget.attrs['accept'] = '.pdf,.jpg,.jpeg,.png'
             f.required = not getattr(self.instance, name)  # already uploaded -> keep it
-        for name in ('indemnity_policy_number', 'indemnity_expiry'):
-            self.fields[name].required = True
 
 
 class PracticeForm(forms.ModelForm):

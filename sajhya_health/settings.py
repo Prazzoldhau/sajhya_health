@@ -186,11 +186,12 @@ STORAGES = {
     'staticfiles': {'BACKEND': 'whitenoise.storage.CompressedStaticFilesStorage'},
 }
 
-# Public uploads (profile photos, product photos). Serve /media/ from the web server in production;
-# set SERVE_MEDIA=True only for small deployments with no front web server.
+# Public uploads (profile photos, product photos); credentials are in PRIVATE_MEDIA_ROOT below, never here.
+# On hosts where the app is the only thing answering requests (cPanel/Passenger) Django serves /media/ itself, which is fine at this size;
+# put a real web server in front and set SERVE_MEDIA=False if the photos ever become heavy traffic.
 MEDIA_URL = 'media/'
 MEDIA_ROOT = BASE_DIR / 'media'
-SERVE_MEDIA = env.bool('SERVE_MEDIA', default=DEBUG)
+SERVE_MEDIA = env.bool('SERVE_MEDIA', default=True)
 
 # Credential uploads (IDs, licences, insurance) - private, never web-served; only the permission-checked view reads them.
 PRIVATE_MEDIA_ROOT = Path(env('PRIVATE_MEDIA_ROOT', default='').strip() or BASE_DIR / 'private_uploads')  # blank in .env means default
