@@ -120,9 +120,11 @@ def entry_save(request, pk=None):
             obj.sex = obj.sex or patient.gender
             obj.contact_number = obj.contact_number or (patient.phone if can_see_contact(profile, patient) else '')
         obj.save()
+        carried = None
         if not pk:
             form.apply_payment(obj, request.user)
-        messages.success(request, f'Saved - {obj.invoice_number}')
+            carried = getattr(form, 'carried', 0)
+        messages.success(request, f'Saved - {obj.invoice_number}' + (f'. NPR {carried:g} carried over as advance for {obj.patient_name}.' if carried else ''))
         return _back(obj.entry_date)
     messages.error(request, first_error(form))
     return redirect('billing:billing')
@@ -146,9 +148,10 @@ def patient_bill(request, patient_id):
         entry.contact_number = patient.phone if can_see_contact(profile, patient) else ''
         entry.save()
         form.apply_payment(entry, request.user)
+        carried = getattr(form, 'carried', 0)
         if form.cleaned_data.get('payment_status') == 'advance' and entry.amount_paid == 0:
             messages.info(request, f'{patient.name} has no advance balance, so the bill is left on credit.')
-        messages.success(request, f'Bill {entry.invoice_number} saved for {patient.name}.' + (f' NPR {entry.amount_due:g} is due.' if entry.amount_due else ''))
+        messages.success(request, f'Bill {entry.invoice_number} saved for {patient.name}.' + (f' NPR {entry.amount_due:g} is due.' if entry.amount_due else '') + (f' NPR {carried:g} carried over as advance - balance NPR {advance_balance(patient.pk):g}.' if carried else ''))
     else:
         messages.error(request, first_error(form))
     return back
@@ -219,7 +222,11 @@ def entry_payment(request, pk):
         entry.refresh_from_db()
         messages.success(request, f'NPR {used:g} taken from the advance for {entry.invoice_number}.' + (f' NPR {entry.amount_due:g} still due.' if entry.amount_due else ' Fully paid.'))
         return back
-    paid = entry.record_payment(form.cleaned_data['amount'], form.cleaned_data['payment_mode'], form.cleaned_data['notes'], user=request.user)
+    given, owed = form.cleaned_data['amount'], entry.amount_due
+    paid = entry.record_payment(given, form.cleaned_data['payment_mode'], form.cleaned_data['notes'], user=request.user)
+    if paid is not None and given > paid.amount and entry.patient_id:  # handed over more than is owed: keep the extra as advance
+        entry.carry_over(given - paid.amount, form.cleaned_data['payment_mode'], user=request.user)
+        messages.info(request, f'NPR {given - paid.amount:g} extra was carried over as the patient\'s advance.')
     if paid is None:
         messages.info(request, 'That bill is already fully paid.')
     else:

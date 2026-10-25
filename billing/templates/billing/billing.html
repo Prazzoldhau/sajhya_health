@@ -118,6 +118,7 @@
       <div id="payFields">
         <div class="two"><label>Payment {{ form.payment_status }}</label><label>Payment mode {{ form.payment_mode }}</label></div>
         <label id="receivedWrap" hidden>{{ form.amount_received.label }} {{ form.amount_received }}</label>
+        <label id="givenWrap">{{ form.amount_given.label }} {{ form.amount_given }}<span class="hint">{{ form.amount_given.help_text }}</span></label>
         <div class="hint" id="creditHint" hidden>Left on credit: it appears under <b>Payments due</b> until the patient pays.</div>
       </div>
       <label>Notes {{ form.notes }}</label>
@@ -133,7 +134,7 @@
   function open() { SajhyaUI.openModal('entryModal'); }
   function syncPay() {
     var s = f('payment_status').value;
-    $('receivedWrap').hidden = s !== 'partial'; $('creditHint').hidden = s !== 'due';
+    $('receivedWrap').hidden = s !== 'partial'; $('creditHint').hidden = s !== 'due'; $('givenWrap').hidden = s !== 'paid' && s !== 'advance_cash';
   }
   f('payment_status').addEventListener('change', syncPay);
   $('newEntry').addEventListener('click', function () {

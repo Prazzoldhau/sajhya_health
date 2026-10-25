@@ -21,8 +21,8 @@
       f.action = d.url;
       document.getElementById('payNext').value = d.next || location.pathname + location.search;
       document.getElementById('payTitle').textContent = 'Receive payment - ' + d.name;
-      document.getElementById('payHint').textContent = d.invoice + ' · NPR ' + d.due + ' still due. You can take part of it now.';
-      f.elements['amount'].value = d.due; f.elements['amount'].max = d.due;
+      document.getElementById('payHint').textContent = d.invoice + ' · NPR ' + d.due + ' still due. Take part of it, or if more is handed over and there is no change, the extra is carried over as advance.';
+      f.elements['amount'].value = d.due; f.elements['amount'].removeAttribute('max');
       SajhyaUI.openModal('payModal');
     });
   });

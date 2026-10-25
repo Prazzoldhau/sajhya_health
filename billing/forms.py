@@ -1,3 +1,5 @@
+from decimal import Decimal
+
 from django import forms
 
 from accounts.models import Patient
@@ -9,9 +11,14 @@ from .models import BillingEntry, EntryPayment, PackagePayment, PatientAdvance, 
 class PaymentStatusMixin(forms.Form):
     """New bills can be paid in full, part paid, or left on credit (due) - many patients settle at the end of the week.
     The payment mode is the mode of what is received now. Editing a bill never changes what was already received."""
-    payment_status = forms.ChoiceField(choices=[('paid', 'Paid in full'), ('partial', 'Part paid'), ('due', 'Not paid yet (credit)'), ('advance', 'Use advance balance')], initial='paid', required=False, label='Payment')
+    payment_status = forms.ChoiceField(choices=[('paid', 'Paid in full'), ('partial', 'Part paid'), ('due', 'Not paid yet (credit)'), ('advance', 'Use advance balance'), ('advance_cash', 'Advance + pay the rest now')], initial='paid', required=False, label='Payment')
     amount_received = forms.DecimalField(required=False, min_value=0, max_digits=10, decimal_places=2, label='Received now (NPR)',
                                          widget=forms.NumberInput(attrs={'placeholder': 'Amount received now', 'step': '0.01', 'min': 0}))
+
+    amount_given = forms.DecimalField(required=False, min_value=0, max_digits=10, decimal_places=2, label='Cash handed over (NPR)',
+                                      widget=forms.NumberInput(attrs={'placeholder': 'Only if more than the bill', 'step': '0.01', 'min': 0}),
+                                      help_text='No change to give back? Enter what the patient handed over: the extra is carried over to their next session.')
+    patient_linked = False  # the patient-tab form always knows the patient; the book form does once one is picked
 
     def clean_rate(self):
         rate = self.cleaned_data.get('rate')
@@ -26,6 +33,12 @@ class PaymentStatusMixin(forms.Form):
         if self.instance.pk:
             return data
         status, rate, got = data.get('payment_status') or 'paid', data.get('rate'), data.get('amount_received')
+        given = data.get('amount_given')
+        if status in ('paid', 'advance_cash') and given is not None and rate is not None:
+            if status == 'paid' and given < rate:
+                self.add_error('amount_given', 'That is less than the bill: choose "Part paid" instead.')
+            elif given > rate and not (self.patient_linked or data.get('patient')):
+                self.add_error('amount_given', 'The extra can only be carried over for a registered patient. Pick the patient, or enter the exact amount.')
         if status == 'partial' and rate is not None:
             if got is None or got <= 0:
                 self.add_error('amount_received', 'Enter how much was received now.')
@@ -36,9 +49,22 @@ class PaymentStatusMixin(forms.Form):
     def apply_payment(self, entry, user=None):
         """After a new bill is saved: record what was received with it (nothing at all when it is left on credit)."""
         status = self.cleaned_data.get('payment_status') or 'paid'
+        self.carried = Decimal('0')
         if status == 'advance':
             return entry.use_advance(user)
-        amount = entry.rate if status == 'paid' else self.cleaned_data.get('amount_received') if status == 'partial' else 0
+        if status in ('paid', 'advance_cash'):
+            if status == 'advance_cash':
+                entry.use_advance(user)
+            owed = entry.amount_due
+            given = self.cleaned_data.get('amount_given')
+            given = owed if given is None else given
+            paid = entry.record_payment(min(given, owed), entry.payment_mode, paid_on=entry.entry_date, user=user)
+            extra = given - (paid.amount if paid else 0) if owed > 0 else given
+            if extra > 0 and entry.patient_id:  # no change given back: the extra is carried over as the patient's advance
+                entry.carry_over(extra, entry.payment_mode, user=user, paid_on=entry.entry_date)
+                self.carried = extra
+            return
+        amount = self.cleaned_data.get('amount_received') if status == 'partial' else 0
         entry.record_payment(amount, entry.payment_mode, paid_on=entry.entry_date, user=user)
 
 
@@ -69,6 +95,7 @@ class BillingEntryForm(PaymentStatusMixin, forms.ModelForm):
         return name
 
 class PatientBillForm(PaymentStatusMixin, forms.ModelForm):
+    patient_linked = True
     """A bill written from inside a patient's own Billing tab: the patient is already known, so only the money details are asked."""
     class Meta:
         model = BillingEntry

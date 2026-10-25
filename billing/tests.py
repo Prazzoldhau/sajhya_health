@@ -577,3 +577,49 @@ class AdvanceTests(BillingBase):
         self.assertEqual(BillingEntry.objects.get().status_key, 'due')
         self.entry(patient_name='Walk', payment_status='advance')
         self.assertEqual(BillingEntry.objects.get(patient_name='Walk').amount_paid, 0)
+
+
+class CarryOverTests(BillingBase):
+    """The patient hands over NPR 1000 for a 700 session and there is no change: 300 is carried over to tomorrow."""
+
+    def bill(self, rate='700', **extra):
+        self.client.post(reverse('billing:patient-bill', args=[self.patient.pk]), {'entry_date': self.today.isoformat(), 'service': 'Session', 'rate': rate, 'payment_mode': 'cash', **extra})
+
+    def test_extra_cash_with_no_change_is_carried_over_and_settles_tomorrows_bill(self):
+        self.bill('700', payment_status='paid', amount_given='1000')
+        first = BillingEntry.objects.get()
+        self.assertEqual((first.status_key, first.amount_paid, advance_balance(self.patient.pk)), ('paid', 700, 300))
+        self.assertEqual(revenue_for(self.profile, self.today), 1000)  # all 1000 was handed over today
+        # tomorrow: 300 from the advance, the patient pays only the other 400
+        self.bill('700', payment_status='advance_cash', amount_given='400')
+        second = BillingEntry.objects.exclude(pk=first.pk).get()
+        self.assertEqual((second.status_key, second.amount_paid, advance_balance(self.patient.pk)), ('paid', 700, 0))
+        self.assertEqual(sorted(p.payment_mode for p in second.payments.all()), ['advance', 'cash'])
+        self.assertEqual(revenue_for(self.profile, self.today), 1400)
+        self.assertContains(self.client.get(reverse('accounts:patient-detail', args=[self.patient.pk]) + '?tab=billing'), 'Change not returned')
+
+    def test_blank_cash_means_exact_and_a_larger_second_payment_carries_again(self):
+        self.bill('700', payment_status='paid')
+        self.assertEqual(advance_balance(self.patient.pk), 0)
+        self.bill('700', payment_status='paid', amount_given='1000')
+        self.bill('700', payment_status='advance_cash', amount_given='500')  # 300 advance + 400 owed, 500 given: 100 carried
+        self.assertEqual(advance_balance(self.patient.pk), 100)
+        self.bill('700', payment_status='advance_cash')  # blank given pays exactly the rest (600) in cash after using the 100
+        self.assertEqual(advance_balance(self.patient.pk), 0)
+        self.assertTrue(all(e.status_key == 'paid' for e in BillingEntry.objects.all()))
+
+    def test_validation_and_walk_ins(self):
+        self.bill('700', payment_status='paid', amount_given='500')  # less than the bill
+        self.assertEqual(BillingEntry.objects.count(), 0)
+        self.entry(patient_name='Walk', rate='700', amount_given='1000')  # walk-in cannot carry over
+        self.assertEqual(BillingEntry.objects.count(), 0)
+        self.entry(patient_name='Walk', rate='700', amount_given='700')
+        self.assertEqual(BillingEntry.objects.get().status_key, 'paid')
+
+    def test_receiving_a_due_bill_with_more_cash_carries_the_extra(self):
+        self.bill('400', payment_status='due')
+        entry = BillingEntry.objects.get()
+        self.client.post(reverse('billing:entry-payment', args=[entry.pk]), {'amount': '1000', 'payment_mode': 'cash'})
+        entry.refresh_from_db()
+        self.assertEqual((entry.status_key, advance_balance(self.patient.pk)), ('paid', 600))
+        self.assertEqual(revenue_for(self.profile, self.today), 1000)

@@ -97,6 +97,13 @@ class BillingEntry(models.Model):
                                       entry=self, paid_on=payment.paid_on, recorded_by=user)
         return payment.amount
 
+    def carry_over(self, amount, payment_mode='cash', user=None, paid_on=None):
+        """The patient handed over more than the bill and no change was given back: keep the extra as their advance for next time."""
+        if self.patient_id is None or amount <= 0:
+            return None
+        return PatientAdvance.objects.create(patient_id=self.patient_id, professional=self.professional, kind=PatientAdvance.DEPOSIT, amount=amount,
+                                             payment_mode=payment_mode, entry=self, notes='Change not returned - carried over', paid_on=paid_on or timezone.localdate(), recorded_by=user)
+
     def release_advance(self, user=None):
         """Hand back to the patient's advance balance whatever this bill took from it (the bill was cancelled)."""
         taken = self.payments.filter(payment_mode=ADVANCE)
