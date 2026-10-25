@@ -80,6 +80,43 @@ class PatientBillForm(PaymentStatusMixin, forms.ModelForm):
 
 
 
+class BillCorrectionForm(forms.ModelForm):
+    """Fix a bill: what was charged and how it was paid (cash, credit, part paid), never the patient's own details."""
+    payment_status = forms.ChoiceField(choices=[('paid', 'Paid in full'), ('partial', 'Part paid'), ('due', 'Not paid yet (credit)')], label='Payment')
+    amount_received = forms.DecimalField(required=False, min_value=0, max_digits=10, decimal_places=2, label='Total received so far (NPR)',
+                                         widget=forms.NumberInput(attrs={'step': '0.01', 'min': 0}))
+
+    class Meta:
+        model = BillingEntry
+        fields = ['entry_date', 'service', 'rate', 'payment_mode', 'notes']
+        widgets = {
+            'entry_date': date_widget(),
+            'service': forms.TextInput(attrs={'placeholder': 'e.g. Physiotherapy'}),
+            'rate': forms.NumberInput(attrs={'placeholder': 'Amount (NPR)', 'step': '0.01', 'min': 0}),
+            'notes': forms.Textarea(attrs={'rows': 2, 'placeholder': 'Optional notes'}),
+        }
+
+    def clean_rate(self):
+        rate = self.cleaned_data.get('rate')
+        if rate is not None and rate < 0:
+            raise forms.ValidationError('Amount cannot be negative.')
+        return rate
+
+    def clean(self):
+        data = super().clean()
+        rate, got = data.get('rate'), data.get('amount_received')
+        if data.get('payment_status') == 'partial' and rate is not None:
+            if got is None or got <= 0:
+                self.add_error('amount_received', 'Enter how much has been received in total.')
+            elif got >= rate:
+                self.add_error('amount_received', 'That is the full amount: choose "Paid in full" instead.')
+        return data
+
+    def received_total(self):
+        status = self.cleaned_data['payment_status']
+        return self.cleaned_data['rate'] if status == 'paid' else self.cleaned_data.get('amount_received') if status == 'partial' else 0
+
+
 class EntryPaymentForm(forms.ModelForm):
     class Meta:
         model = EntryPayment

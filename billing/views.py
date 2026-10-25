@@ -9,7 +9,7 @@ from django.utils import timezone
 
 from accounts.access import can_see_contact, first_error, own_patient, require_workspace, workspace_context, workspace_profile
 
-from .forms import BillingEntryForm, EntryPaymentForm, PackagePaymentForm, PatientBillForm, PatientPackageForm
+from .forms import BillCorrectionForm, BillingEntryForm, EntryPaymentForm, PackagePaymentForm, PatientBillForm, PatientPackageForm
 from .models import BillingEntry, EntryPayment, PackagePayment, PatientPackage
 
 
@@ -68,7 +68,7 @@ def billing(request):
         'prev_date': selected - datetime.timedelta(days=1), 'next_date': selected + datetime.timedelta(days=1),
         'total': total, 'by_mode': [(mode_names[m], v) for m, v in by_mode.items()],
         'month_total': month_total, 'month_label': f'{selected:%B %Y}', 'package_payments': revenue_for(profile, selected) - collected, 'collected': collected,
-        'packages_due': packages_due, 'owed': owed, 'bills_due': bills_due, 'pay_form': EntryPaymentForm(), 'open_new': request.GET.get('new') == '1', 'open_edit': request.GET.get('edit', '') if request.GET.get('edit', '').isdigit() else '',
+        'packages_due': packages_due, 'owed': owed, 'bills_due': bills_due, 'pay_form': EntryPaymentForm(), 'correct_form': BillCorrectionForm(), 'open_new': request.GET.get('new') == '1', 'open_edit': request.GET.get('edit', '') if request.GET.get('edit', '').isdigit() else '',
     })
     return render(request, 'billing/billing.html', context)
 
@@ -143,6 +143,28 @@ def entry_payment(request, pk):
         messages.info(request, 'That bill is already fully paid.')
     else:
         messages.success(request, f'NPR {paid.amount:g} received for {entry.invoice_number}.' + (f' NPR {entry.amount_due:g} still due.' if entry.amount_due else ' Fully paid.'))
+    return back
+
+
+@login_required
+def entry_correct(request, pk):
+    """Fix a bill's amount, date, service or how it was paid (cash / credit / part paid). The patient's details are not part of it."""
+    profile = require_workspace(request)
+    entry = get_object_or_404(BillingEntry, pk=pk, professional=profile)
+    nxt = request.POST.get('next', '')
+    back = redirect(nxt if nxt.startswith('/') and not nxt.startswith('//') else f"{reverse('billing:billing')}?date={entry.entry_date.isoformat()}")
+    if request.method != 'POST':
+        return back
+    if entry.is_cancelled:
+        messages.error(request, 'A cancelled bill cannot be edited. Restore it first.')
+        return back
+    form = BillCorrectionForm(request.POST, instance=entry)
+    if not form.is_valid():
+        messages.error(request, first_error(form))
+        return back
+    bill = form.save()
+    bill.set_amount_paid(form.received_total(), bill.payment_mode, request.user)
+    messages.success(request, f'{bill.invoice_number} updated - {bill.status_label.lower()}' + (f', NPR {bill.amount_due:g} due.' if bill.amount_due else '.'))
     return back
 
 

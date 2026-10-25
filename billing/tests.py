@@ -419,3 +419,58 @@ class CancelBillTests(BillingBase):
         other = self.client_class()
         other.force_login(stranger)
         self.assertEqual(other.post(reverse('billing:entry-cancel', args=[entry.pk])).status_code, 404)
+
+
+class CorrectBillTests(BillingBase):
+    def make_bill(self, **extra):
+        self.client.post(reverse('billing:patient-bill', args=[self.patient.pk]), {'entry_date': self.today.isoformat(), 'service': 'Therapy', 'rate': '800', 'payment_mode': 'cash', **extra})
+        return BillingEntry.objects.get()
+
+    def correct(self, entry, **extra):
+        data = {'entry_date': self.today.isoformat(), 'service': 'Therapy', 'rate': '800', 'payment_mode': 'cash', 'payment_status': 'paid', **extra}
+        return self.client.post(reverse('billing:entry-correct', args=[entry.pk]), data)
+
+    def test_reception_can_turn_a_paid_bill_into_credit_and_back_without_touching_patient_details(self):
+        entry = self.make_bill()  # recorded as paid in full by mistake
+        self.assertEqual(entry.status_key, 'paid')
+        before = (entry.patient_name, entry.age, entry.sex, entry.contact_number)
+        self.correct(entry, payment_status='due')
+        entry.refresh_from_db()
+        self.assertEqual((entry.amount_paid, entry.amount_due, entry.payments.count()), (0, 800, 0))
+        self.assertEqual(revenue_for(self.profile, self.today), 0)
+        self.assertEqual((entry.patient_name, entry.age, entry.sex, entry.contact_number), before)
+        self.correct(entry, payment_status='partial', amount_received='300', payment_mode='online')
+        entry.refresh_from_db()
+        self.assertEqual((entry.amount_paid, entry.status_key, entry.payments.get().payment_mode), (300, 'partial', 'online'))
+        self.correct(entry, payment_status='paid', rate='700')  # wrong amount too
+        entry.refresh_from_db()
+        self.assertEqual((entry.rate, entry.amount_paid, entry.status_key, sum(p.amount for p in entry.payments.all())), (700, 700, 'paid', 700))
+        self.assertEqual(revenue_for(self.profile, self.today), 700)
+
+    def test_lowering_what_was_received_shrinks_the_latest_payments(self):
+        entry = self.make_bill(payment_status='partial', amount_received='500')
+        entry.record_payment(300, 'cash')
+        self.correct(entry, payment_status='partial', amount_received='400')
+        entry.refresh_from_db()
+        self.assertEqual((entry.amount_paid, sum(p.amount for p in entry.payments.all())), (400, 400))
+
+    def test_validation_cancelled_and_ownership(self):
+        entry = self.make_bill()
+        self.correct(entry, payment_status='partial', amount_received='800')  # not partial
+        self.correct(entry, rate='-5')
+        entry.refresh_from_db()
+        self.assertEqual((entry.rate, entry.amount_paid), (800, 800))
+        self.client.post(reverse('billing:entry-cancel', args=[entry.pk]))
+        self.correct(entry, rate='100')
+        entry.refresh_from_db()
+        self.assertEqual(entry.rate, 800)
+        stranger, _ = make_professional('stranger')
+        other = self.client_class()
+        other.force_login(stranger)
+        self.assertEqual(other.post(reverse('billing:entry-correct', args=[entry.pk]), {'rate': '1'}).status_code, 404)
+
+    def test_the_patient_tab_and_the_book_open_the_small_edit_form(self):
+        entry = self.make_bill(payment_status='due')
+        tab = self.client.get(reverse('accounts:patient-detail', args=[self.patient.pk]) + '?tab=billing')
+        self.assertContains(tab, reverse('billing:entry-correct', args=[entry.pk]))
+        self.assertContains(self.client.get(reverse('billing:billing'), {'edit': entry.pk}), reverse('billing:entry-correct', args=[entry.pk]))

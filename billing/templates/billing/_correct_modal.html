@@ -1,0 +1,38 @@
+{# Fix a bill (amount, date, service, how it was paid) without touching the patient's details. Buttons: <button data-correct data-url data-name data-invoice data-date data-service data-rate data-mode data-notes data-status data-received data-next>. Needs SajhyaUI. #}
+<div class="modal-backdrop" id="correctModal" role="dialog" aria-modal="true">
+  <div class="modal-card" style="max-width:460px">
+    <div class="modal-head"><h2 id="corTitle">Edit bill</h2><button type="button" class="modal-x" data-close aria-label="Close">×</button></div>
+    <form method="post" id="correctForm" class="mini-form">
+      {% csrf_token %}
+      <input type="hidden" name="next" id="corNext">
+      <div class="hint" id="corHint" style="margin:0 0 6px"></div>
+      <div class="two"><label>Date {{ correct_form.entry_date }}</label><label>Service {{ correct_form.service }}</label></div>
+      <div class="two"><label>Amount (NPR) {{ correct_form.rate }}</label><label>Payment mode {{ correct_form.payment_mode }}</label></div>
+      <label>Payment {{ correct_form.payment_status }}</label>
+      <label id="corReceivedWrap" hidden>{{ correct_form.amount_received.label }} {{ correct_form.amount_received }}</label>
+      <label>Notes {{ correct_form.notes }}</label>
+      <div class="pf-actions" style="padding:10px 0 0"><button type="button" class="secondary-btn" data-close>Cancel</button><button type="submit" class="primary-btn">Save changes</button></div>
+    </form>
+  </div>
+</div>
+<script>
+(function () {
+  var f = document.getElementById('correctForm');
+  function sync() { document.getElementById('corReceivedWrap').hidden = f.elements['payment_status'].value !== 'partial'; }
+  f.elements['payment_status'].addEventListener('change', sync);
+  document.querySelectorAll('[data-correct]').forEach(function (b) {
+    b.addEventListener('click', function () {
+      var d = b.dataset;
+      f.action = d.url;
+      document.getElementById('corNext').value = d.next || location.pathname + location.search;
+      document.getElementById('corTitle').textContent = 'Edit bill - ' + d.name;
+      document.getElementById('corHint').textContent = d.invoice + ' · fix the amount or how it was paid. Patient details are not changed here.';
+      f.elements['entry_date'].value = d.date; f.elements['service'].value = d.service; f.elements['rate'].value = d.rate;
+      f.elements['payment_mode'].value = d.mode; f.elements['notes'].value = d.notes;
+      f.elements['payment_status'].value = d.status; f.elements['amount_received'].value = d.received;
+      sync();
+      SajhyaUI.openModal('correctModal');
+    });
+  });
+})();
+</script>

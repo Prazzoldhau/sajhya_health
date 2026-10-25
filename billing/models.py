@@ -81,6 +81,29 @@ class BillingEntry(models.Model):
         return payment
 
 
+    def set_amount_paid(self, target, payment_mode='cash', user=None):
+        """Correct what has been received in total (a reception mistake): add the missing payment, or take the surplus back off the
+        most recent payments. The ledger always adds up to amount_paid."""
+        target = max(Decimal('0'), min(Decimal(target), self.rate))
+        diff = target - self.amount_paid
+        if diff > 0:
+            self.record_payment(diff, payment_mode, notes='Correction', user=user)
+        elif diff < 0:
+            remove = -diff
+            for payment in self.payments.order_by('-created_at', '-id'):
+                if remove <= 0:
+                    break
+                if payment.amount <= remove:
+                    remove -= payment.amount
+                    payment.delete()
+                else:
+                    payment.amount -= remove
+                    payment.save(update_fields=['amount'])
+                    remove = Decimal('0')
+            self.amount_paid = target
+            self.save(update_fields=['amount_paid', 'updated_at'])
+
+
 class EntryPayment(models.Model):
     """Money received against a billing entry - on the day of the bill, or later when the patient settles a credit."""
     entry = models.ForeignKey(BillingEntry, on_delete=models.CASCADE, related_name='payments')

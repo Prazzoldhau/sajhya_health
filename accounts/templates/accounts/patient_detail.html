@@ -228,7 +228,7 @@
           <td style="text-align:right">{% if b.is_cancelled %}<span style="color:#b83b3b;font-weight:700">Cancelled</span>{% elif b.status_key == 'paid' %}<span style="color:#16834f;font-weight:700">Paid</span>{% else %}<span style="color:#b78317;font-weight:700">{{ b.status_label }} · NPR {{ b.amount_due }} due</span> <button type="button" class="table-action" data-pay data-url="{% url 'billing:entry-payment' b.pk %}" data-next="{% url 'accounts:patient-detail' patient.pk %}?tab=billing" data-name="{{ patient.name }}" data-due="{{ b.amount_due }}" data-invoice="{{ b.invoice_number }}">Receive</button>{% endif %}</td>
           <td style="text-align:right;white-space:nowrap">
             {% if b.is_cancelled %}<form method="post" action="{% url 'billing:entry-restore' b.pk %}" style="display:inline">{% csrf_token %}<input type="hidden" name="next" value="{% url 'accounts:patient-detail' patient.pk %}?tab=billing"><button class="table-action" type="submit">Restore</button></form>
-            {% else %}<a class="table-action" href="{% url 'billing:billing' %}?date={{ b.entry_date|date:'Y-m-d' }}&edit={{ b.pk }}" style="text-decoration:none">Edit</a>
+            {% else %}<button type="button" class="table-action" data-correct data-url="{% url 'billing:entry-correct' b.pk %}" data-name="{{ patient.name }}" data-invoice="{{ b.invoice_number }}" data-date="{{ b.entry_date|date:'Y-m-d' }}" data-service="{{ b.service }}" data-rate="{{ b.rate }}" data-mode="{{ b.payment_mode }}" data-notes="{{ b.notes }}" data-status="{{ b.status_key }}" data-received="{{ b.amount_paid }}" data-next="{% url 'accounts:patient-detail' patient.pk %}?tab=billing">Edit</button>
             <form method="post" action="{% url 'billing:entry-cancel' b.pk %}" style="display:inline" data-cancel-bill>{% csrf_token %}<input type="hidden" name="next" value="{% url 'accounts:patient-detail' patient.pk %}?tab=billing"><input type="hidden" name="reason"><button class="table-action" type="submit">Cancel bill</button></form>{% endif %}
           </td></tr>
       {% empty %}
@@ -273,6 +273,7 @@
 
 {% block modals %}
 {% if tab == 'billing' %}{% include 'billing/_pay_modal.html' %}
+{% include 'billing/_correct_modal.html' %}
 <script>document.querySelectorAll('[data-cancel-bill]').forEach(function (fm) { fm.addEventListener('submit', function (ev) { var r = prompt('Cancel this bill? It stays on record but no longer counts.\nReason (optional):'); if (r === null) { ev.preventDefault(); return; } fm.elements['reason'].value = r; }); });</script>{% endif %}
 {% if tab == 'profile' %}{% include 'profiles/_modals.html' %}{% endif %}
 <div class="modal-backdrop" id="visitModal" role="dialog" aria-modal="true">

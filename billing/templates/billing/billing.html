@@ -67,7 +67,8 @@
             <button type="button" class="table-action" data-edit
               data-url="{% url 'billing:entry-edit' e.pk %}" data-date="{{ e.entry_date|date:'Y-m-d' }}" data-patient="{{ e.patient_id|default_if_none:'' }}"
               data-name="{{ e.patient_name }}" data-age="{{ e.age|default_if_none:'' }}" data-sex="{{ e.sex }}" data-contact="{{ e.contact_number }}"
-              data-service="{{ e.service }}" data-rate="{{ e.rate }}" data-mode="{{ e.payment_mode }}" data-notes="{{ e.notes }}">Edit</button>
+              data-service="{{ e.service }}" data-rate="{{ e.rate }}" data-mode="{{ e.payment_mode }}" data-notes="{{ e.notes }}"{% if e.patient_id %} hidden{% endif %}>Edit</button>
+            {% if e.patient_id %}<button type="button" class="table-action" data-correct data-url="{% url 'billing:entry-correct' e.pk %}" data-name="{{ e.patient_name }}" data-invoice="{{ e.invoice_number }}" data-date="{{ e.entry_date|date:'Y-m-d' }}" data-service="{{ e.service }}" data-rate="{{ e.rate }}" data-mode="{{ e.payment_mode }}" data-notes="{{ e.notes }}" data-status="{{ e.status_key }}" data-received="{{ e.amount_paid }}" data-next="{% url 'billing:billing' %}?date={{ e.entry_date|date:'Y-m-d' }}">Edit</button>{% endif %}
             <form method="post" action="{% url 'billing:entry-cancel' e.pk %}" data-cancel-bill>{% csrf_token %}<input type="hidden" name="reason"><button class="table-action" type="submit">Cancel bill</button></form>
             {% endif %}
             <form method="post" action="{% url 'billing:entry-delete' e.pk %}" onsubmit="return confirm('Delete this entry?')">{% csrf_token %}<button class="table-action" type="submit">Delete</button></form>
@@ -85,6 +86,7 @@
 
 {% block modals %}
 {% include 'billing/_pay_modal.html' %}
+{% include 'billing/_correct_modal.html' %}
 <div class="modal-backdrop" id="entryModal" role="dialog" aria-modal="true">
   <div class="modal-card" style="max-width:520px">
     <div class="modal-head"><h2 id="entryTitle">New billing entry</h2><button type="button" class="modal-x" data-close aria-label="Close">×</button></div>
@@ -151,7 +153,7 @@
     });
   });
   {% if open_new %}$('newEntry').click();{% endif %}
-  {% if open_edit %}var target = document.querySelector('[data-edit][data-url$="/{{ open_edit }}/save/"]'); if (target) target.click();{% endif %}
+  {% if open_edit %}var target = document.querySelector('[data-edit][data-url$="/{{ open_edit }}/save/"]:not([hidden]), [data-correct][data-url$="/{{ open_edit }}/correct/"]'); if (target) target.click();{% endif %}
 })();
 </script>
 {% endblock %}
