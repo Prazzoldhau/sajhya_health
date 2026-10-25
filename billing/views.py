@@ -2,22 +2,22 @@ import datetime
 
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
-from django.db.models import Sum
+from django.db.models import F, Sum
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
 from django.utils import timezone
 
 from accounts.access import can_see_contact, first_error, own_patient, require_workspace, workspace_context, workspace_profile
 
-from .forms import BillingEntryForm, PackagePaymentForm, PatientBillForm, PatientPackageForm
-from .models import BillingEntry, PackagePayment, PatientPackage
+from .forms import BillingEntryForm, EntryPaymentForm, PackagePaymentForm, PatientBillForm, PatientPackageForm
+from .models import BillingEntry, EntryPayment, PackagePayment, PatientPackage
 
 
 def revenue_for(profile, date):
-    """Money taken on one day: billing-book entries plus package payments recorded that day."""
+    """Money actually received on one day: payments on bills (including late settlements of credit) plus package payments."""
     start = timezone.make_aware(datetime.datetime.combine(date, datetime.time.min))
     end = start + datetime.timedelta(days=1)
-    entries = profile.billing_entries.filter(entry_date=date).aggregate(t=Sum('rate'))['t'] or 0
+    entries = EntryPayment.objects.filter(entry__professional=profile, paid_on=date).aggregate(t=Sum('amount'))['t'] or 0
     packages = PackagePayment.objects.filter(package__professional=profile, created_at__gte=start, created_at__lt=end).aggregate(t=Sum('amount'))['t'] or 0
     return entries + packages
 
@@ -51,18 +51,23 @@ def billing(request):
     by_mode = {m: 0 for m in mode_names}
     total = 0
     for e in entries:
-        by_mode[e.payment_mode] += e.rate
         total += e.rate
+    received = EntryPayment.objects.filter(entry__professional=profile, paid_on=selected)
+    for mode, amount in received.values_list('payment_mode', 'amount'):
+        by_mode[mode] += amount
+    collected = sum(by_mode.values())
     month_total = profile.billing_entries.filter(entry_date__year=selected.year, entry_date__month=selected.month).aggregate(t=Sum('rate'))['t'] or 0
     packages_due = sum((p.amount_due for p in PatientPackage.objects.filter(professional=profile).exclude(status='cancelled')), 0)
+    owed = [e for e in profile.billing_entries.filter(amount_paid__lt=F('rate')).select_related('patient').order_by('entry_date', 'id')]
+    bills_due = sum((e.amount_due for e in owed), 0)
 
     context = workspace_context(request.user, profile)
     context.update({
         'active': 'billing', 'billing_tab': 'book', 'form': form, 'entries': entries, 'selected': selected, 'today': today,
         'prev_date': selected - datetime.timedelta(days=1), 'next_date': selected + datetime.timedelta(days=1),
         'total': total, 'by_mode': [(mode_names[m], v) for m, v in by_mode.items()],
-        'month_total': month_total, 'month_label': f'{selected:%B %Y}', 'package_payments': revenue_for(profile, selected) - total,
-        'packages_due': packages_due, 'open_new': request.GET.get('new') == '1',
+        'month_total': month_total, 'month_label': f'{selected:%B %Y}', 'package_payments': revenue_for(profile, selected) - collected, 'collected': collected,
+        'packages_due': packages_due, 'owed': owed, 'bills_due': bills_due, 'pay_form': EntryPaymentForm(), 'open_new': request.GET.get('new') == '1',
     })
     return render(request, 'billing/billing.html', context)
 
@@ -84,6 +89,8 @@ def entry_save(request, pk=None):
             obj.sex = obj.sex or patient.gender
             obj.contact_number = obj.contact_number or (patient.phone if can_see_contact(profile, patient) else '')
         obj.save()
+        if not pk:
+            form.apply_payment(obj, request.user)
         messages.success(request, f'Saved - {obj.invoice_number}')
         return _back(obj.entry_date)
     messages.error(request, first_error(form))
@@ -107,9 +114,31 @@ def patient_bill(request, patient_id):
         entry.sex = patient.gender
         entry.contact_number = patient.phone if can_see_contact(profile, patient) else ''
         entry.save()
-        messages.success(request, f'Bill {entry.invoice_number} saved for {patient.name}.')
+        form.apply_payment(entry, request.user)
+        messages.success(request, f'Bill {entry.invoice_number} saved for {patient.name}.' + (f' NPR {entry.amount_due:g} is due.' if entry.amount_due else ''))
     else:
         messages.error(request, first_error(form))
+    return back
+
+
+@login_required
+def entry_payment(request, pk):
+    """Receive money against a bill that was left on credit (in full or in part), then return to the page it came from."""
+    profile = require_workspace(request)
+    entry = get_object_or_404(BillingEntry, pk=pk, professional=profile)
+    nxt = request.POST.get('next', '')
+    back = redirect(nxt if nxt.startswith('/') and not nxt.startswith('//') else reverse('billing:billing'))
+    if request.method != 'POST':
+        return back
+    form = EntryPaymentForm(request.POST)
+    if not form.is_valid():
+        messages.error(request, first_error(form))
+        return back
+    paid = entry.record_payment(form.cleaned_data['amount'], form.cleaned_data['payment_mode'], form.cleaned_data['notes'], user=request.user)
+    if paid is None:
+        messages.info(request, 'That bill is already fully paid.')
+    else:
+        messages.success(request, f'NPR {paid.amount:g} received for {entry.invoice_number}.' + (f' NPR {entry.amount_due:g} still due.' if entry.amount_due else ' Fully paid.'))
     return back
 
 

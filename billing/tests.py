@@ -310,3 +310,73 @@ class PatientBillTests(BillingBase):
         other_user, other = make_professional('other')
         stranger = make_patient(other, name='Not Mine')
         self.assertEqual(self.client.post(reverse('billing:patient-bill', args=[stranger.pk]), {'entry_date': self.today.isoformat(), 'service': 'x', 'rate': '5', 'payment_mode': 'cash'}).status_code, 404)
+
+
+class CreditBillTests(BillingBase):
+    """Many patients pay at the end of the week, so a bill can be left on credit and settled later (in full or in parts)."""
+
+    def test_a_bill_can_be_paid_in_full_part_paid_or_left_due(self):
+        self.entry(patient_name='Full')
+        self.entry(patient_name='Part', payment_status='partial', amount_received='200')
+        self.entry(patient_name='Credit', payment_status='due', payment_mode='cash')
+        full, part, due = (BillingEntry.objects.get(patient_name=n) for n in ('Full', 'Part', 'Credit'))
+        self.assertEqual((full.status_key, full.amount_due), ('paid', 0))
+        self.assertEqual((part.status_key, part.amount_paid, part.amount_due), ('partial', 200, 300))
+        self.assertEqual((due.status_key, due.amount_paid, due.amount_due), ('due', 0, 500))
+        page = self.client.get(reverse('billing:billing'))
+        self.assertEqual(page.context['bills_due'], Decimal('800'))
+        self.assertEqual(page.context['collected'], Decimal('700'))  # only what was received counts as money taken
+        self.assertContains(page, 'Payments due')
+        self.assertEqual(revenue_for(self.profile, self.today), Decimal('700'))
+
+    def test_partial_needs_a_sensible_amount(self):
+        self.entry(patient_name='Zero', payment_status='partial', amount_received='0')
+        self.entry(patient_name='All', payment_status='partial', amount_received='500')
+        self.assertEqual(BillingEntry.objects.count(), 0)
+
+    def test_receiving_the_credit_later_counts_as_money_taken_on_that_day(self):
+        yesterday = self.today - datetime.timedelta(days=3)
+        self.entry(entry_date=yesterday.isoformat(), payment_status='due')
+        entry = BillingEntry.objects.get()
+        self.assertEqual(revenue_for(self.profile, yesterday), 0)
+        r = self.client.post(reverse('billing:entry-payment', args=[entry.pk]), {'amount': '300', 'payment_mode': 'online', 'next': '/billing/'})
+        self.assertRedirects(r, '/billing/', fetch_redirect_response=False)
+        entry.refresh_from_db()
+        self.assertEqual((entry.amount_paid, entry.status_key), (300, 'partial'))
+        self.client.post(reverse('billing:entry-payment', args=[entry.pk]), {'amount': '900', 'payment_mode': 'cash'})  # more than owed: capped
+        entry.refresh_from_db()
+        self.assertEqual((entry.amount_paid, entry.status_key, entry.payments.count()), (500, 'paid', 2))
+        self.assertEqual(revenue_for(self.profile, self.today), Decimal('500'))
+        self.assertEqual(revenue_for(self.profile, yesterday), 0)
+        self.assertEqual(self.client.post(reverse('billing:entry-payment', args=[entry.pk]), {'amount': '10', 'payment_mode': 'cash'}).status_code, 302)
+        self.assertEqual(entry.payments.count(), 2)  # already paid: nothing more recorded
+
+    def test_credit_from_the_patient_tab_and_receive_there(self):
+        tab = reverse('accounts:patient-detail', args=[self.patient.pk]) + '?tab=billing'
+        self.client.post(reverse('billing:patient-bill', args=[self.patient.pk]),
+                         {'entry_date': self.today.isoformat(), 'service': 'Therapy', 'rate': '900', 'payment_mode': 'cash', 'payment_status': 'due'})
+        entry = BillingEntry.objects.get()
+        self.assertEqual(entry.amount_due, 900)
+        self.assertContains(self.client.get(tab), 'NPR 900.00 due')
+        self.client.post(reverse('billing:entry-payment', args=[entry.pk]), {'amount': '900', 'payment_mode': 'cash', 'next': tab})
+        entry.refresh_from_db()
+        self.assertEqual(entry.status_key, 'paid')
+
+    def test_editing_cannot_drop_the_amount_below_what_was_received_and_strangers_are_refused(self):
+        self.entry(payment_status='partial', amount_received='300')
+        entry = BillingEntry.objects.get()
+        self.client.post(reverse('billing:entry-edit', args=[entry.pk]), {'entry_date': self.today.isoformat(), 'patient_name': 'Walk In', 'service': 'Consult', 'rate': '100', 'payment_mode': 'cash'})
+        entry.refresh_from_db()
+        self.assertEqual(entry.rate, 500)
+        stranger, _ = make_professional('stranger')
+        other = self.client_class()
+        other.force_login(stranger)
+        self.assertEqual(other.post(reverse('billing:entry-payment', args=[entry.pk]), {'amount': '10', 'payment_mode': 'cash'}).status_code, 404)
+
+    def test_existing_bills_were_all_paid(self):
+        from importlib import import_module
+        from django.apps import apps
+        legacy = BillingEntry.objects.create(professional=self.profile, patient_name='Old', rate=400, payment_mode='card', entry_date=self.today)
+        import_module('billing.migrations.0008_existing_bills_are_paid').mark_existing_paid(apps, None)
+        legacy.refresh_from_db()
+        self.assertEqual((legacy.amount_paid, legacy.payments.get().payment_mode), (400, 'card'))

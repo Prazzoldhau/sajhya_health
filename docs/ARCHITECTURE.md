@@ -6,7 +6,7 @@
 | --- | --- | --- |
 | `accounts` | Users and account types, professional onboarding + staff review, patients (with private pictures), visits, appointments and to-dos, treatment plans, ICD-10 lookup, password reset, the workspace layout | `models.py`, `access.py`, `views.py`, `appointments.py`, `plans.py`, `auth_views.py`, `services.py`, `forms.py`, `images.py`, `templatetags/accounts_ui.py`, `templates/accounts/pro_base.html` |
 | `reports` (inside `accounts`) | Weekly/monthly/custom reports as plain data (KPIs + table sections) that feed both the page and the CSV | `reports.py` (all queries and definitions), `report_views.py`, `templates/accounts/reports.html` |
-| `billing` | Daily billing book, **patient packages** (1-4 weeks, sessions, payments), **account plans** (the package page content) | `models.py`, `views.py` |
+| `billing` | Daily billing book (bills can be paid in full, part paid or left **on credit**; later payments are `EntryPayment` rows, and "money taken" counts payments by the day they were received), **patient packages** (1-4 weeks, sessions, payments), **account plans** (the package page content) | `models.py`, `views.py` |
 | `exercises` | Exercise library (regions -> sub-regions -> exercises -> step images), prescriptions and completion | `models.py`, `views.py` |
 | `profiles` | Patient profile sections: standing info, medicine, nursing, surgical aids, therapy notes (OT/speech/behavioural), lab tests; plus the read-only physio summary | `models.py`, `rehab.py`, `views.py` |
 | `assessments` | Data-driven outcome-measure scales (items, options, score bands), forms (bundles) and recorded results with a snapshot of what was asked | `models.py`, `scoring.py`, `views.py`, `services.py`, `fixtures/scales.json`, `management/commands/load_scales.py` - see [ASSESSMENTS.md](ASSESSMENTS.md) |
@@ -187,3 +187,7 @@ python manage.py test sajhya_health.test_end_to_end
 
 Test helpers: `accounts/tests/helpers.py` (`make_professional`, `make_patient`, `private_storage()` which redirects uploads
 to a temp folder). Lockout is off in tests (`AXES_ENABLED = not TESTING`); the lockout test turns it back on.
+
+## Show / hide password
+
+`static/js/pw-toggle.js` adds an eye button to every `input[type=password]` (sign-up, change password, clinic login, staff logins). The sign-in page keeps its own `data-pw-toggle` button, which the script leaves alone. New templates with a password box only need to load the script (the three base templates already do).

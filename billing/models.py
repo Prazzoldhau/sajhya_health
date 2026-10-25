@@ -29,6 +29,7 @@ class BillingEntry(models.Model):
     rate = models.DecimalField(max_digits=10, decimal_places=2)
     payment_mode = models.CharField(max_length=10, choices=PAYMENT_MODE_CHOICES, default='cash')
     notes = models.TextField(blank=True)
+    amount_paid = models.DecimalField(max_digits=10, decimal_places=2, default=0, help_text='Total received so far; the rest is on credit (due).')
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
@@ -43,6 +44,48 @@ class BillingEntry(models.Model):
         if not self.invoice_number:
             self.invoice_number = f'BILL-{uuid.uuid4().hex[:8].upper()}'
         super().save(*args, **kwargs)
+
+    @property
+    def amount_due(self):
+        return max(Decimal('0'), self.rate - self.amount_paid)
+
+    @property
+    def status_key(self):
+        if self.amount_due <= 0:
+            return 'paid'
+        return 'partial' if self.amount_paid > 0 else 'due'
+
+    @property
+    def status_label(self):
+        return {'paid': 'Paid', 'partial': 'Part paid', 'due': 'Due'}[self.status_key]
+
+    def record_payment(self, amount, payment_mode='cash', notes='', paid_on=None, user=None):
+        """Log money received against this bill, capped at what is still owed. Returns the EntryPayment, or None if nothing was recorded."""
+        if amount is None or amount <= 0 or self.amount_due <= 0:
+            return None
+        amount = min(Decimal(amount), self.amount_due)
+        payment = EntryPayment.objects.create(entry=self, amount=amount, payment_mode=payment_mode, notes=notes,
+                                              paid_on=paid_on or timezone.localdate(), recorded_by=user)
+        self.amount_paid += amount
+        self.save(update_fields=['amount_paid', 'updated_at'])
+        return payment
+
+
+class EntryPayment(models.Model):
+    """Money received against a billing entry - on the day of the bill, or later when the patient settles a credit."""
+    entry = models.ForeignKey(BillingEntry, on_delete=models.CASCADE, related_name='payments')
+    amount = models.DecimalField(max_digits=10, decimal_places=2)
+    payment_mode = models.CharField(max_length=10, choices=PAYMENT_MODE_CHOICES, default='cash')
+    notes = models.CharField(max_length=255, blank=True, default='')
+    paid_on = models.DateField(default=timezone.localdate)
+    recorded_by = models.ForeignKey(settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.SET_NULL, related_name='+')
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['-paid_on', '-created_at']
+
+    def __str__(self):
+        return f'NPR {self.amount} - {self.entry.invoice_number}'
 
 
 class Plan(models.Model):

@@ -9,6 +9,7 @@ urlpatterns = [
     path('patient/<int:patient_id>/bill/', views.patient_bill, name='patient-bill'),
     path('entry/save/', views.entry_save, name='entry-create'),
     path('entry/<int:pk>/save/', views.entry_save, name='entry-edit'),
+    path('entry/<int:pk>/payment/', views.entry_payment, name='entry-payment'),
     path('entry/<int:pk>/delete/', views.entry_delete, name='entry-delete'),
     # patient packages (1 / 2 / 3 / 4 weeks)
     path('packages/', views.packages, name='packages'),

@@ -3,10 +3,44 @@ from django import forms
 from accounts.models import Patient
 from accounts.widgets import date_widget
 
-from .models import BillingEntry, PackagePayment, PatientPackage
+from .models import BillingEntry, EntryPayment, PackagePayment, PatientPackage
 
 
-class BillingEntryForm(forms.ModelForm):
+class PaymentStatusMixin(forms.Form):
+    """New bills can be paid in full, part paid, or left on credit (due) - many patients settle at the end of the week.
+    The payment mode is the mode of what is received now. Editing a bill never changes what was already received."""
+    payment_status = forms.ChoiceField(choices=[('paid', 'Paid in full'), ('partial', 'Part paid'), ('due', 'Not paid yet (credit)')], initial='paid', required=False, label='Payment')
+    amount_received = forms.DecimalField(required=False, min_value=0, max_digits=10, decimal_places=2, label='Received now (NPR)',
+                                         widget=forms.NumberInput(attrs={'placeholder': 'Amount received now', 'step': '0.01', 'min': 0}))
+
+    def clean_rate(self):
+        rate = self.cleaned_data.get('rate')
+        if rate is not None and rate < 0:
+            raise forms.ValidationError('Amount cannot be negative.')
+        if rate is not None and self.instance.pk and rate < self.instance.amount_paid:
+            raise forms.ValidationError(f'NPR {self.instance.amount_paid:g} has already been received, so the amount cannot be lower than that.')
+        return rate
+
+    def clean(self):
+        data = super().clean()
+        if self.instance.pk:
+            return data
+        status, rate, got = data.get('payment_status') or 'paid', data.get('rate'), data.get('amount_received')
+        if status == 'partial' and rate is not None:
+            if got is None or got <= 0:
+                self.add_error('amount_received', 'Enter how much was received now.')
+            elif got >= rate:
+                self.add_error('amount_received', 'That is the full amount: choose "Paid in full" instead.')
+        return data
+
+    def apply_payment(self, entry, user=None):
+        """After a new bill is saved: record what was received with it (nothing at all when it is left on credit)."""
+        status = self.cleaned_data.get('payment_status') or 'paid'
+        amount = entry.rate if status == 'paid' else self.cleaned_data.get('amount_received') if status == 'partial' else 0
+        entry.record_payment(amount, entry.payment_mode, paid_on=entry.entry_date, user=user)
+
+
+class BillingEntryForm(PaymentStatusMixin, forms.ModelForm):
     class Meta:
         model = BillingEntry
         fields = ['entry_date', 'patient', 'patient_name', 'age', 'sex', 'contact_number', 'service', 'rate', 'payment_mode', 'notes']
@@ -32,14 +66,7 @@ class BillingEntryForm(forms.ModelForm):
             raise forms.ValidationError('Name must be at least 2 characters long.')
         return name
 
-    def clean_rate(self):
-        rate = self.cleaned_data.get('rate')
-        if rate is not None and rate < 0:
-            raise forms.ValidationError('Amount cannot be negative.')
-        return rate
-
-
-class PatientBillForm(forms.ModelForm):
+class PatientBillForm(PaymentStatusMixin, forms.ModelForm):
     """A bill written from inside a patient's own Billing tab: the patient is already known, so only the money details are asked."""
     class Meta:
         model = BillingEntry
@@ -51,7 +78,22 @@ class PatientBillForm(forms.ModelForm):
             'notes': forms.Textarea(attrs={'rows': 2, 'placeholder': 'Optional notes'}),
         }
 
-    clean_rate = BillingEntryForm.clean_rate
+
+
+class EntryPaymentForm(forms.ModelForm):
+    class Meta:
+        model = EntryPayment
+        fields = ['amount', 'payment_mode', 'notes']
+        widgets = {
+            'amount': forms.NumberInput(attrs={'placeholder': 'Amount (NPR)', 'step': '0.01', 'min': 0.01}),
+            'notes': forms.TextInput(attrs={'placeholder': 'Optional notes'}),
+        }
+
+    def clean_amount(self):
+        amount = self.cleaned_data['amount']
+        if amount <= 0:
+            raise forms.ValidationError('Enter an amount greater than zero.')
+        return amount
 
 
 class PatientPackageForm(forms.ModelForm):

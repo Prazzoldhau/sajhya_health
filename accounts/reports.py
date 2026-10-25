@@ -14,7 +14,7 @@ import datetime
 from collections import Counter, defaultdict
 from decimal import Decimal
 
-from django.db.models import Count, Min, Sum
+from django.db.models import Count, F, Min, Sum
 from django.utils import timezone
 
 from .models import Appointment, Patient, Visit
@@ -92,7 +92,7 @@ def _section(title, columns, rows, note=''):
 
 def build_report(profile, start, end):
     """The full report for [start, end] (inclusive)."""
-    from billing.models import BillingEntry, PackagePayment, PatientPackage
+    from billing.models import BillingEntry, EntryPayment, PackagePayment, PatientPackage
     from exercises.models import Prescription, PrescriptionExercise
     from profiles.models import AidEntry, LabEntry, MedicineEntry
 
@@ -102,6 +102,7 @@ def build_report(profile, start, end):
     appointments = Appointment.objects.filter(professional=profile, kind=Appointment.APPOINTMENT, start__gte=lo, start__lt=hi)
     entries = BillingEntry.objects.filter(professional=profile, entry_date__gte=start, entry_date__lte=end)
     payments = PackagePayment.objects.filter(package__professional=profile, created_at__gte=lo, created_at__lt=hi)
+    received = EntryPayment.objects.filter(entry__professional=profile, paid_on__gte=start, paid_on__lte=end)  # money actually received on bills
 
     # ---- who was seen, and are they new or follow-up ----
     seen_ids = set(visits.values_list('patient_id', flat=True))
@@ -115,6 +116,8 @@ def build_report(profile, start, end):
     now = timezone.now()
     missed = appointments.filter(status=Appointment.SCHEDULED, end__lt=now).count()
     billed = entries.aggregate(t=Sum('rate'))['t'] or 0
+    taken = received.aggregate(t=Sum('amount'))['t'] or 0
+    credit_open = sum((e.amount_due for e in BillingEntry.objects.filter(professional=profile, amount_paid__lt=F('rate'))), Decimal(0))
     paid_pkg = payments.aggregate(t=Sum('amount'))['t'] or 0
     packages_live = list(PatientPackage.objects.filter(professional=profile).exclude(status='cancelled').select_related('patient'))
     outstanding = sum((p.amount_due for p in packages_live), Decimal(0))
@@ -124,7 +127,8 @@ def build_report(profile, start, end):
         ('New clients', len(new_ids)), ('Follow-up clients', len(followup_ids)),
         ('Patients registered', patients.filter(created_at__gte=lo, created_at__lt=hi).count()),
         ('Appointments attended', attended), ('Cancelled', cancelled), ('Missed (not marked)', missed),
-        ('Money taken (NPR)', _money(billed + paid_pkg)), ('Package dues open (NPR)', _money(outstanding)),
+        ('Billed (NPR)', _money(billed)), ('Money taken (NPR)', _money(taken + paid_pkg)),
+        ('Bills on credit, unpaid (NPR)', _money(credit_open)), ('Package dues open (NPR)', _money(outstanding)),
     ]
 
     sections = []
@@ -133,7 +137,7 @@ def build_report(profile, start, end):
     visits_by_day = Counter(visits.values_list('date', flat=True))
     new_by_day = Counter(timezone.localtime(d).date() for d in patients.filter(created_at__gte=lo, created_at__lt=hi).values_list('created_at', flat=True))
     billed_by_day = defaultdict(Decimal)
-    for day, amount in entries.values_list('entry_date', 'rate'):
+    for day, amount in received.values_list('paid_on', 'amount'):
         billed_by_day[day] += amount
     for stamp, amount in payments.values_list('created_at', 'amount'):
         billed_by_day[timezone.localtime(stamp).date()] += amount
@@ -203,13 +207,13 @@ def build_report(profile, start, end):
     # ---- money ----
     modes = dict(BillingEntry._meta.get_field('payment_mode').choices)
     book, pkg = defaultdict(Decimal), defaultdict(Decimal)
-    for mode, amount in entries.values_list('payment_mode', 'rate'):
+    for mode, amount in received.values_list('payment_mode', 'amount'):
         book[mode] += amount
     for mode, amount in payments.values_list('payment_mode', 'amount'):
         pkg[mode] += amount
     rows = [[modes.get(m, m), _money(book[m]), _money(pkg[m]), _money(book[m] + pkg[m])] for m in sorted(set(book) | set(pkg))]
     if rows:
-        rows.append(['Total', _money(billed), _money(paid_pkg), _money(billed + paid_pkg)])
+        rows.append(['Total', _money(taken), _money(paid_pkg), _money(taken + paid_pkg)])
     sections.append(_section('Money taken by payment mode', ['Mode', 'Billing book', 'Package payments', 'Total (NPR)'], rows))
     services = entries.values('service').annotate(n=Count('id'), total=Sum('rate')).order_by('-total')[:10]
     sections.append(_section('Billing by service', ['Service', 'Invoices', 'Amount (NPR)'], [[s['service'], s['n'], _money(s['total'])] for s in services]))

@@ -33,7 +33,8 @@ class ReportContentTests(TestCase):
         Visit.objects.create(patient=self.old, date=datetime.date(2026, 9, 5), therapist='x')
         for patient, day in ((self.new, 3), (self.old, 4), (self.old, 11)):
             Visit.objects.create(patient=patient, date=datetime.date(2026, 10, day), therapist='x', progress='improving')
-        BillingEntry.objects.create(professional=self.profile, patient=self.new, entry_date=datetime.date(2026, 10, 3), patient_name='New Man', rate=1000, payment_mode='cash', invoice_number='T1')
+        bill = BillingEntry.objects.create(professional=self.profile, patient=self.new, entry_date=datetime.date(2026, 10, 3), patient_name='New Man', rate=1000, payment_mode='cash', invoice_number='T1')
+        bill.record_payment(1000, 'cash', paid_on=datetime.date(2026, 10, 3))
         package = PatientPackage.objects.create(patient=self.old, professional=self.profile, duration='2_week', total_sessions=6, total_amount=5000, amount_paid=2000, start_date=self.start)
         payment = PackagePayment.objects.create(package=package, amount=2000, payment_mode='online')
         PackagePayment.objects.filter(pk=payment.pk).update(created_at=timezone.make_aware(datetime.datetime(2026, 10, 5, 12)))

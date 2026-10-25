@@ -24,17 +24,32 @@
 
 <div class="kpis">
   <div class="kpi"><div class="k">Billed on {{ selected|date:"M j, Y" }}</div><div class="v">NPR {{ total }}</div><div class="n">{{ entries|length }} entr{{ entries|length|pluralize:"y,ies" }}</div></div>
-  <div class="kpi"><div class="k">Package payments that day</div><div class="v">NPR {{ package_payments }}</div><div class="n"><a href="{% url 'billing:packages' %}" style="color:inherit">Manage packages →</a></div></div>
-  <div class="kpi"><div class="k">{{ month_label }} total</div><div class="v">NPR {{ month_total }}</div><div class="n">Billing entries only</div></div>
-  <div class="kpi"><div class="k">Package balance due</div><div class="v" style="color:#b78317">NPR {{ packages_due }}</div><div class="n" style="color:#b78317">Across all patients</div></div>
+  <div class="kpi"><div class="k">Received on {{ selected|date:"M j, Y" }}</div><div class="v">NPR {{ collected|add:package_payments }}</div><div class="n">Bills NPR {{ collected }} · packages NPR {{ package_payments }} · <a href="{% url 'billing:packages' %}" style="color:inherit">packages →</a></div></div>
+  <div class="kpi"><div class="k">{{ month_label }} billed</div><div class="v">NPR {{ month_total }}</div><div class="n">Billing entries only</div></div>
+  <div class="kpi"><div class="k">Credit due from patients</div><div class="v" style="color:#b78317">NPR {{ bills_due|add:packages_due }}</div><div class="n" style="color:#b78317">Bills NPR {{ bills_due }} · packages NPR {{ packages_due }}</div></div>
 </div>
+
+{% if owed %}
+<section class="panel" style="margin-bottom:14px" id="dues">
+  <div class="panel-header"><div class="panel-title"><span class="small-icon">◔</span>Payments due (credit)</div><span class="patient-id">{{ owed|length }} bill{{ owed|length|pluralize }} · NPR {{ bills_due }}</span></div>
+  <div class="table-wrap"><table>
+    <thead><tr><th>PATIENT</th><th>INVOICE</th><th>DATE</th><th style="text-align:right">BILLED</th><th style="text-align:right">PAID</th><th style="text-align:right">DUE</th><th class="no-print"></th></tr></thead>
+    <tbody>{% for e in owed %}<tr>
+      <td>{% if e.patient %}<a href="{% url 'accounts:patient-detail' e.patient.pk %}?tab=billing" style="color:inherit;text-decoration:none">{{ e.patient_name }}</a>{% else %}{{ e.patient_name }}{% endif %}{% if e.contact_number %}<div class="patient-id">{{ e.contact_number }}</div>{% endif %}</td>
+      <td>{{ e.invoice_number }}</td><td>{{ e.entry_date|date:"M j" }}</td>
+      <td style="text-align:right">NPR {{ e.rate }}</td><td style="text-align:right">NPR {{ e.amount_paid }}</td><td style="text-align:right"><b style="color:#b78317">NPR {{ e.amount_due }}</b></td>
+      <td class="no-print"><button type="button" class="table-action" data-pay data-url="{% url 'billing:entry-payment' e.pk %}" data-name="{{ e.patient_name }}" data-due="{{ e.amount_due }}" data-invoice="{{ e.invoice_number }}">Receive payment</button></td>
+    </tr>{% endfor %}</tbody>
+  </table></div>
+</section>
+{% endif %}
 
 <section class="panel">
   <div class="panel-header"><div class="panel-title"><span class="small-icon">▣</span>Daily billing record</div><span class="patient-id">{{ selected|date:"l, F j, Y" }}</span></div>
   <div class="modes">{% for label, value in by_mode %}<span class="mode-chip">{{ label }}: NPR {{ value }}</span>{% endfor %}</div>
   <div class="table-wrap">
     <table>
-      <thead><tr><th>INVOICE</th><th>PATIENT</th><th>SERVICE</th><th>PAYMENT</th><th style="text-align:right">AMOUNT</th><th class="no-print"></th></tr></thead>
+      <thead><tr><th>INVOICE</th><th>PATIENT</th><th>SERVICE</th><th>PAYMENT</th><th style="text-align:right">AMOUNT</th><th>STATUS</th><th class="no-print"></th></tr></thead>
       <tbody>
       {% for e in entries %}
         <tr>
@@ -43,7 +58,9 @@
           <td>{{ e.service }}{% if e.notes %}<div class="patient-id">{{ e.notes }}</div>{% endif %}</td>
           <td>{{ e.get_payment_mode_display }}</td>
           <td style="text-align:right"><b>NPR {{ e.rate }}</b></td>
+          <td>{% if e.status_key == 'paid' %}<span style="color:#16834f;font-weight:700">Paid</span>{% else %}<span style="color:#b78317;font-weight:700">{{ e.status_label }}</span><div class="patient-id">NPR {{ e.amount_due }} due</div>{% endif %}</td>
           <td class="no-print"><div class="row-actions">
+            {% if e.amount_due > 0 %}<button type="button" class="table-action" data-pay data-url="{% url 'billing:entry-payment' e.pk %}" data-name="{{ e.patient_name }}" data-due="{{ e.amount_due }}" data-invoice="{{ e.invoice_number }}">Receive</button>{% endif %}
             <button type="button" class="table-action" data-edit
               data-url="{% url 'billing:entry-edit' e.pk %}" data-date="{{ e.entry_date|date:'Y-m-d' }}" data-patient="{{ e.patient_id|default_if_none:'' }}"
               data-name="{{ e.patient_name }}" data-age="{{ e.age|default_if_none:'' }}" data-sex="{{ e.sex }}" data-contact="{{ e.contact_number }}"
@@ -52,16 +69,17 @@
           </div></td>
         </tr>
       {% empty %}
-        <tr><td colspan="6" style="padding:28px;text-align:center;color:var(--muted)">Nothing billed on this day. Click <b>New entry</b> to log a payment.</td></tr>
+        <tr><td colspan="7" style="padding:28px;text-align:center;color:var(--muted)">Nothing billed on this day. Click <b>New entry</b> to log a payment.</td></tr>
       {% endfor %}
       </tbody>
-      {% if entries %}<tfoot><tr><td colspan="4" style="text-align:right;font-weight:800;padding:12px">Day total</td><td style="text-align:right;font-weight:800;padding:12px">NPR {{ total }}</td><td class="no-print"></td></tr></tfoot>{% endif %}
+      {% if entries %}<tfoot><tr><td colspan="4" style="text-align:right;font-weight:800;padding:12px">Day total billed</td><td style="text-align:right;font-weight:800;padding:12px">NPR {{ total }}</td><td colspan="2" class="no-print"></td></tr></tfoot>{% endif %}
     </table>
   </div>
 </section>
 {% endblock %}
 
 {% block modals %}
+{% include 'billing/_pay_modal.html' %}
 <div class="modal-backdrop" id="entryModal" role="dialog" aria-modal="true">
   <div class="modal-card" style="max-width:520px">
     <div class="modal-head"><h2 id="entryTitle">New billing entry</h2><button type="button" class="modal-x" data-close aria-label="Close">×</button></div>
@@ -75,7 +93,11 @@
       <div class="two"><label>Age {{ form.age }}</label><label>Sex {{ form.sex }}</label></div>
       <label>Contact number {{ form.contact_number }}</label>
       <div class="two"><label>Service {{ form.service }}</label><label>Amount (NPR) {{ form.rate }}</label></div>
-      <label>Payment mode {{ form.payment_mode }}</label>
+      <div id="payFields">
+        <div class="two"><label>Payment {{ form.payment_status }}</label><label>Payment mode {{ form.payment_mode }}</label></div>
+        <label id="receivedWrap" hidden>{{ form.amount_received.label }} {{ form.amount_received }}</label>
+        <div class="hint" id="creditHint" hidden>Left on credit: it appears under <b>Payments due</b> until the patient pays.</div>
+      </div>
       <label>Notes {{ form.notes }}</label>
       <div class="pf-actions" style="padding:10px 0 0"><button type="button" class="secondary-btn" data-close>Cancel</button><button type="submit" class="primary-btn">Save entry</button></div>
     </form>
@@ -87,12 +109,17 @@
   var form = $('entryForm');
   function f(name) { return form.elements[name]; }
   function open() { SajhyaUI.openModal('entryModal'); }
+  function syncPay() {
+    var s = f('payment_status').value;
+    $('receivedWrap').hidden = s !== 'partial'; $('creditHint').hidden = s !== 'due';
+  }
+  f('payment_status').addEventListener('change', syncPay);
   $('newEntry').addEventListener('click', function () {
-    form.reset(); form.action = form.dataset.create; $('entryTitle').textContent = 'New billing entry'; f('patient').value = ''; f('entry_date').value = "{{ selected|date:'Y-m-d' }}"; open();
+    form.reset(); form.action = form.dataset.create; $('entryTitle').textContent = 'New billing entry'; $('payFields').hidden = false; syncPay(); f('patient').value = ''; f('entry_date').value = "{{ selected|date:'Y-m-d' }}"; open();
   });
   document.querySelectorAll('[data-edit]').forEach(function (b) {
     b.addEventListener('click', function () {
-      var d = b.dataset; form.action = d.url; $('entryTitle').textContent = 'Edit billing entry';
+      var d = b.dataset; form.action = d.url; $('entryTitle').textContent = 'Edit billing entry'; $('payFields').hidden = true;
       f('patient').value = d.patient; f('patient_name').value = d.name; f('entry_date').value = d.date; f('age').value = d.age; f('sex').value = d.sex;
       f('contact_number').value = d.contact; f('service').value = d.service; f('rate').value = d.rate; f('payment_mode').value = d.mode; f('notes').value = d.notes; open();
     });

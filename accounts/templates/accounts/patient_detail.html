@@ -210,19 +210,24 @@
       <label>Date {{ bill_form.entry_date }}</label>
       <label>Service {{ bill_form.service }}</label>
       <label>Amount (NPR) {{ bill_form.rate }}</label>
+      <label>Payment {{ bill_form.payment_status }}</label>
       <label>Payment mode {{ bill_form.payment_mode }}</label>
+      <label id="billReceivedWrap" hidden>{{ bill_form.amount_received.label }} {{ bill_form.amount_received }}</label>
     </div>
+    <div class="patient-id" id="billCreditHint" hidden style="margin-top:8px">Left on credit: the amount stays due until you receive it from this tab or from Billing.</div>
     <label style="display:block;margin-top:10px">Notes {{ bill_form.notes }}</label>
+    <script>(function(){var s=document.querySelector('#patientBill [name=payment_status]');function sync(){document.getElementById('billReceivedWrap').hidden=s.value!=='partial';document.getElementById('billCreditHint').hidden=s.value!=='due';}s.addEventListener('change',sync);})();</script>
     <div style="margin-top:10px"><button type="submit" class="primary-btn">Save bill</button></div>
   </form>
   <div class="table-wrap" style="padding:0 24px 20px">
     <table>
-      <thead><tr><th>DATE</th><th>INVOICE</th><th>SERVICE</th><th>PAYMENT</th><th style="text-align:right">AMOUNT</th></tr></thead>
+      <thead><tr><th>DATE</th><th>INVOICE</th><th>SERVICE</th><th>PAYMENT</th><th style="text-align:right">AMOUNT</th><th style="text-align:right">STATUS</th></tr></thead>
       <tbody>
       {% for b in bill_entries %}
-        <tr><td>{{ b.entry_date|date:"Y-m-d" }}</td><td>{{ b.invoice_number }}</td><td>{{ b.service }}</td><td>{{ b.get_payment_mode_display }}</td><td style="text-align:right"><b>NPR {{ b.rate }}</b></td></tr>
+        <tr><td>{{ b.entry_date|date:"Y-m-d" }}</td><td>{{ b.invoice_number }}</td><td>{{ b.service }}</td><td>{{ b.get_payment_mode_display }}</td><td style="text-align:right"><b>NPR {{ b.rate }}</b></td>
+          <td style="text-align:right">{% if b.status_key == 'paid' %}<span style="color:#16834f;font-weight:700">Paid</span>{% else %}<span style="color:#b78317;font-weight:700">{{ b.status_label }} · NPR {{ b.amount_due }} due</span> <button type="button" class="table-action" data-pay data-url="{% url 'billing:entry-payment' b.pk %}" data-next="{% url 'accounts:patient-detail' patient.pk %}?tab=billing" data-name="{{ patient.name }}" data-due="{{ b.amount_due }}" data-invoice="{{ b.invoice_number }}">Receive</button>{% endif %}</td></tr>
       {% empty %}
-        <tr><td colspan="5" style="padding:22px;text-align:center;color:var(--muted)">No bills recorded for this patient yet.</td></tr>
+        <tr><td colspan="6" style="padding:22px;text-align:center;color:var(--muted)">No bills recorded for this patient yet.</td></tr>
       {% endfor %}
       </tbody>
     </table>
@@ -262,6 +267,7 @@
 {% endblock %}
 
 {% block modals %}
+{% if tab == 'billing' %}{% include 'billing/_pay_modal.html' %}{% endif %}
 {% if tab == 'profile' %}{% include 'profiles/_modals.html' %}{% endif %}
 <div class="modal-backdrop" id="visitModal" role="dialog" aria-modal="true">
   <div class="modal-card" style="max-width:460px">

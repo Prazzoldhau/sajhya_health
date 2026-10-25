@@ -1,0 +1,30 @@
+{# Receive money against a bill left on credit. Buttons: <button data-pay data-url data-name data-due data-invoice data-next>. Needs SajhyaUI. #}
+<div class="modal-backdrop" id="payModal" role="dialog" aria-modal="true">
+  <div class="modal-card" style="max-width:420px">
+    <div class="modal-head"><h2 id="payTitle">Receive payment</h2><button type="button" class="modal-x" data-close aria-label="Close">×</button></div>
+    <form method="post" id="payForm" class="mini-form">
+      {% csrf_token %}
+      <input type="hidden" name="next" id="payNext">
+      <div class="hint" id="payHint" style="margin:0 0 6px"></div>
+      <label>Amount received (NPR) {{ pay_form.amount }}</label>
+      <label>Payment mode {{ pay_form.payment_mode }}</label>
+      <label>Notes {{ pay_form.notes }}</label>
+      <div class="pf-actions" style="padding:10px 0 0"><button type="button" class="secondary-btn" data-close>Cancel</button><button type="submit" class="primary-btn">Record payment</button></div>
+    </form>
+  </div>
+</div>
+<script>
+(function () {
+  document.querySelectorAll('[data-pay]').forEach(function (b) {
+    b.addEventListener('click', function () {
+      var d = b.dataset, f = document.getElementById('payForm');
+      f.action = d.url;
+      document.getElementById('payNext').value = d.next || location.pathname + location.search;
+      document.getElementById('payTitle').textContent = 'Receive payment - ' + d.name;
+      document.getElementById('payHint').textContent = d.invoice + ' · NPR ' + d.due + ' still due. You can take part of it now.';
+      f.elements['amount'].value = d.due; f.elements['amount'].max = d.due;
+      SajhyaUI.openModal('payModal');
+    });
+  });
+})();
+</script>

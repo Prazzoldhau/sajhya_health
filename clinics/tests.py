@@ -705,3 +705,15 @@ class StaffLoginTests(Base):
         self.assertEqual(self.client.get(reverse('clinics:desk')).status_code, 404)
         self.client.logout()
         self.assertEqual(self.client.get(reverse('clinics:desk')).status_code, 302)
+
+
+class PasswordToggleTests(Base):
+    def test_every_page_with_a_password_box_loads_the_show_hide_control(self):
+        clinic = self.make_clinic()
+        for page in (self.client.get(reverse('clinics:detail', args=[clinic.pk]), {'tab': 'settings'}),
+                     self.client.get(reverse('clinics:detail', args=[clinic.pk]), {'tab': 'team'}),
+                     self.client.get(reverse('accounts:password-change'))):
+            self.assertContains(page, 'js/pw-toggle.js')
+        self.client.logout()
+        self.assertContains(self.client.get(reverse('accounts:signup-client')), 'js/pw-toggle.js')
+        self.assertContains(self.client.get(reverse('accounts:login')), 'js/pw-toggle.js')
