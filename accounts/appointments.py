@@ -255,7 +255,7 @@ def appointment_action(request, pk):
         appt.status = Appointment.ATTENDED
         appt.save(update_fields=['status'])
         _, used = record_visit(patient, profile.full_name, local_date, appt.session_type, notes=appt.notes)
-        messages.success(request, f'Marked as attended - visit recorded for {patient.name}.' + (' One package session used.' if used else ''))
+        messages.success(request, f'Marked as attended - session recorded for {patient.name}.' + (' One package session used.' if used else ''))
     elif action == 'cancel' and appt.kind == Appointment.APPOINTMENT:
         appt.status = Appointment.CANCELLED
         appt.save(update_fields=['status'])

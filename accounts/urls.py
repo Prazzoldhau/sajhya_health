@@ -3,7 +3,7 @@ from django.contrib.auth.decorators import login_required
 from django.urls import path
 from django.views.generic import TemplateView
 
-from . import appointments, plans, report_views, settings_views, views
+from . import appointments, plans, report_views, settings_views, treatments, views
 from .forms import StyledAuthenticationForm
 from . import auth_views as password_views
 
@@ -31,6 +31,7 @@ urlpatterns = [
     path('patients/<int:pk>/edit/', views.patient_edit, name='patient-edit'),
     path('patients/<int:pk>/photo/<str:version>/', views.patient_photo, name='patient-photo'),
     path('patients/<int:pk>/photo/', views.patient_photo_update, name='patient-photo-update'),
+    path('patients/treatments/search/', treatments.treatment_search, name='treatment-search'),
     path('patients/<int:pk>/visit/add/', views.patient_visit_add, name='patient-visit-add'),
     path('patients/<int:pk>/notes/', views.patient_notes, name='patient-notes'),
     path('patients/<int:pk>/next-visit/', views.patient_next_visit, name='patient-next-visit'),

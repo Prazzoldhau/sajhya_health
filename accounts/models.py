@@ -268,6 +268,24 @@ class Visit(models.Model):
         return f'{self.patient.name} - {self.date}'
 
 
+class VisitTreatment(models.Model):
+    """One treatment given during a session: an electrotherapy / clinical intervention, or an exercise from the library."""
+    CLINICAL, EXERCISE = 'clinical', 'exercise'
+    KIND_CHOICES = [(CLINICAL, 'Clinical / electrotherapy'), (EXERCISE, 'Exercise')]
+
+    visit = models.ForeignKey(Visit, on_delete=models.CASCADE, related_name='treatments')
+    kind = models.CharField(max_length=10, choices=KIND_CHOICES, default=CLINICAL)
+    name = models.CharField(max_length=200)
+    dosage = models.CharField(max_length=100, blank=True)  # e.g. "15 min", "10 reps x 3 sets"
+    order = models.PositiveSmallIntegerField(default=0)
+
+    class Meta:
+        ordering = ['order', 'id']
+
+    def __str__(self):
+        return f'{self.name} ({self.visit})'
+
+
 class Icd10Code(models.Model):
     """WHO ICD-10 reference list, searched when a clinician records a diagnosis.
     Loaded with `manage.py load_icd10`."""

@@ -177,3 +177,42 @@ class TaskTests(TestCase):
         other.force_login(stranger)
         self.assertEqual(other.post(reverse('accounts:task-delete', args=[task.pk])).status_code, 404)
         self.assertTrue(Task.objects.filter(pk=task.pk).exists())
+
+
+class SessionTreatmentTests(TestCase):
+    def setUp(self):
+        self.user, self.profile = make_professional()
+        self.client.force_login(self.user)
+        self.patient = make_patient(self.profile)
+
+    def post(self, treatments, **extra):
+        import json
+        return self.client.post(reverse('accounts:patient-visit-add', args=[self.patient.pk]), {
+            'date': timezone.localdate().isoformat(), 'session_type': 'treatment', 'progress': 'improving', 'notes': 'Good', 'treatments': json.dumps(treatments), **extra})
+
+    def test_a_session_records_the_treatments_given(self):
+        r = self.post([{'kind': 'clinical', 'name': 'TENS (pain relief)', 'dosage': '15 min'}, {'kind': 'exercise', 'name': 'Bridging', 'dosage': '3 x 10'}, {'kind': 'bogus', 'name': '  Custom  ', 'dosage': ''}, {'name': ''}])
+        self.assertEqual(r.status_code, 302)
+        visit = Visit.objects.get()
+        self.assertEqual([(t.kind, t.name, t.dosage) for t in visit.treatments.all()], [('clinical', 'TENS (pain relief)', '15 min'), ('exercise', 'Bridging', '3 x 10'), ('clinical', 'Custom', '')])
+        tab = self.client.get(reverse('accounts:patient-detail', args=[self.patient.pk]), {'tab': 'visits'})
+        self.assertContains(tab, 'TENS (pain relief)')
+        self.assertContains(tab, 'Record Session')
+        self.assertNotContains(tab, 'Record Visit')
+        self.assertContains(self.client.get(reverse('accounts:patient-detail', args=[self.patient.pk])), 'Recent Sessions')
+
+    def test_bad_treatment_data_never_blocks_the_session(self):
+        self.post('not json')
+        self.post({'name': 'x'})
+        self.post([{'name': 'N' * 500, 'dosage': 'D' * 500}] * 40)
+        self.assertEqual(Visit.objects.count(), 3)
+        self.assertEqual(Visit.objects.order_by('id').last().treatments.count(), 30)  # capped
+        self.assertEqual(max(len(t.name) for t in Visit.objects.order_by('id').last().treatments.all()), 200)
+
+    def test_search_finds_electrotherapy_and_the_exercise_library(self):
+        r = self.client.get(reverse('accounts:treatment-search'), {'q': 'tens'})
+        self.assertIn('TENS (pain relief)', [x['name'] for x in r.json()['results']])
+        self.assertEqual(self.client.get(reverse('accounts:treatment-search'), {'q': ''}).json()['results'], [])
+        self.assertEqual(self.client.get(reverse('accounts:treatment-search'), {'q': 'electro'}).json()['results'][0]['group'], 'Electrotherapy')
+        self.client.logout()
+        self.assertEqual(self.client.get(reverse('accounts:treatment-search'), {'q': 'tens'}).status_code, 302)

@@ -61,7 +61,7 @@
     <a href="?tab=assessments" class="{% if tab == 'assessments' %}on{% endif %}">Assessments</a>
     <a href="?tab=profile" class="{% if tab == 'profile' %}on{% endif %}">Profile</a>
     <a href="?tab=exercises" class="{% if tab == 'exercises' %}on{% endif %}">Exercises</a>
-    <a href="?tab=visits" class="{% if tab == 'visits' %}on{% endif %}">Visits</a>
+    <a href="?tab=visits" class="{% if tab == 'visits' %}on{% endif %}">Sessions</a>
     <a href="?tab=billing" class="{% if tab == 'billing' %}on{% endif %}">Billing</a>
     <a href="?tab=notes" class="{% if tab == 'notes' %}on{% endif %}">Notes</a>
     <a href="?tab=documents" class="{% if tab == 'documents' %}on{% endif %}">Documents</a>
@@ -75,15 +75,15 @@
     <div class="info-card"><div class="k">Next Appointment</div><div class="v">{% if patient.next_appointment %}▦ {{ patient.next_appointment|date:"Y-m-d" }}{% else %}Not booked{% endif %}</div></div>
   </div>
 
-  <div class="section-title"><span class="bar">Recent Visits</span><a class="text-link" href="?tab=visits" style="text-decoration:none">View all</a></div>
+  <div class="section-title"><span class="bar">Recent Sessions</span><a class="text-link" href="?tab=visits" style="text-decoration:none">View all</a></div>
   <div class="table-wrap" style="padding:0 24px 16px">
     <table>
-      <thead><tr><th>DATE</th><th>THERAPIST</th><th>SESSION TYPE</th><th>PROGRESS</th></tr></thead>
+      <thead><tr><th>DATE</th><th>THERAPIST</th><th>SESSION TYPE</th><th>TREATMENT GIVEN</th><th>PROGRESS</th></tr></thead>
       <tbody>
       {% for v in recent_visits %}
-        <tr><td>{{ v.date|date:"Y-m-d" }}</td><td><b>{{ v.therapist }}</b></td><td>{{ v.get_session_type_display }}</td><td>{% if v.progress %}<span class="status {{ v.progress }}">{{ v.get_progress_display }}</span>{% else %}-{% endif %}</td></tr>
+        <tr><td>{{ v.date|date:"Y-m-d" }}</td><td><b>{{ v.therapist }}</b></td><td>{{ v.get_session_type_display }}</td><td style="white-space:normal;max-width:260px">{% for t in v.treatments.all %}{{ t.name }}{% if not forloop.last %}, {% endif %}{% empty %}-{% endfor %}</td><td>{% if v.progress %}<span class="status {{ v.progress }}">{{ v.get_progress_display }}</span>{% else %}-{% endif %}</td></tr>
       {% empty %}
-        <tr><td colspan="4" class="empty" style="padding:22px;text-align:center;color:var(--muted)">No visits recorded yet.</td></tr>
+        <tr><td colspan="5" class="empty" style="padding:22px;text-align:center;color:var(--muted)">No sessions recorded yet.</td></tr>
       {% endfor %}
       </tbody>
     </table>
@@ -157,15 +157,15 @@
   </div>
 
   {% elif tab == 'visits' %}
-  <div class="section-title" style="padding-top:18px"><span class="bar">All Visits</span><button type="button" class="primary-btn" data-open="visitModal" style="height:34px">＋ Add Visit</button></div>
+  <div class="section-title" style="padding-top:18px"><span class="bar">All Sessions</span><button type="button" class="primary-btn" data-open="visitModal" style="height:34px">＋ Add Session</button></div>
   <div class="table-wrap" style="padding:0 24px 20px">
     <table>
-      <thead><tr><th>DATE</th><th>THERAPIST</th><th>SESSION TYPE</th><th>PROGRESS</th><th>NOTES</th></tr></thead>
+      <thead><tr><th>DATE</th><th>THERAPIST</th><th>SESSION TYPE</th><th>TREATMENT GIVEN</th><th>PROGRESS</th><th>NOTES</th></tr></thead>
       <tbody>
       {% for v in visits %}
-        <tr><td>{{ v.date|date:"Y-m-d" }}</td><td><b>{{ v.therapist }}</b></td><td>{{ v.get_session_type_display }}</td><td>{% if v.progress %}<span class="status {{ v.progress }}">{{ v.get_progress_display }}</span>{% else %}-{% endif %}</td><td style="white-space:normal;max-width:300px">{{ v.notes|default:"-" }}</td></tr>
+        <tr><td>{{ v.date|date:"Y-m-d" }}</td><td><b>{{ v.therapist }}</b></td><td>{{ v.get_session_type_display }}</td><td style="white-space:normal;max-width:280px">{% for t in v.treatments.all %}<div><b>{{ t.name }}</b>{% if t.dosage %} <span class="patient-id">{{ t.dosage }}</span>{% endif %}</div>{% empty %}-{% endfor %}</td><td>{% if v.progress %}<span class="status {{ v.progress }}">{{ v.get_progress_display }}</span>{% else %}-{% endif %}</td><td style="white-space:normal;max-width:300px">{{ v.notes|default:"-" }}</td></tr>
       {% empty %}
-        <tr><td colspan="5" style="padding:22px;text-align:center;color:var(--muted)">No visits recorded yet.</td></tr>
+        <tr><td colspan="6" style="padding:22px;text-align:center;color:var(--muted)">No sessions recorded yet.</td></tr>
       {% endfor %}
       </tbody>
     </table>
@@ -277,18 +277,71 @@
 <script>document.querySelectorAll('[data-cancel-bill]').forEach(function (fm) { fm.addEventListener('submit', function (ev) { var r = prompt('Cancel this bill? It stays on record but no longer counts.\nReason (optional):'); if (r === null) { ev.preventDefault(); return; } fm.elements['reason'].value = r; }); });</script>{% endif %}
 {% if tab == 'profile' %}{% include 'profiles/_modals.html' %}{% endif %}
 <div class="modal-backdrop" id="visitModal" role="dialog" aria-modal="true">
-  <div class="modal-card" style="max-width:460px">
-    <div class="modal-head"><h2>Record Visit</h2><button type="button" class="modal-x" data-close aria-label="Close">×</button></div>
+  <div class="modal-card" style="max-width:560px">
+    <div class="modal-head"><h2>Record Session</h2><button type="button" class="modal-x" data-close aria-label="Close">×</button></div>
     <form method="post" action="{% url 'accounts:patient-visit-add' patient.pk %}" class="mini-form">
       {% csrf_token %}
       <label>Date {{ visit_form.date }}</label>
       <label>Session type {{ visit_form.session_type }}</label>
       <label>Progress {{ visit_form.progress }}</label>
+      <div class="tx-box">
+        <div class="tx-title">Treatment given <span class="patient-id">search electrotherapy, manual therapy or exercises, then add</span></div>
+        <div class="tx-chips"><button type="button" class="chip" data-tx-quick="TENS (pain relief)|clinical|15-20 min">＋ TENS</button><button type="button" class="chip" data-tx-quick="IFC / Interferential current|clinical|15-20 min">＋ IFC</button><button type="button" class="chip" data-tx-quick="Therapeutic ultrasound|clinical|5-8 min">＋ Ultrasound</button><button type="button" class="chip" data-tx-quick="Hot pack|clinical|15 min">＋ Hot pack</button><button type="button" class="chip" data-tx-quick="Strengthening exercises|clinical|3 x 10">＋ Exercises</button></div>
+        <span style="position:relative;display:block"><input type="search" id="txSearch" placeholder="Search treatments or exercises (e.g. TENS, ultrasound, bridging)..." autocomplete="off"></span>
+        <div id="txList"></div>
+        <input type="hidden" name="treatments" id="txJson" value="[]">
+      </div>
       <label>Notes {{ visit_form.notes }}</label>
-      <div class="pf-actions" style="padding:10px 0 0"><button type="button" class="secondary-btn" data-close>Cancel</button><button type="submit" class="primary-btn">Save Visit</button></div>
+      <div class="pf-actions" style="padding:10px 0 0"><button type="button" class="secondary-btn" data-close>Cancel</button><button type="submit" class="primary-btn">Save Session</button></div>
     </form>
   </div>
 </div>
+<style>
+  .tx-box { border: 1px solid var(--line); border-radius: 10px; padding: 10px 12px; background: #f6faf7; display: grid; gap: 8px; }
+  .tx-title { font-size: 12px; font-weight: 800; color: var(--green-dark); }
+  .tx-chips { display: flex; gap: 6px; flex-wrap: wrap; }
+  .tx-chips .chip { border: 1px solid #cfe6d8; background: #fff; border-radius: 14px; padding: 4px 10px; font-size: 11px; font-weight: 700; color: var(--green-dark); }
+  .tx-row { display: grid; grid-template-columns: 1fr 130px auto; gap: 6px; align-items: center; background: #fff; border: 1px solid var(--line); border-radius: 8px; padding: 6px 8px; }
+  .tx-row .tx-name { font-weight: 700; font-size: 12.5px; } .tx-row .tx-kind { font-size: 10px; color: var(--muted); display: block; }
+  .tx-row input { height: 32px; border: 1px solid var(--line); border-radius: 6px; padding: 0 8px; width: 100%; }
+  .tx-row button { border: 0; background: transparent; color: #9aaca1; font-size: 16px; }
+</style>
+<script>
+(function () {
+  var list = document.getElementById('txList'), json = document.getElementById('txJson'), input = document.getElementById('txSearch');
+  if (!list || !window.SajhyaUI) return;
+  var rows = [];
+  function sync() { json.value = JSON.stringify(rows); }
+  function draw() {
+    list.innerHTML = '';
+    rows.forEach(function (r, i) {
+      var row = document.createElement('div'); row.className = 'tx-row';
+      var name = document.createElement('div'); name.innerHTML = '<span class="tx-name">' + SajhyaUI.esc(r.name) + '</span><span class="tx-kind">' + (r.kind === 'exercise' ? 'Exercise' : 'Clinical / electrotherapy') + '</span>';
+      var dose = document.createElement('input'); dose.placeholder = 'Dose / duration'; dose.value = r.dosage || '';
+      dose.addEventListener('input', function () { r.dosage = dose.value; sync(); });
+      dose.addEventListener('keydown', function (e) { if (e.key === 'Enter') e.preventDefault(); });
+      var del = document.createElement('button'); del.type = 'button'; del.textContent = '×'; del.setAttribute('aria-label', 'Remove');
+      del.addEventListener('click', function () { rows.splice(i, 1); draw(); });
+      row.appendChild(name); row.appendChild(dose); row.appendChild(del); list.appendChild(row);
+    });
+    sync();
+  }
+  function add(kind, name, dosage) {
+    name = (name || '').trim(); if (!name) return;
+    if (!rows.some(function (r) { return r.name.toLowerCase() === name.toLowerCase(); })) rows.push({ kind: kind, name: name, dosage: dosage || '' });
+    input.value = ''; draw();
+  }
+  SajhyaUI.picker(input, {
+    url: "{% url 'accounts:treatment-search' %}", minChars: 1, emptyText: 'No match - press Enter to add what you typed',
+    render: function (r) { return '<b>' + SajhyaUI.esc(r.name) + '</b> <span style="color:#7c9186">' + SajhyaUI.esc(r.group) + (r.dose ? ' · ' + SajhyaUI.esc(r.dose) : '') + '</span>'; },
+    onPick: function (r) { add(r.kind, r.name, r.dose); },
+  });
+  input.addEventListener('keydown', function (e) { if (e.key === 'Enter') { e.preventDefault(); if (input.value.trim()) add('clinical', input.value, ''); } });  // anything typed that is not in the list
+  document.querySelectorAll('[data-tx-quick]').forEach(function (b) {
+    b.addEventListener('click', function () { var p = b.dataset.txQuick.split('|'); add(p[1], p[0], p[2]); });
+  });
+})();
+</script>
 <div class="modal-backdrop" id="photoModal" role="dialog" aria-modal="true">
   <div class="modal-card" style="max-width:400px">
     <div class="modal-head"><h2>Profile picture</h2><button type="button" class="modal-x" data-close aria-label="Close">×</button></div>

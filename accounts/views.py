@@ -18,6 +18,7 @@ from sajhya_health.throttle import too_many
 from .access import can_see_contact, first_error, own_patient, own_profile, staff_required, workspace_context, workspace_profile
 from .services import record_visit
 from .forms import SUBTYPES, STEP_FORMS, STEP_TITLES, NextVisitForm, PatientEditForm, PatientForm, PatientNotesForm, PatientPhotoForm, ProfilePictureForm, SignupForm, VisitForm
+from .treatments import parse_treatments
 from billing.forms import BillCorrectionForm, EntryPaymentForm, PackagePaymentForm, PatientBillForm
 from .models import Account, Appointment, Icd10Code, Patient, ProfessionalProfile, Visit
 
@@ -345,8 +346,8 @@ def patient_detail(request, pk):
     context.update({
         'active': 'patients', 'patient': patient, 'tab': tab, 'show_contact': can_see_contact(profile, patient),
         'session_count': patient.visits.count(),
-        'recent_visits': patient.visits.all()[:3],
-        'visits': patient.visits.all() if tab == 'visits' else None,
+        'recent_visits': patient.visits.prefetch_related('treatments')[:3],
+        'visits': patient.visits.prefetch_related('treatments') if tab == 'visits' else None,
         'plans': patient.plans.prefetch_related('phases') if tab == 'plan' else None,
         'prescriptions': patient.prescriptions.prefetch_related('exercises__exercise__step_images', 'exercises__feedback_logs') if tab == 'exercises' else None,
         'bill_entries': patient.billing_entries.all()[:50] if tab == 'billing' else None,
@@ -399,10 +400,11 @@ def patient_visit_add(request, pk):
         form = VisitForm(request.POST)
         if form.is_valid():
             data = form.cleaned_data
-            _, used = record_visit(patient, profile.full_name, data['date'], data['session_type'], data['progress'], data['notes'])
-            messages.success(request, 'Visit recorded.' + (' One package session used.' if used else ''))
+            given = parse_treatments(request.POST.get('treatments'))
+            _, used = record_visit(patient, profile.full_name, data['date'], data['session_type'], data['progress'], data['notes'], given)
+            messages.success(request, 'Session recorded' + (f' with {len(given)} treatment{"s" if len(given) != 1 else ""}.' if given else '.') + (' One package session used.' if used else ''))
         else:
-            messages.error(request, 'Could not save the visit - check the date and session type.')
+            messages.error(request, 'Could not save the session - check the date and session type.')
     return redirect('accounts:patient-detail', pk=patient.pk)
 
 
