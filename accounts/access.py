@@ -57,7 +57,7 @@ def own_patient(request, pk):
 def can_see_contact(profile, patient):
     """Phone, email and address of a clinic-registered patient are for the clinic owner only; everyone else sees them
     only on patients that are not tied to a clinic."""
-    return patient.clinic_id is None or patient.clinic.owner_id == profile.pk
+    return patient.clinic_id is None or profile.pk in (patient.clinic.owner_id, patient.clinic.workspace_id)
 
 
 def first_error(form, default='Please check the form.'):
@@ -72,6 +72,6 @@ def workspace_context(user, profile):
     display_name = profile.full_name or user.get_username()
     initials = ''.join(p[0] for p in (profile.first_name, profile.last_name) if p).upper() or user.get_username()[:2].upper()
     from clinics.models import ClinicMember
-    return {'profile': profile, 'display_name': display_name, 'first_name': profile.first_name,
+    return {'workspace_clinic': getattr(profile, 'clinic_workspace', None), 'profile': profile, 'display_name': display_name, 'first_name': profile.first_name,
             'initials': initials, 'role': profile.account.profession or profile.title,
             'clinic_invites': ClinicMember.objects.filter(physio=profile, status=ClinicMember.INVITED).count()}

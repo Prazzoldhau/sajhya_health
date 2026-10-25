@@ -3,7 +3,7 @@ import datetime
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.db.models import Count, Q
-from django.http import JsonResponse
+from django.http import Http404, JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
 from django.utils import timezone
@@ -13,7 +13,8 @@ from accounts.access import first_error, require_workspace, workspace_context, w
 from accounts.models import Patient, ProfessionalProfile, Visit
 
 from .access import clinic_allowance, clinic_for_member, clinic_for_owner
-from .forms import ClinicForm, StaffForm
+from .forms import ClinicForm, ClinicLoginForm, StaffForm
+from .login import set_clinic_login
 from .models import Clinic, ClinicMember, ClinicSubscription, QueueEntry
 
 TABS = [('overview', 'Overview'), ('team', 'Team'), ('patients', 'Patients'), ('queue', 'Queue'), ('settings', 'Clinic details')]
@@ -44,6 +45,9 @@ def hub(request):
     profile = workspace_profile(request)
     if profile is None:
         return redirect('accounts:welcome')
+    own = Clinic.objects.filter(workspace=profile).first()
+    if own:  # the clinic's own login has one clinic: go straight to it
+        return redirect('clinics:detail', pk=own.pk)
     from billing.models import Plan
     sub = ClinicSubscription.objects.filter(professional=profile).first()
     owned = profile.owned_clinics.annotate(team=Count('members', filter=Q(members__status=ClinicMember.ACTIVE), distinct=True),
@@ -66,6 +70,8 @@ def clinic_create(request):
     """Register a clinic: the full profile form. Submitting it also requests the Clinic plan (staff activate it), then the
     owner lands on the clinic dashboard."""
     profile = require_workspace(request)
+    if Clinic.objects.filter(workspace=profile).exists():
+        return redirect('clinics:hub')
     if profile.owned_clinics.count() >= clinic_allowance(profile):
         messages.info(request, 'You have reached the number of clinics your plan allows. Contact us to add more.')
         return redirect('clinics:hub')
@@ -91,12 +97,12 @@ def clinic_create(request):
     return render(request, 'clinics/create.html', context)
 
 
-def _detail_context(request, profile, clinic, is_owner, tab, form=None):
+def _detail_context(request, profile, clinic, is_owner, tab, form=None, login_form=None):
     q = request.GET.get('q', '').strip()
     context = workspace_context(request.user, profile)
     tabs = [t for t in TABS if is_owner or t[0] != 'settings']
     others = (Clinic.objects.filter(is_active=True).exclude(pk=clinic.pk)
-              .filter(Q(owner=profile) | Q(members__physio=profile, members__status=ClinicMember.ACTIVE)).distinct().order_by('name'))
+              .filter(Q(owner=profile) | Q(workspace=profile) | Q(members__physio=profile, members__status=ClinicMember.ACTIVE)).distinct().order_by('name'))
     context.update({'active': 'clinics', 'clinic': clinic, 'is_owner': is_owner, 'tab': tab, 'usable': clinic.is_usable,
                     'tabs': tabs, 'nav_items': [(key, label, TAB_ICONS[key]) for key, label in tabs], 'switch_clinics': others})
     start, end = _today()
@@ -126,7 +132,8 @@ def _detail_context(request, profile, clinic, is_owner, tab, form=None):
     elif tab == 'queue':
         context.update({'entries': todays.exclude(status=QueueEntry.CANCELLED)})
     elif tab == 'settings':
-        context.update({'form': form or ClinicForm(instance=clinic)})
+        context.update({'form': form or ClinicForm(instance=clinic),
+                        'login_form': login_form or (ClinicLoginForm(clinic=clinic) if clinic.owner_id == profile.pk else None)})
     return context
 
 
@@ -153,6 +160,21 @@ def clinic_update(request, pk):
     return render(request, 'clinics/detail.html', _detail_context(request, profile, clinic, True, 'settings', form=form))
 
 
+@login_required
+@require_POST
+def clinic_login(request, pk):
+    """The owner sets (or changes) the username and password the clinic itself signs in with."""
+    profile, clinic = clinic_for_owner(request, pk)
+    if clinic.owner_id != profile.pk:  # the clinic's own login cannot rename or lock itself out; only the owning physiotherapist can
+        raise Http404
+    form = ClinicLoginForm(request.POST, clinic=clinic)
+    if form.is_valid():
+        set_clinic_login(clinic, form.cleaned_data['username'], form.cleaned_data['password1'])
+        messages.success(request, f'Clinic login saved. {clinic.name} signs in with the username "{form.cleaned_data["username"]}".')
+        return _back(clinic, 'settings')
+    return render(request, 'clinics/detail.html', _detail_context(request, profile, clinic, True, 'settings', login_form=form))
+
+
 def _plan_needed(request, clinic):
     """Team and queue work once the Clinic plan is active; until then send the owner back with an explanation."""
     if clinic.is_usable:
@@ -168,7 +190,7 @@ def _plan_needed(request, clinic):
 def physio_search(request):
     """Owner's type-ahead: only physios whose credentials are verified can be found."""
     profile = require_workspace(request)
-    clinic = get_object_or_404(Clinic, pk=request.GET.get('clinic', 0), owner=profile)
+    clinic = get_object_or_404(Clinic.objects.filter(Q(owner=profile) | Q(workspace=profile)), pk=request.GET.get('clinic', 0))
     q = request.GET.get('q', '').strip()
     if len(q) < 2:
         return JsonResponse({'results': []})

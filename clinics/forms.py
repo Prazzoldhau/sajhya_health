@@ -146,3 +146,42 @@ class StaffForm(forms.ModelForm):
 
     def clean_name(self):
         return self.cleaned_data['name'].strip()
+
+
+class ClinicLoginForm(forms.Form):
+    """The owner chooses the sign-in the clinic itself uses (a shared front-desk login), separate from their own."""
+    username = forms.CharField(max_length=150, label='Clinic username', help_text='Letters, digits and @ . + - _ only. The clinic signs in with this.')
+    password1 = forms.CharField(label='Clinic password', widget=forms.PasswordInput(attrs={'autocomplete': 'new-password'}), strip=False)
+    password2 = forms.CharField(label='Repeat the password', widget=forms.PasswordInput(attrs={'autocomplete': 'new-password'}), strip=False)
+
+    def __init__(self, *args, clinic, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.clinic = clinic
+        if clinic.workspace_id:
+            self.fields['username'].initial = clinic.workspace.account.user.get_username()
+
+    def clean_username(self):
+        from django.contrib.auth.models import User
+        from django.contrib.auth.validators import UnicodeUsernameValidator
+        username = self.cleaned_data['username'].strip()
+        UnicodeUsernameValidator()(username)
+        taken = User.objects.filter(username__iexact=username)
+        if self.clinic.workspace_id:
+            taken = taken.exclude(pk=self.clinic.workspace.account.user_id)
+        if taken.exists():
+            raise ValidationError('That username is already taken. Choose another.')
+        return username
+
+    def clean(self):
+        data = super().clean()
+        if data.get('password1') and data['password1'] != data.get('password2'):
+            self.add_error('password2', 'The two passwords do not match.')
+        elif data.get('password1'):
+            from django.contrib.auth.models import User
+            from django.contrib.auth.password_validation import validate_password
+            candidate = User(username=data.get('username', ''))
+            try:
+                validate_password(data['password1'], candidate)
+            except ValidationError as exc:
+                self.add_error('password1', exc)
+        return data

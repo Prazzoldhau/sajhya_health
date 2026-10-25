@@ -12,6 +12,7 @@ urlpatterns = [
     path('invitations/<int:member_id>/respond/', views.invitation_respond, name='invitation-respond'),
     path('<int:pk>/', views.clinic_detail, name='detail'),
     path('<int:pk>/update/', views.clinic_update, name='update'),
+    path('<int:pk>/login/', views.clinic_login, name='login'),
     path('<int:pk>/leave/', views.leave, name='leave'),
     path('<int:pk>/team/invite/', views.member_invite, name='invite'),
     path('<int:pk>/team/staff/', views.staff_add, name='staff-add'),

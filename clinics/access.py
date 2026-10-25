@@ -18,7 +18,7 @@ def _plan_is_active():
 def clinics_of(profile):
     """Usable clinics this professional owns or belongs to as an active physio (used for tagging patients)."""
     return Clinic.objects.filter(is_active=True).filter(_plan_is_active()).filter(
-        Q(owner=profile) | Q(members__physio=profile, members__status=ClinicMember.ACTIVE)).distinct()
+        Q(owner=profile) | Q(workspace=profile) | Q(members__physio=profile, members__status=ClinicMember.ACTIVE)).distinct()
 
 
 def resolve_clinic(profile, value):
@@ -38,7 +38,7 @@ def clinic_for_member(request, pk):
     """(profile, clinic, is_owner) for the owner or an active physio of the clinic; 404 for anyone else."""
     profile = require_workspace(request)
     clinic = get_object_or_404(Clinic, pk=pk)
-    if clinic.owner_id == profile.pk:
+    if clinic.owner_id == profile.pk or clinic.workspace_id == profile.pk:  # the clinic's own login runs the clinic like its owner
         return profile, clinic, True
     if clinic.is_active and clinic.members.filter(physio=profile, status=ClinicMember.ACTIVE).exists():
         return profile, clinic, False
@@ -47,4 +47,4 @@ def clinic_for_member(request, pk):
 
 def clinic_for_owner(request, pk):
     profile = require_workspace(request)
-    return profile, get_object_or_404(Clinic, pk=pk, owner=profile)
+    return profile, get_object_or_404(Clinic.objects.filter(Q(owner=profile) | Q(workspace=profile)), pk=pk)

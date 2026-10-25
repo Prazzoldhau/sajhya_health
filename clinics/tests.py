@@ -541,3 +541,65 @@ class ClinicWorkspaceTests(Base):
         self.assertContains(page, '<span class="nav-text">Team</span>')
         self.assertNotContains(page, '<span class="nav-text">Clinic details</span>')
 
+
+class ClinicLoginTests(Base):
+    LOGIN = {'username': 'himal-desk', 'password1': PASSWORD, 'password2': PASSWORD}
+
+    def set_login(self, clinic, **extra):
+        return self.client.post(reverse('clinics:login', args=[clinic.pk]), {**self.LOGIN, **extra})
+
+    def test_owner_sets_the_clinic_login_and_the_clinic_gets_a_full_workspace_of_its_own(self):
+        clinic = self.make_clinic()
+        self.assertContains(self.client.get(reverse('clinics:detail', args=[clinic.pk]), {'tab': 'settings'}), 'Create clinic login')
+        r = self.set_login(clinic)
+        self.assertRedirects(r, reverse('clinics:detail', args=[clinic.pk]) + '?tab=settings', fetch_redirect_response=False)
+        clinic.refresh_from_db()
+        self.assertEqual((clinic.workspace.account.user.username, clinic.workspace.status, clinic.workspace.account.account_type), ('himal-desk', 'approved', 'clinic'))
+        self.assertTrue(clinic.workspace.account.user.check_password(self.LOGIN['password1']))
+
+        self.client.logout()
+        self.assertTrue(self.client.login(username='himal-desk', password=self.LOGIN['password1']))
+        for name in ('accounts:dashboard', 'accounts:patients', 'accounts:appointments', 'accounts:plans', 'billing:billing', 'accounts:reports', 'exercises:library'):
+            self.assertEqual(self.client.get(reverse(name)).status_code, 200, name)
+        sidebar = self.client.get(reverse('accounts:dashboard'))
+        self.assertContains(sidebar, 'Clinic &amp; team')
+        self.assertContains(self.client.get(reverse('clinics:detail', args=[clinic.pk])), 'Himal Clinic')
+
+    def test_patients_added_by_the_clinic_login_belong_to_the_clinic_and_are_seen_by_its_team(self):
+        clinic = self.make_clinic()
+        self.set_login(clinic)
+        guest_user, guest = make_professional('guest')
+        ClinicMember.objects.create(clinic=clinic, physio=guest, role=ClinicMember.PHYSIO, status=ClinicMember.ACTIVE)
+        self.as_user('himal-desk')
+        r = self.client.post(reverse('accounts:patient-add'), {'name': 'Front Desk Patient', 'phone': '9841111111', 'gender': 'F', 'date_of_birth': '1990-01-02'})
+        self.assertEqual(r.status_code, 302)
+        clinic.refresh_from_db()
+        patient = Patient.objects.get(name='Front Desk Patient')
+        self.assertEqual((patient.clinic, patient.professional), (clinic, clinic.workspace))
+        self.as_user('guest')
+        self.assertEqual(self.client.get(reverse('accounts:patient-detail', args=[patient.pk])).status_code, 200)
+
+    def test_only_the_owning_physio_can_change_the_login_and_usernames_are_unique(self):
+        clinic = self.make_clinic()
+        self.assertEqual(self.set_login(clinic, username='owner').context['login_form'].errors['username'][0], 'That username is already taken. Choose another.')
+        self.assertEqual(self.set_login(clinic, password2='different').context['login_form'].errors['password2'][0], 'The two passwords do not match.')
+        self.assertEqual(self.set_login(clinic, password1='short', password2='short').status_code, 200)
+        clinic.refresh_from_db()
+        self.assertIsNone(clinic.workspace_id)
+        self.set_login(clinic)
+        self.set_login(clinic, username='himal-new', password1='An0ther!Desk-Pass-88', password2='An0ther!Desk-Pass-88')  # changing it later keeps the same workspace
+        clinic.refresh_from_db()
+        self.assertEqual(clinic.workspace.account.user.username, 'himal-new')
+        self.client.logout()
+        self.assertTrue(self.client.login(username='himal-new', password='An0ther!Desk-Pass-88'))  # the clinic's own login cannot rename itself
+        self.assertEqual(self.set_login(clinic, username='sneaky').status_code, 404)
+        stranger, _ = make_professional('stranger')
+        self.as_user('stranger')
+        self.assertEqual(self.set_login(clinic).status_code, 404)
+
+    def test_add_team_lives_in_an_actions_menu_with_both_forms(self):
+        clinic = self.make_clinic()
+        page = self.client.get(reverse('clinics:detail', args=[clinic.pk]), {'tab': 'team'})
+        self.assertContains(page, 'data-open="addTeamModal"')
+        self.assertContains(page, reverse('clinics:invite', args=[clinic.pk]))
+        self.assertContains(page, reverse('clinics:staff-add', args=[clinic.pk]))

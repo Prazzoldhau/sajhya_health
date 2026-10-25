@@ -43,6 +43,23 @@ Code: the `clinics` app. Ported from the old project's `clinic_account` app, wit
 9. **Queue**: add one of the *clinic's* patients to today's queue, **Call in**, **Done**, **Cancel**; every team member can work
    it. The queue search returns names and IDs only.
 
+## The clinic's own login and workspace
+
+Each clinic can have a sign-in of its own, chosen by the **owning physiotherapist** (Clinic workspace > *Clinic details* > *Clinic login*: a username and
+a password; they can change both at any time, and only they can).
+
+- The clinic login is a normal user (account type *clinic*) whose workspace profile belongs to the clinic. It opens the **full professional workspace**:
+  Dashboard, Patients, Appointments, Treatment plans, Exercise library, Billing, Reports, Settings - all with the clinic's **own** data, separate from the
+  physiotherapist's. Assessments, SOAP notes and results work from the clinic's patients.
+- The sidebar has **Clinic & team**, which opens the clinic workspace (Overview, Team, Patients, Queue, Clinic details). The clinic login runs the clinic like
+  its owner does (team, queue, details), except that it cannot change its own username/password.
+- Patients added by the clinic login are registered **under the clinic**: they count toward the monthly cap, the team sees them, and the clinic plan covers them
+  (no personal 10-free-patient limit applies to a clinic login).
+- The physiotherapist keeps their own workspace and sees the clinic from *Clinic Connect* as before. Staff can switch clinics from the clinic sidebar.
+- Technical: `Clinic.workspace` points to the clinic's `ProfessionalProfile` (created by `clinics/login.py`); `clinics_of()` and `clinic_for_member()` treat it as the owner.
+
+In the clinic's *Team* tab, adding people is under **Actions > Add team**: one window with a *Physiotherapist* form (invitation) and a *Staff* form.
+
 ## Privacy rules (deliberate)
 
 - **Clinic patients are shared by the clinic team** (owner + active physios), and only by them. Nobody else can open them (404).

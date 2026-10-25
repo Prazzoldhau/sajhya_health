@@ -73,6 +73,8 @@ SLOT_CHOICES = [(15, '15 minutes'), (30, '30 minutes'), (45, '45 minutes'), (60,
 
 class Clinic(models.Model):
     owner = models.ForeignKey('accounts.ProfessionalProfile', on_delete=models.CASCADE, related_name='owned_clinics')
+    workspace = models.OneToOneField('accounts.ProfessionalProfile', null=True, blank=True, on_delete=models.SET_NULL, related_name='clinic_workspace',
+                                     help_text="The clinic's own sign-in: a workspace profile with its own patients, appointments, billing and reports. Set by the owner.")
     code = models.CharField(max_length=14, unique=True, editable=False)
     is_active = models.BooleanField(default=True)
     created_at = models.DateTimeField(auto_now_add=True)

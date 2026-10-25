@@ -2,7 +2,11 @@
 {% block title %}{{ clinic.name }} | Sajhya Health{% endblock %}
 {% block extra_css %}
 {% include 'clinics/_styles.html' %}
-  @media (min-width: 901px) { .chipbar { display: none; } }  /* the sidebar carries these links on wide screens */
+  .cl-menu { position: relative; margin-left: auto; } .cl-menu summary::-webkit-details-marker { display: none; }
+  .cl-menu-list { position: absolute; right: 0; top: 38px; z-index: 5; background: #fff; border: 1px solid var(--line); border-radius: 10px; box-shadow: 0 8px 24px #0002; min-width: 160px; padding: 4px; }
+  .cl-menu-list button { display: block; width: 100%; text-align: left; border: 0; background: none; padding: 9px 12px; border-radius: 7px; font: inherit; font-weight: 600; cursor: pointer; }
+  .cl-menu-list button:hover { background: #f2f8f4; }
+  .chipbar.cl-tabs { display: flex; } @media (min-width: 901px) { .chipbar.cl-tabs { display: none; } }  /* the sidebar carries these links on wide screens */
 {% endblock %}
 {% block tagline %}{{ clinic.name }} · clinic workspace{% endblock %}
 {% block sidebar %}
@@ -16,9 +20,9 @@
 <a class="nav" href="{% url 'clinics:detail' c.pk %}" title="{{ c.name }}"><span class="nav-icon">{{ c.name|slice:":1"|upper }}</span><span class="nav-text">{{ c.name }}</span></a>
 {% endfor %}
 {% endif %}
-<div class="nav-label">My practice</div>
-<a class="nav" href="{% url 'accounts:dashboard' %}"><span class="nav-icon">⌂</span><span class="nav-text">My dashboard</span></a>
-<a class="nav" href="{% url 'clinics:hub' %}"><span class="nav-icon">✚</span><span class="nav-text">Clinic Connect</span></a>
+<div class="nav-label">{% if workspace_clinic %}Workspace{% else %}My practice{% endif %}</div>
+<a class="nav" href="{% url 'accounts:dashboard' %}"><span class="nav-icon">⌂</span><span class="nav-text">{% if workspace_clinic %}Dashboard{% else %}My dashboard{% endif %}</span></a>
+{% if not workspace_clinic %}<a class="nav" href="{% url 'clinics:hub' %}"><span class="nav-icon">✚</span><span class="nav-text">Clinic Connect</span></a>{% endif %}
 <div class="sidebar-bottom"><strong>{{ clinic.name }}</strong><p>Code {{ clinic.code }}. This workspace is only for this clinic: its team, patients and queue. Your own practice stays under My dashboard.</p></div>
 {% endblock %}
 {% block main %}
@@ -32,7 +36,7 @@
   <form method="post" action="{% url 'clinics:leave' clinic.pk %}" onsubmit="return confirm('Leave this clinic? Patients you registered under it stay yours but are no longer tagged to it.')" style="margin-left:auto">{% csrf_token %}<button class="secondary-btn" type="submit">Leave clinic</button></form>
   {% endif %}
 </div>
-<div class="chipbar">{% for key, label in tabs %}<a href="?tab={{ key }}" class="{% if tab == key %}on{% endif %}">{{ label }}</a>{% endfor %}</div>
+<div class="chipbar cl-tabs">{% for key, label in tabs %}<a href="?tab={{ key }}" class="{% if tab == key %}on{% endif %}">{{ label }}</a>{% endfor %}</div>
 
 {% if not usable and tab != 'overview' and tab != 'settings' %}
   <div class="cl-notice"><b>Waiting for plan activation.</b> This section unlocks when our team activates your Clinic plan. Meanwhile you can complete the clinic profile in <a href="?tab=settings">Clinic details</a>.</div>
@@ -84,7 +88,14 @@
   </div>
 
 {% elif tab == 'team' %}
-  <section class="panel"><div class="panel-header"><div class="panel-title">Team</div></div>
+  <section class="panel"><div class="panel-header"><div class="panel-title">Team</div>
+    {% if is_owner %}
+    <details class="cl-menu">
+      <summary class="secondary-btn" style="height:34px;display:inline-flex;align-items:center;cursor:pointer;list-style:none">Actions ▾</summary>
+      <div class="cl-menu-list"><button type="button" data-open="addTeamModal" onclick="this.closest('details').open=false">Add team</button></div>
+    </details>
+    {% endif %}
+  </div>
     <div class="table-wrap"><table class="cl-table">
       <thead><tr><th>NAME</th><th>ROLE</th><th>STATUS</th><th>CONTACT</th><th></th></tr></thead>
       <tbody>
@@ -102,25 +113,41 @@
     </table></div>
   </section>
   {% if is_owner %}
-  <div class="cl-grid" style="margin-top:14px">
-    <section class="panel cl-box">
-      <div class="cl-h" style="margin-top:0">Add a physiotherapist</div>
-      <p class="hint" style="margin-top:0">Only physios with verified Sajhya credentials can be added. They receive an invitation and join when they accept.</p>
+  <div class="modal-backdrop" id="addTeamModal" role="dialog" aria-modal="true">
+    <div class="modal-card" style="max-width:560px">
+      <div class="modal-head"><h2>Add team</h2><button type="button" class="modal-x" data-close aria-label="Close">×</button></div>
+      <div class="chipbar" style="display:flex;margin:0 18px">
+        <a href="#" class="on" data-teamtab="physio">Physiotherapist</a><a href="#" data-teamtab="staff">Staff</a>
+      </div>
+      <div style="padding:6px 18px 18px">
+        <div data-teampane="physio">
+            <p class="hint" style="margin-top:0">Only physios with verified Sajhya credentials can be added. They receive an invitation and join when they accept.</p>
       <form method="post" action="{% url 'clinics:invite' clinic.pk %}" class="cl-form" id="inviteForm">{% csrf_token %}
         <div class="cl-search"><input type="text" id="physioSearch" placeholder="Search by name, username or licence number..." autocomplete="off"></div>
         <input type="hidden" name="physio_id" id="physioId"><span class="hint" id="physioChosen"></span>
         <button class="primary-btn" type="submit" style="width:fit-content">Send invitation</button>
       </form>
-    </section>
-    <section class="panel cl-box">
-      <div class="cl-h" style="margin-top:0">Add staff</div>
-      <p class="hint" style="margin-top:0">Receptionists, assistants and managers are kept as records (they do not sign in).</p>
+        </div>
+        <div data-teampane="staff" hidden>
+            <p class="hint" style="margin-top:0">Receptionists, assistants and managers are kept as records (they do not sign in).</p>
       <form method="post" action="{% url 'clinics:staff-add' clinic.pk %}" class="cl-form">{% csrf_token %}
         <label>Name{{ staff_form.name }}</label><label>Role{{ staff_form.role }}</label><label>Phone{{ staff_form.phone }}</label><label>Email{{ staff_form.email }}</label>
         <button class="primary-btn" type="submit" style="width:fit-content">Add staff member</button>
       </form>
-    </section>
+        </div>
+      </div>
+    </div>
   </div>
+  <script>
+  (function () {
+    var tabs = document.querySelectorAll('[data-teamtab]'), panes = document.querySelectorAll('[data-teampane]');
+    tabs.forEach(function (t) { t.addEventListener('click', function (e) {
+      e.preventDefault();
+      tabs.forEach(function (x) { x.classList.toggle('on', x === t); });
+      panes.forEach(function (p) { p.hidden = p.dataset.teampane !== t.dataset.teamtab; });
+    }); });
+  })();
+  </script>
   {% if past %}<p class="hint" style="margin-top:12px">Former / declined: {% for m in past %}{{ m.display_name }} ({{ m.get_status_display|lower }}){% if not forloop.last %}, {% endif %}{% endfor %}</p>{% endif %}
   <script>
   (function () {
@@ -185,6 +212,18 @@
   </script>
 
 {% elif tab == 'settings' %}
+  {% if login_form %}
+  <section class="panel cl-box" style="margin-bottom:14px;max-width:560px">
+    <div class="cl-h" style="margin-top:0">Clinic login</div>
+    <p class="hint" style="margin-top:0">{% if clinic.workspace_id %}This clinic signs in as <b>{{ login_form.username.initial }}</b>. Saving a new password signs the clinic out everywhere.{% else %}Give the clinic its own username and password. It opens a workspace of its own (patients, appointments, billing, plans, assessments, reports), separate from yours. You decide the credentials and can change them at any time.{% endif %}</p>
+    <form method="post" action="{% url 'clinics:login' clinic.pk %}" class="cl-form" autocomplete="off">{% csrf_token %}
+      <label>{{ login_form.username.label }}{{ login_form.username }}{{ login_form.username.errors }}<span class="hint">{{ login_form.username.help_text }}</span></label>
+      <label>{{ login_form.password1.label }}{{ login_form.password1 }}{{ login_form.password1.errors }}</label>
+      <label>{{ login_form.password2.label }}{{ login_form.password2 }}{{ login_form.password2.errors }}</label>
+      <button class="primary-btn" type="submit" style="width:fit-content">{% if clinic.workspace_id %}Change clinic login{% else %}Create clinic login{% endif %}</button>
+    </form>
+  </section>
+  {% endif %}
   <form method="post" action="{% url 'clinics:update' clinic.pk %}" enctype="multipart/form-data">{% csrf_token %}
     {% include 'clinics/_profile_form.html' with submit_label='Save clinic details' %}
   </form>

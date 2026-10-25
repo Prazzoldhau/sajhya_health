@@ -257,7 +257,7 @@ def patient_list(request):
     age = request.GET.get('age', '')
     sort = request.GET.get('sort', 'recent')
     if q:
-        patients = patients.filter(Q(name__icontains=q) | (Q(phone__icontains=q) & (Q(clinic__isnull=True) | Q(clinic__owner=profile))) | Q(patient_code__icontains=q))
+        patients = patients.filter(Q(name__icontains=q) | (Q(phone__icontains=q) & (Q(clinic__isnull=True) | Q(clinic__owner=profile) | Q(clinic__workspace=profile))) | Q(patient_code__icontains=q))
     if status in dict(Patient.STATUS_CHOICES):
         patients = patients.filter(status=status)
     if age in AGE_BUCKETS:
@@ -298,6 +298,9 @@ def patient_add(request):
         return redirect('accounts:welcome')
     clinic = None
     clinic_id = request.POST.get('clinic') or request.GET.get('clinic')
+    own_clinic = profile.clinic_workspace if hasattr(profile, 'clinic_workspace') else None
+    if own_clinic is not None:  # signed in as a clinic: every patient is registered under that clinic, and the clinic plan covers them
+        clinic_id = own_clinic.pk
     if clinic_id:  # arriving from a clinic page: the clinic is fixed; anything that is not one of my usable clinics is refused
         clinic = resolve_clinic(profile, clinic_id)
         if clinic is None:

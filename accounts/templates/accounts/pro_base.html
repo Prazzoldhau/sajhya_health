@@ -287,7 +287,11 @@
       <a class="nav {% if active == 'plans' %}active{% endif %}" href="{% url 'accounts:plans' %}"><span class="nav-icon">▤</span><span class="nav-text">Treatment Plans</span></a>
       <a class="nav {% if active == 'exercises' %}active{% endif %}" href="{% url 'exercises:library' %}"><span class="nav-icon">♧</span><span class="nav-text">Exercise Library</span></a>
       <a class="nav {% if active == 'billing' %}active{% endif %}" href="{% url 'billing:billing' %}"><span class="nav-icon">▣</span><span class="nav-text">Billing</span></a>
-      <a class="nav {% if active == 'clinics' %}active{% endif %}" href="{% url 'clinics:hub' %}"><span class="nav-icon">✚</span><span class="nav-text">Clinic Connect</span>{% if clinic_invites %}<span class="nav-badge">{{ clinic_invites }}</span>{% endif %}</a>
+      {% if workspace_clinic %}
+      <a class="nav {% if active == 'clinics' %}active{% endif %}" href="{% url 'clinics:detail' workspace_clinic.pk %}"><span class="nav-icon">✚</span><span class="nav-text">Clinic &amp; team</span></a>
+      {% else %}
+      <a class="nav {% if active == 'clinics' %}active{% endif %}" href="{% url 'clinics:hub' %}"><span class="nav-icon">✚</span><span class="nav-text">Clinic Connect</span>{% if clinic_invites %}<span class="nav-badge">{{ clinic_invites }}</span>{% endif %}</a>
+      {% endif %}
       <a class="nav {% if active == 'reports' %}active{% endif %}" href="{% url 'accounts:reports' %}"><span class="nav-icon">▥</span><span class="nav-text">Reports</span></a>
       <a class="nav {% if active == 'settings' %}active{% endif %}" href="{% url 'accounts:settings' %}"><span class="nav-icon">⚙</span><span class="nav-text">Settings</span></a>
       <div class="sidebar-bottom"><strong>Clinic workspace</strong><p>Manage appointments, assessments, treatment plans and patient progress from one place.</p></div>
