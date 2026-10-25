@@ -39,6 +39,21 @@ class BillingEntryForm(forms.ModelForm):
         return rate
 
 
+class PatientBillForm(forms.ModelForm):
+    """A bill written from inside a patient's own Billing tab: the patient is already known, so only the money details are asked."""
+    class Meta:
+        model = BillingEntry
+        fields = ['entry_date', 'service', 'rate', 'payment_mode', 'notes']
+        widgets = {
+            'entry_date': date_widget(),
+            'service': forms.TextInput(attrs={'placeholder': 'e.g. Physiotherapy'}),
+            'rate': forms.NumberInput(attrs={'placeholder': 'Amount (NPR)', 'step': '0.01', 'min': 0}),
+            'notes': forms.Textarea(attrs={'rows': 2, 'placeholder': 'Optional notes'}),
+        }
+
+    clean_rate = BillingEntryForm.clean_rate
+
+
 class PatientPackageForm(forms.ModelForm):
     patient = forms.ModelChoiceField(queryset=Patient.objects.none(), widget=forms.HiddenInput(), error_messages={'required': 'Choose a patient first.', 'invalid_choice': 'Choose a patient from the list.'})
     amount_paid_now = forms.DecimalField(

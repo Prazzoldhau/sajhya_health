@@ -17,6 +17,7 @@ from .forms import ClinicForm, StaffForm
 from .models import Clinic, ClinicMember, ClinicSubscription, QueueEntry
 
 TABS = [('overview', 'Overview'), ('team', 'Team'), ('patients', 'Patients'), ('queue', 'Queue'), ('settings', 'Clinic details')]
+TAB_ICONS = {'overview': '⌂', 'team': '✚', 'patients': '♙', 'queue': '▦', 'settings': '⚙'}
 
 
 def _back(clinic, tab):
@@ -93,8 +94,11 @@ def clinic_create(request):
 def _detail_context(request, profile, clinic, is_owner, tab, form=None):
     q = request.GET.get('q', '').strip()
     context = workspace_context(request.user, profile)
+    tabs = [t for t in TABS if is_owner or t[0] != 'settings']
+    others = (Clinic.objects.filter(is_active=True).exclude(pk=clinic.pk)
+              .filter(Q(owner=profile) | Q(members__physio=profile, members__status=ClinicMember.ACTIVE)).distinct().order_by('name'))
     context.update({'active': 'clinics', 'clinic': clinic, 'is_owner': is_owner, 'tab': tab, 'usable': clinic.is_usable,
-                    'tabs': [t for t in TABS if is_owner or t[0] != 'settings']})
+                    'tabs': tabs, 'nav_items': [(key, label, TAB_ICONS[key]) for key, label in tabs], 'switch_clinics': others})
     start, end = _today()
     todays = clinic.queue_entries.filter(joined_at__gte=start, joined_at__lt=end).select_related('patient', 'patient__professional')
     if tab == 'overview':

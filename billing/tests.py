@@ -289,3 +289,24 @@ class PackageTests(BillingBase):
         self.assertEqual(revenue_for(self.profile, self.today - datetime.timedelta(days=1)), 0)
         self.assertEqual(self.client.get(reverse('accounts:dashboard')).context['stats']['revenue_today'], Decimal('1500'))
         self.assertEqual(self.client.get(reverse('billing:billing')).context['package_payments'], Decimal('1000'))
+
+
+class PatientBillTests(BillingBase):
+    def test_bill_from_the_patient_tab_is_filled_from_the_record_and_returns_to_the_tab(self):
+        tab = reverse('accounts:patient-detail', args=[self.patient.pk]) + '?tab=billing'
+        page = self.client.get(tab)
+        self.assertContains(page, reverse('billing:patient-bill', args=[self.patient.pk]))  # the small form, not a link to the whole book
+        r = self.client.post(reverse('billing:patient-bill', args=[self.patient.pk]),
+                             {'entry_date': self.today.isoformat(), 'service': 'Ultrasound', 'rate': '700', 'payment_mode': 'online'})
+        self.assertRedirects(r, tab, fetch_redirect_response=False)
+        entry = BillingEntry.objects.get()
+        self.assertEqual((entry.patient, entry.patient_name, entry.professional, entry.rate, entry.age), (self.patient, self.patient.name, self.profile, Decimal('700'), self.patient.age))
+        self.assertContains(self.client.get(tab), 'Ultrasound')
+
+    def test_negative_amount_is_refused_and_other_physios_patients_are_off_limits(self):
+        url = reverse('billing:patient-bill', args=[self.patient.pk])
+        self.client.post(url, {'entry_date': self.today.isoformat(), 'service': 'x', 'rate': '-5', 'payment_mode': 'cash'})
+        self.assertEqual(BillingEntry.objects.count(), 0)
+        other_user, other = make_professional('other')
+        stranger = make_patient(other, name='Not Mine')
+        self.assertEqual(self.client.post(reverse('billing:patient-bill', args=[stranger.pk]), {'entry_date': self.today.isoformat(), 'service': 'x', 'rate': '5', 'payment_mode': 'cash'}).status_code, 404)

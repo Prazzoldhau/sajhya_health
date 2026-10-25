@@ -202,7 +202,19 @@
   {% endfor %}
   </div>
 
-  <div class="section-title" style="padding-top:8px"><span class="bar">Billing history</span><a class="secondary-btn" href="{% url 'billing:billing' %}?new=1" style="height:34px;text-decoration:none;display:inline-flex;align-items:center">＋ New bill</a></div>
+  <div class="section-title" style="padding-top:8px"><span class="bar">Billing history</span><button type="button" class="secondary-btn" style="height:34px" onclick="var f=document.getElementById('patientBill');f.hidden=!f.hidden;if(!f.hidden)f.querySelector('[name=rate]').focus()">＋ New bill</button></div>
+  <form method="post" action="{% url 'billing:patient-bill' patient.pk %}" id="patientBill" hidden style="margin:0 24px 14px;padding:14px 16px;border:1px solid var(--line);border-radius:10px;background:#f6faf7">
+    {% csrf_token %}
+    <div class="patient-id" style="margin-bottom:10px">Bill for <b>{{ patient.name }}</b> -- name, age and contact are filled in from the patient record.</div>
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;align-items:end">
+      <label>Date {{ bill_form.entry_date }}</label>
+      <label>Service {{ bill_form.service }}</label>
+      <label>Amount (NPR) {{ bill_form.rate }}</label>
+      <label>Payment mode {{ bill_form.payment_mode }}</label>
+    </div>
+    <label style="display:block;margin-top:10px">Notes {{ bill_form.notes }}</label>
+    <div style="margin-top:10px"><button type="submit" class="primary-btn">Save bill</button></div>
+  </form>
   <div class="table-wrap" style="padding:0 24px 20px">
     <table>
       <thead><tr><th>DATE</th><th>INVOICE</th><th>SERVICE</th><th>PAYMENT</th><th style="text-align:right">AMOUNT</th></tr></thead>

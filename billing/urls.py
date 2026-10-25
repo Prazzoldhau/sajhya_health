@@ -6,6 +6,7 @@ app_name = 'billing'
 
 urlpatterns = [
     path('', views.billing, name='billing'),
+    path('patient/<int:patient_id>/bill/', views.patient_bill, name='patient-bill'),
     path('entry/save/', views.entry_save, name='entry-create'),
     path('entry/<int:pk>/save/', views.entry_save, name='entry-edit'),
     path('entry/<int:pk>/delete/', views.entry_delete, name='entry-delete'),

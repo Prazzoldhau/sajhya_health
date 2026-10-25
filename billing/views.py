@@ -7,9 +7,9 @@ from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
 from django.utils import timezone
 
-from accounts.access import can_see_contact, first_error, require_workspace, workspace_context, workspace_profile
+from accounts.access import can_see_contact, first_error, own_patient, require_workspace, workspace_context, workspace_profile
 
-from .forms import BillingEntryForm, PackagePaymentForm, PatientPackageForm
+from .forms import BillingEntryForm, PackagePaymentForm, PatientBillForm, PatientPackageForm
 from .models import BillingEntry, PackagePayment, PatientPackage
 
 
@@ -88,6 +88,29 @@ def entry_save(request, pk=None):
         return _back(obj.entry_date)
     messages.error(request, first_error(form))
     return redirect('billing:billing')
+
+
+@login_required
+def patient_bill(request, patient_id):
+    """Add a bill for one patient from that patient's Billing tab, then return to the tab."""
+    profile, patient = own_patient(request, patient_id)
+    back = redirect(f"{reverse('accounts:patient-detail', args=[patient.pk])}?tab=billing")
+    if request.method != 'POST':
+        return back
+    form = PatientBillForm(request.POST)
+    if form.is_valid():
+        entry = form.save(commit=False)
+        entry.professional = profile
+        entry.patient = patient
+        entry.patient_name = patient.name
+        entry.age = patient.age
+        entry.sex = patient.gender
+        entry.contact_number = patient.phone if can_see_contact(profile, patient) else ''
+        entry.save()
+        messages.success(request, f'Bill {entry.invoice_number} saved for {patient.name}.')
+    else:
+        messages.error(request, first_error(form))
+    return back
 
 
 @login_required

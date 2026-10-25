@@ -2,9 +2,26 @@
 {% block title %}{{ clinic.name }} | Sajhya Health{% endblock %}
 {% block extra_css %}
 {% include 'clinics/_styles.html' %}
+  @media (min-width: 901px) { .chipbar { display: none; } }  /* the sidebar carries these links on wide screens */
+{% endblock %}
+{% block tagline %}{{ clinic.name }} · clinic workspace{% endblock %}
+{% block sidebar %}
+<div class="nav-label">{{ clinic.name }}</div>
+{% for key, label, icon in nav_items %}
+<a class="nav {% if tab == key %}active{% endif %}" href="{% url 'clinics:detail' clinic.pk %}?tab={{ key }}"><span class="nav-icon">{{ icon }}</span><span class="nav-text">{{ label }}</span></a>
+{% endfor %}
+{% if switch_clinics %}
+<div class="nav-label">Switch clinic</div>
+{% for c in switch_clinics %}
+<a class="nav" href="{% url 'clinics:detail' c.pk %}" title="{{ c.name }}"><span class="nav-icon">{{ c.name|slice:":1"|upper }}</span><span class="nav-text">{{ c.name }}</span></a>
+{% endfor %}
+{% endif %}
+<div class="nav-label">My practice</div>
+<a class="nav" href="{% url 'accounts:dashboard' %}"><span class="nav-icon">⌂</span><span class="nav-text">My dashboard</span></a>
+<a class="nav" href="{% url 'clinics:hub' %}"><span class="nav-icon">✚</span><span class="nav-text">Clinic Connect</span></a>
+<div class="sidebar-bottom"><strong>{{ clinic.name }}</strong><p>Code {{ clinic.code }}. This workspace is only for this clinic: its team, patients and queue. Your own practice stays under My dashboard.</p></div>
 {% endblock %}
 {% block main %}
-<p style="margin:0 0 4px"><a class="text-link" href="{% url 'clinics:hub' %}" style="text-decoration:none">← Clinic Connect</a></p>
 {% if clinic.banner %}<div class="cl-banner" style="background-image:url('{{ clinic.banner.url }}')"></div>{% endif %}
 <div class="cl-head">
   {% if clinic.logo %}<img class="logo" src="{{ clinic.logo.url }}" alt="">{% else %}<span class="logo">{{ clinic.name|slice:":1"|upper }}</span>{% endif %}

@@ -515,3 +515,29 @@ class MonthlyUsageTests(JoinedClinic):
         call_command('clinic_usage', stdout=out)
         self.assertIn('2 over the cap of 1 -> NPR 400 due', out.getvalue())
         self.assertIn('Total due across clinics: NPR 400', out.getvalue())
+
+
+class ClinicWorkspaceTests(Base):
+    def test_each_clinic_has_its_own_workspace_with_its_own_menu_and_a_switcher(self):
+        first = self.make_clinic('Himal Clinic')
+        self.client.post(reverse('clinics:create'), {**CLINIC_DATA, 'name': 'Lake Clinic'})
+        second = Clinic.objects.filter(name='Lake Clinic').first()
+        if second is None:  # the plan allows one clinic: raise the allowance by registering through the model
+            second = Clinic.objects.create(owner=self.owner, name='Lake Clinic', phone='015550002')
+        page = self.client.get(reverse('clinics:detail', args=[first.pk]))
+        self.assertContains(page, 'Himal Clinic · clinic workspace')  # the header names this clinic, not "Professional workspace"
+        for label in ('Overview', 'Team', 'Queue', 'Clinic details'):
+            self.assertContains(page, f'<span class="nav-text">{label}</span>')
+        self.assertNotContains(page, '<span class="nav-text">Exercise Library</span>')  # the professional menu is replaced
+        self.assertContains(page, reverse('clinics:detail', args=[second.pk]))  # switch clinic
+        self.assertContains(page, reverse('accounts:dashboard'))  # and a way back to the personal dashboard
+
+    def test_a_visiting_physio_does_not_see_the_owners_settings_item(self):
+        clinic = self.make_clinic()
+        guest_user, guest = make_professional('guest')
+        ClinicMember.objects.create(clinic=clinic, physio=guest, role=ClinicMember.PHYSIO, status=ClinicMember.ACTIVE)
+        self.as_user('guest')
+        page = self.client.get(reverse('clinics:detail', args=[clinic.pk]))
+        self.assertContains(page, '<span class="nav-text">Team</span>')
+        self.assertNotContains(page, '<span class="nav-text">Clinic details</span>')
+
