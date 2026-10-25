@@ -2,7 +2,7 @@ import datetime
 
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
-from django.db.models import F, Sum
+from django.db.models import F, Q, Sum
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
 from django.utils import timezone
@@ -62,9 +62,28 @@ def billing(request):
     owed = [e for e in profile.billing_entries.filter(cancelled_at__isnull=True, amount_paid__lt=F('rate')).select_related('patient').order_by('entry_date', 'id')]
     bills_due = sum((e.amount_due for e in owed), 0)
 
+    search = None
+    patient_id, text = request.GET.get('patient', ''), request.GET.get('q', '').strip()
+    if patient_id.isdigit() or text:
+        # search mode: only that patient's bills (every date), never the whole book
+        found = profile.billing_entries.select_related('patient')
+        if patient_id.isdigit():
+            found = found.filter(patient_id=int(patient_id))
+            patient = profile.patients.filter(pk=int(patient_id)).first()
+            label = patient.name if patient else 'this patient'
+        else:
+            found = found.filter(Q(patient_name__icontains=text) | Q(contact_number__icontains=text) | Q(invoice_number__icontains=text) | Q(patient__patient_code__icontains=text))
+            label = text
+        found = list(found.order_by('-entry_date', '-created_at')[:300])
+        live = [e for e in found if not e.is_cancelled]
+        search = {'label': label, 'count': len(found), 'billed': sum((e.rate for e in live), 0), 'received': sum((e.amount_paid for e in live), 0),
+                  'due': sum((e.amount_due for e in live), 0), 'text': text}
+        entries = found
+        owed = [e for e in owed if e in found]
+
     context = workspace_context(request.user, profile)
     context.update({
-        'active': 'billing', 'billing_tab': 'book', 'form': form, 'entries': entries, 'selected': selected, 'today': today,
+        'active': 'billing', 'billing_tab': 'book', 'search': search, 'form': form, 'entries': entries, 'selected': selected, 'today': today,
         'prev_date': selected - datetime.timedelta(days=1), 'next_date': selected + datetime.timedelta(days=1),
         'total': total, 'by_mode': [(mode_names[m], v) for m, v in by_mode.items()],
         'month_total': month_total, 'month_label': f'{selected:%B %Y}', 'package_payments': revenue_for(profile, selected) - collected, 'collected': collected,

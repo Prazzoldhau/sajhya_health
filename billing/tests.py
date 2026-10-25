@@ -474,3 +474,31 @@ class CorrectBillTests(BillingBase):
         tab = self.client.get(reverse('accounts:patient-detail', args=[self.patient.pk]) + '?tab=billing')
         self.assertContains(tab, reverse('billing:entry-correct', args=[entry.pk]))
         self.assertContains(self.client.get(reverse('billing:billing'), {'edit': entry.pk}), reverse('billing:entry-correct', args=[entry.pk]))
+
+
+class BillingSearchTests(BillingBase):
+    def test_searching_a_patient_shows_only_that_patients_bills_across_all_dates(self):
+        other = make_patient(self.profile, 'Other Person')
+        last_week = self.today - datetime.timedelta(days=6)
+        for pat, day, rate, extra in ((self.patient, self.today, '400', {}), (self.patient, last_week, '600', {'payment_status': 'due'}), (other, self.today, '999', {})):
+            self.client.post(reverse('billing:patient-bill', args=[pat.pk]), {'entry_date': day.isoformat(), 'service': 'Therapy', 'rate': rate, 'payment_mode': 'cash', **extra})
+        page = self.client.get(reverse('billing:billing'), {'patient': self.patient.pk})
+        self.assertEqual([e.rate for e in page.context['entries']], [400, 600])  # newest first, both dates, nobody else
+        s = page.context['search']
+        self.assertEqual((s['count'], s['billed'], s['received'], s['due']), (2, 1000, 400, 600))
+        self.assertEqual([e.pk for e in page.context['owed']], [e.pk for e in page.context['entries'] if e.amount_due])
+        self.assertNotIn('Other Person', [e.patient_name for e in page.context['entries']])
+        self.assertContains(page, 'Clear')
+        # the normal day view is untouched
+        self.assertIsNone(self.client.get(reverse('billing:billing')).context['search'])
+
+    def test_text_search_and_privacy(self):
+        self.entry(patient_name='Walk In Sita', contact_number='9800000123')
+        self.entry(patient_name='Someone Else')
+        page = self.client.get(reverse('billing:billing'), {'q': '9800000123'})
+        self.assertEqual([e.patient_name for e in page.context['entries']], ['Walk In Sita'])
+        self.assertEqual(len(self.client.get(reverse('billing:billing'), {'q': 'nobody'}).context['entries']), 0)
+        stranger, _ = make_professional('stranger')
+        other = self.client_class()
+        other.force_login(stranger)
+        self.assertEqual(len(other.get(reverse('billing:billing'), {'patient': self.patient.pk, 'q': 'Walk'}).context['entries']), 0)
