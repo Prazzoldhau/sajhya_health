@@ -19,7 +19,8 @@ from .access import can_see_contact, first_error, own_patient, own_profile, staf
 from .services import record_visit
 from .forms import SUBTYPES, STEP_FORMS, STEP_TITLES, NextVisitForm, PatientEditForm, PatientForm, PatientNotesForm, PatientPhotoForm, ProfilePictureForm, SignupForm, VisitForm
 from .treatments import parse_treatments
-from billing.forms import BillCorrectionForm, EntryPaymentForm, PackagePaymentForm, PatientBillForm
+from billing.models import advance_balance
+from billing.forms import AdvanceForm, BillCorrectionForm, EntryPaymentForm, PackagePaymentForm, PatientBillForm
 from .models import Account, Appointment, Icd10Code, Patient, ProfessionalProfile, Visit
 
 
@@ -355,6 +356,9 @@ def patient_detail(request, pk):
         'payment_form': PackagePaymentForm(),
         'bill_form': PatientBillForm(initial={'entry_date': timezone.localdate()}) if tab == 'billing' else None,
         'pay_form': EntryPaymentForm() if tab == 'billing' else None,
+        'advance_balance': advance_balance(patient.pk) if tab == 'billing' else None,
+        'advance_moves': patient.advances.select_related('entry')[:15] if tab == 'billing' else None,
+        'advance_form': AdvanceForm() if tab == 'billing' else None,
         'correct_form': BillCorrectionForm() if tab == 'billing' else None,
         'visit_form': VisitForm(initial={'date': timezone.localdate()}),
         'next_form': NextVisitForm(initial={'date': timezone.localdate() + datetime.timedelta(days=7)}),

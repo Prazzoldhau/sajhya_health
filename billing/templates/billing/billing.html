@@ -32,13 +32,15 @@
   <div class="kpi"><div class="k">Billed</div><div class="v">NPR {{ search.billed }}</div><div class="n">Cancelled bills not counted</div></div>
   <div class="kpi"><div class="k">Received</div><div class="v">NPR {{ search.received }}</div></div>
   <div class="kpi"><div class="k">Due</div><div class="v" style="color:#b78317">NPR {{ search.due }}</div><div class="n" style="color:#b78317">Credit still to collect</div></div>
+  {% if search.advance is not None %}<div class="kpi"><div class="k">Advance balance</div><div class="v" style="color:#16834f">NPR {{ search.advance }}</div><div class="n">Paid ahead, still unused</div></div>{% endif %}
 </div>
 {% else %}
 <div class="kpis">
   <div class="kpi"><div class="k">Billed on {{ selected|date:"M j, Y" }}</div><div class="v">NPR {{ total }}</div><div class="n">{{ entries|length }} entr{{ entries|length|pluralize:"y,ies" }}</div></div>
-  <div class="kpi"><div class="k">Received on {{ selected|date:"M j, Y" }}</div><div class="v">NPR {{ collected|add:package_payments }}</div><div class="n">Bills NPR {{ collected }} · packages NPR {{ package_payments }} · <a href="{% url 'billing:packages' %}" style="color:inherit">packages →</a></div></div>
+  <div class="kpi"><div class="k">Received on {{ selected|date:"M j, Y" }}</div><div class="v">NPR {{ received_total }}</div><div class="n">Bills NPR {{ collected }} · advances NPR {{ advance_net }} · packages NPR {{ package_payments }}</div></div>
   <div class="kpi"><div class="k">{{ month_label }} billed</div><div class="v">NPR {{ month_total }}</div><div class="n">Billing entries only</div></div>
   <div class="kpi"><div class="k">Credit due from patients</div><div class="v" style="color:#b78317">NPR {{ bills_due|add:packages_due }}</div><div class="n" style="color:#b78317">Bills NPR {{ bills_due }} · packages NPR {{ packages_due }}</div></div>
+  <div class="kpi"><div class="k">Advance held for patients</div><div class="v" style="color:#16834f">NPR {{ advance_held }}</div><div class="n">Paid ahead, not yet used</div></div>
 </div>
 {% endif %}
 

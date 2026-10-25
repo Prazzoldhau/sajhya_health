@@ -3,13 +3,13 @@ from django import forms
 from accounts.models import Patient
 from accounts.widgets import date_widget
 
-from .models import BillingEntry, EntryPayment, PackagePayment, PatientPackage
+from .models import BillingEntry, EntryPayment, PackagePayment, PatientAdvance, PatientPackage
 
 
 class PaymentStatusMixin(forms.Form):
     """New bills can be paid in full, part paid, or left on credit (due) - many patients settle at the end of the week.
     The payment mode is the mode of what is received now. Editing a bill never changes what was already received."""
-    payment_status = forms.ChoiceField(choices=[('paid', 'Paid in full'), ('partial', 'Part paid'), ('due', 'Not paid yet (credit)')], initial='paid', required=False, label='Payment')
+    payment_status = forms.ChoiceField(choices=[('paid', 'Paid in full'), ('partial', 'Part paid'), ('due', 'Not paid yet (credit)'), ('advance', 'Use advance balance')], initial='paid', required=False, label='Payment')
     amount_received = forms.DecimalField(required=False, min_value=0, max_digits=10, decimal_places=2, label='Received now (NPR)',
                                          widget=forms.NumberInput(attrs={'placeholder': 'Amount received now', 'step': '0.01', 'min': 0}))
 
@@ -36,6 +36,8 @@ class PaymentStatusMixin(forms.Form):
     def apply_payment(self, entry, user=None):
         """After a new bill is saved: record what was received with it (nothing at all when it is left on credit)."""
         status = self.cleaned_data.get('payment_status') or 'paid'
+        if status == 'advance':
+            return entry.use_advance(user)
         amount = entry.rate if status == 'paid' else self.cleaned_data.get('amount_received') if status == 'partial' else 0
         entry.record_payment(amount, entry.payment_mode, paid_on=entry.entry_date, user=user)
 
@@ -115,6 +117,26 @@ class BillCorrectionForm(forms.ModelForm):
     def received_total(self):
         status = self.cleaned_data['payment_status']
         return self.cleaned_data['rate'] if status == 'paid' else self.cleaned_data.get('amount_received') if status == 'partial' else 0
+
+
+class AdvanceForm(forms.ModelForm):
+    """Money a patient pays ahead of their sessions."""
+    class Meta:
+        model = PatientAdvance
+        fields = ['amount', 'payment_mode', 'notes']
+        widgets = {
+            'amount': forms.NumberInput(attrs={'placeholder': 'Amount (NPR)', 'step': '0.01', 'min': 0.01}),
+            'notes': forms.TextInput(attrs={'placeholder': 'Optional notes'}),
+        }
+
+    def clean_amount(self):
+        amount = self.cleaned_data['amount']
+        if amount <= 0:
+            raise forms.ValidationError('Enter an amount greater than zero.')
+        return amount
+
+    def clean_payment_mode(self):
+        return self.cleaned_data.get('payment_mode') or 'cash'
 
 
 class EntryPaymentForm(forms.ModelForm):

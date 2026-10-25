@@ -191,3 +191,7 @@ to a temp folder). Lockout is off in tests (`AXES_ENABLED = not TESTING`); the l
 ## Show / hide password
 
 `static/js/pw-toggle.js` adds an eye button to every `input[type=password]` (sign-up, change password, clinic login, staff logins). The sign-in page keeps its own `data-pw-toggle` button, which the script leaves alone. New templates with a password box only need to load the script (the three base templates already do).
+
+## Advance payments
+
+`billing.PatientAdvance` is a signed ledger per patient (advance taken +, used for a bill -, refund -, returned to balance +); the balance is its sum. A bill settled from the advance gets an `EntryPayment` with mode `advance`, which is **not** counted as money taken (the cash was counted when the advance was taken, and refunds count as money paid out). Cancelling or correcting a bill puts what it took back into the balance.

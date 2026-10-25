@@ -1,4 +1,5 @@
 import datetime
+from decimal import Decimal
 
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
@@ -9,15 +10,17 @@ from django.utils import timezone
 
 from accounts.access import can_see_contact, first_error, own_patient, require_workspace, workspace_context, workspace_profile
 
-from .forms import BillCorrectionForm, BillingEntryForm, EntryPaymentForm, PackagePaymentForm, PatientBillForm, PatientPackageForm
-from .models import BillingEntry, EntryPayment, PackagePayment, PatientPackage
+from .forms import AdvanceForm, BillCorrectionForm, BillingEntryForm, EntryPaymentForm, PackagePaymentForm, PatientBillForm, PatientPackageForm
+from .models import ADVANCE, BillingEntry, EntryPayment, PackagePayment, PatientAdvance, PatientPackage, advance_balance
 
 
 def revenue_for(profile, date):
     """Money actually received on one day: payments on bills (including late settlements of credit) plus package payments."""
     start = timezone.make_aware(datetime.datetime.combine(date, datetime.time.min))
     end = start + datetime.timedelta(days=1)
-    entries = EntryPayment.objects.filter(entry__professional=profile, entry__cancelled_at__isnull=True, paid_on=date).aggregate(t=Sum('amount'))['t'] or 0
+    entries = (EntryPayment.objects.filter(entry__professional=profile, entry__cancelled_at__isnull=True, paid_on=date).exclude(payment_mode=ADVANCE)
+               .aggregate(t=Sum('amount'))['t'] or 0)
+    entries += PatientAdvance.objects.filter(professional=profile, paid_on=date, kind__in=[PatientAdvance.DEPOSIT, PatientAdvance.REFUND], payment_mode__gt='').aggregate(t=Sum('amount'))['t'] or 0  # advances taken less refunds paid back
     packages = PackagePayment.objects.filter(package__professional=profile, created_at__gte=start, created_at__lt=end).aggregate(t=Sum('amount'))['t'] or 0
     return entries + packages
 
@@ -53,10 +56,15 @@ def billing(request):
     for e in entries:
         if not e.is_cancelled:
             total += e.rate
-    received = EntryPayment.objects.filter(entry__professional=profile, entry__cancelled_at__isnull=True, paid_on=selected)
+    received = EntryPayment.objects.filter(entry__professional=profile, entry__cancelled_at__isnull=True, paid_on=selected).exclude(payment_mode=ADVANCE)
     for mode, amount in received.values_list('payment_mode', 'amount'):
         by_mode[mode] += amount
-    collected = sum(by_mode.values())
+    collected = sum(by_mode.values())  # money received on bills
+    advance_net = Decimal('0')
+    for mode, amount in PatientAdvance.objects.filter(professional=profile, paid_on=selected, kind__in=[PatientAdvance.DEPOSIT, PatientAdvance.REFUND]).values_list('payment_mode', 'amount'):
+        by_mode[mode or 'cash'] += amount
+        advance_net += amount
+    advance_held = PatientAdvance.objects.filter(professional=profile).aggregate(t=Sum('amount'))['t'] or Decimal('0')
     month_total = profile.billing_entries.filter(cancelled_at__isnull=True, entry_date__year=selected.year, entry_date__month=selected.month).aggregate(t=Sum('rate'))['t'] or 0
     packages_due = sum((p.amount_due for p in PatientPackage.objects.filter(professional=profile).exclude(status='cancelled')), 0)
     owed = [e for e in profile.billing_entries.filter(cancelled_at__isnull=True, amount_paid__lt=F('rate')).select_related('patient').order_by('entry_date', 'id')]
@@ -76,7 +84,7 @@ def billing(request):
             label = text
         found = list(found.order_by('-entry_date', '-created_at')[:300])
         live = [e for e in found if not e.is_cancelled]
-        search = {'label': label, 'count': len(found), 'billed': sum((e.rate for e in live), 0), 'received': sum((e.amount_paid for e in live), 0),
+        search = {'advance': advance_balance(int(patient_id)) if patient_id.isdigit() else None, 'label': label, 'count': len(found), 'billed': sum((e.rate for e in live), 0), 'received': sum((e.amount_paid for e in live), 0),
                   'due': sum((e.amount_due for e in live), 0), 'text': text}
         entries = found
         owed = [e for e in owed if e in found]
@@ -86,7 +94,7 @@ def billing(request):
         'active': 'billing', 'billing_tab': 'book', 'search': search, 'form': form, 'entries': entries, 'selected': selected, 'today': today,
         'prev_date': selected - datetime.timedelta(days=1), 'next_date': selected + datetime.timedelta(days=1),
         'total': total, 'by_mode': [(mode_names[m], v) for m, v in by_mode.items()],
-        'month_total': month_total, 'month_label': f'{selected:%B %Y}', 'package_payments': revenue_for(profile, selected) - collected, 'collected': collected,
+        'month_total': month_total, 'month_label': f'{selected:%B %Y}', 'package_payments': revenue_for(profile, selected) - collected - advance_net, 'collected': collected, 'advance_net': advance_net, 'received_total': revenue_for(profile, selected), 'advance_held': advance_held,
         'packages_due': packages_due, 'owed': owed, 'bills_due': bills_due, 'pay_form': EntryPaymentForm(), 'correct_form': BillCorrectionForm(), 'open_new': request.GET.get('new') == '1', 'open_edit': request.GET.get('edit', '') if request.GET.get('edit', '').isdigit() else '',
     })
     return render(request, 'billing/billing.html', context)
@@ -138,9 +146,55 @@ def patient_bill(request, patient_id):
         entry.contact_number = patient.phone if can_see_contact(profile, patient) else ''
         entry.save()
         form.apply_payment(entry, request.user)
+        if form.cleaned_data.get('payment_status') == 'advance' and entry.amount_paid == 0:
+            messages.info(request, f'{patient.name} has no advance balance, so the bill is left on credit.')
         messages.success(request, f'Bill {entry.invoice_number} saved for {patient.name}.' + (f' NPR {entry.amount_due:g} is due.' if entry.amount_due else ''))
     else:
         messages.error(request, first_error(form))
+    return back
+
+
+@login_required
+def advance_add(request, patient_id):
+    """Take money from a patient in advance, to be used against their next bills."""
+    profile, patient = own_patient(request, patient_id)
+    back = redirect(f"{reverse('accounts:patient-detail', args=[patient.pk])}?tab=billing")
+    if request.method != 'POST':
+        return back
+    form = AdvanceForm(request.POST)
+    if not form.is_valid():
+        messages.error(request, first_error(form))
+        return back
+    move = form.save(commit=False)
+    move.patient, move.professional, move.kind, move.recorded_by = patient, profile, PatientAdvance.DEPOSIT, request.user
+    move.save()
+    used = 0
+    for entry in profile.billing_entries.filter(patient=patient, cancelled_at__isnull=True, amount_paid__lt=F('rate')).order_by('entry_date', 'id'):
+        if request.POST.get('settle') and advance_balance(patient.pk) > 0:  # optionally clear the oldest unpaid bills first
+            used += entry.use_advance(request.user)
+    balance = advance_balance(patient.pk)
+    messages.success(request, f'NPR {move.amount:g} advance taken from {patient.name}.' + (f' NPR {used:g} used for unpaid bills.' if used else '') + f' Balance: NPR {balance:g}.')
+    return back
+
+
+@login_required
+def advance_refund(request, patient_id):
+    """Pay back part or all of what a patient has left in advance."""
+    profile, patient = own_patient(request, patient_id)
+    back = redirect(f"{reverse('accounts:patient-detail', args=[patient.pk])}?tab=billing")
+    if request.method != 'POST':
+        return back
+    form = AdvanceForm(request.POST)
+    if not form.is_valid():
+        messages.error(request, first_error(form))
+        return back
+    amount = form.cleaned_data['amount']
+    if amount > advance_balance(patient.pk):
+        messages.error(request, f'Only NPR {advance_balance(patient.pk):g} is held for {patient.name}.')
+        return back
+    PatientAdvance.objects.create(patient=patient, professional=profile, kind=PatientAdvance.REFUND, amount=-amount, payment_mode=form.cleaned_data['payment_mode'],
+                                  notes=form.cleaned_data['notes'], recorded_by=request.user)
+    messages.success(request, f'NPR {amount:g} refunded to {patient.name}. Balance: NPR {advance_balance(patient.pk):g}.')
     return back
 
 
@@ -156,6 +210,14 @@ def entry_payment(request, pk):
     form = EntryPaymentForm(request.POST)
     if not form.is_valid():
         messages.error(request, first_error(form))
+        return back
+    if form.cleaned_data['payment_mode'] == ADVANCE:
+        used = entry.use_advance(request.user, limit=form.cleaned_data['amount'])
+        if not used:
+            messages.error(request, 'This patient has no advance balance to use.' if entry.patient_id else 'Only a bill linked to a patient can use an advance.')
+            return back
+        entry.refresh_from_db()
+        messages.success(request, f'NPR {used:g} taken from the advance for {entry.invoice_number}.' + (f' NPR {entry.amount_due:g} still due.' if entry.amount_due else ' Fully paid.'))
         return back
     paid = entry.record_payment(form.cleaned_data['amount'], form.cleaned_data['payment_mode'], form.cleaned_data['notes'], user=request.user)
     if paid is None:
@@ -198,9 +260,10 @@ def entry_cancel(request, pk):
         return back
     if entry.is_cancelled:
         return back
+    returned = entry.release_advance(request.user)  # what was taken from an advance goes back to the patient's balance
     entry.cancelled_at, entry.cancel_reason = timezone.now(), request.POST.get('reason', '').strip()[:255]
     entry.save(update_fields=['cancelled_at', 'cancel_reason', 'updated_at'])
-    note = f' NPR {entry.amount_paid:g} that was received is no longer counted as money taken - refund it to the patient.' if entry.amount_paid else ''
+    note = (f' NPR {returned:g} went back to the patient\'s advance balance.' if returned else '') + (f' NPR {entry.amount_paid:g} that was received is no longer counted as money taken - refund it to the patient.' if entry.amount_paid else '')
     messages.success(request, f'{entry.invoice_number} cancelled.{note}')
     return back
 

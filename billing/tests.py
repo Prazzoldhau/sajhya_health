@@ -8,7 +8,7 @@ from django.utils import timezone
 from accounts.models import Appointment, Visit
 from accounts.tests.helpers import make_patient, make_professional
 
-from .models import PatientAllowance, SlotOrder, BillingEntry, PackagePayment, PatientPackage, Plan, use_package_session
+from .models import advance_balance, PatientAllowance, SlotOrder, BillingEntry, PackagePayment, PatientPackage, Plan, use_package_session
 from .views import revenue_for
 
 
@@ -502,3 +502,78 @@ class BillingSearchTests(BillingBase):
         other = self.client_class()
         other.force_login(stranger)
         self.assertEqual(len(other.get(reverse('billing:billing'), {'patient': self.patient.pk, 'q': 'Walk'}).context['entries']), 0)
+
+
+class AdvanceTests(BillingBase):
+    """A patient pays NPR 1000 ahead; each session of 700 is taken from it."""
+
+    def take(self, amount='1000', **extra):
+        return self.client.post(reverse('billing:advance-add', args=[self.patient.pk]), {'amount': amount, 'payment_mode': 'cash', **extra})
+
+    def bill(self, rate='700', **extra):
+        self.client.post(reverse('billing:patient-bill', args=[self.patient.pk]), {'entry_date': self.today.isoformat(), 'service': 'Session', 'rate': rate, 'payment_mode': 'cash', 'payment_status': 'advance', **extra})
+
+    def test_advance_is_money_taken_once_and_sessions_draw_it_down(self):
+        self.take('1000')
+        self.assertEqual(advance_balance(self.patient.pk), 1000)
+        self.assertEqual(revenue_for(self.profile, self.today), 1000)  # the cash arrived today
+        self.bill('700')
+        first = BillingEntry.objects.get()
+        self.assertEqual((first.status_key, first.amount_paid, advance_balance(self.patient.pk)), ('paid', 700, 300))
+        self.assertEqual(revenue_for(self.profile, self.today), 1000)  # settling from the advance is not new money
+        self.bill('700')  # only 300 left: the rest stays due
+        second = BillingEntry.objects.exclude(pk=first.pk).get()
+        self.assertEqual((second.amount_paid, second.amount_due, second.status_key, advance_balance(self.patient.pk)), (300, 400, 'partial', 0))
+        page = self.client.get(reverse('billing:billing'))
+        self.assertEqual((page.context['received_total'], page.context['collected'], page.context['advance_net'], page.context['advance_held']), (1000, 0, 1000, 0))
+        self.assertEqual(dict(page.context['by_mode'])['Cash'], 1000)
+        tab = self.client.get(reverse('accounts:patient-detail', args=[self.patient.pk]) + '?tab=billing')
+        self.assertContains(tab, 'Advance balance: NPR 0')
+        self.assertContains(tab, 'Used for a bill')
+
+    def test_take_advance_can_clear_unpaid_bills_and_credit_can_be_received_from_the_advance(self):
+        self.client.post(reverse('billing:patient-bill', args=[self.patient.pk]), {'entry_date': self.today.isoformat(), 'service': 'S', 'rate': '600', 'payment_mode': 'cash', 'payment_status': 'due'})
+        self.take('1000', settle='1')
+        entry = BillingEntry.objects.get()
+        self.assertEqual((entry.status_key, advance_balance(self.patient.pk)), ('paid', 400))
+        self.client.post(reverse('billing:patient-bill', args=[self.patient.pk]), {'entry_date': self.today.isoformat(), 'service': 'S', 'rate': '900', 'payment_mode': 'cash', 'payment_status': 'due'})
+        late = BillingEntry.objects.exclude(pk=entry.pk).get()
+        self.client.post(reverse('billing:entry-payment', args=[late.pk]), {'amount': '250', 'payment_mode': 'advance'})
+        late.refresh_from_db()
+        self.assertEqual((late.amount_paid, advance_balance(self.patient.pk)), (250, 150))
+        self.client.post(reverse('billing:entry-payment', args=[late.pk]), {'amount': '900', 'payment_mode': 'advance'})  # capped by what is held
+        late.refresh_from_db()
+        self.assertEqual((late.amount_paid, advance_balance(self.patient.pk)), (400, 0))
+
+    def test_cancelling_a_bill_returns_its_advance_and_refunds_are_money_out(self):
+        self.take('1000')
+        self.bill('700')
+        entry = BillingEntry.objects.get()
+        self.client.post(reverse('billing:entry-cancel', args=[entry.pk]), {'reason': 'x'})
+        self.assertEqual(advance_balance(self.patient.pk), 1000)
+        r = self.client.post(reverse('billing:advance-refund', args=[self.patient.pk]), {'amount': '400', 'payment_mode': 'cash'})
+        self.assertEqual((r.status_code, advance_balance(self.patient.pk)), (302, 600))
+        self.assertEqual(revenue_for(self.profile, self.today), 600)  # 1000 taken less 400 paid back
+        self.client.post(reverse('billing:advance-refund', args=[self.patient.pk]), {'amount': '9999', 'payment_mode': 'cash'})
+        self.assertEqual(advance_balance(self.patient.pk), 600)  # cannot refund more than is held
+
+    def test_correcting_a_bill_that_used_the_advance_puts_it_back_and_the_rules_hold(self):
+        self.take('1000')
+        self.bill('700')
+        entry = BillingEntry.objects.get()
+        self.client.post(reverse('billing:entry-correct', args=[entry.pk]), {'entry_date': self.today.isoformat(), 'service': 'S', 'rate': '700', 'payment_mode': 'cash', 'payment_status': 'due'})
+        entry.refresh_from_db()
+        self.assertEqual((entry.amount_paid, advance_balance(self.patient.pk)), (0, 1000))
+        self.assertEqual(self.take('0').status_code, 302)
+        self.assertEqual(advance_balance(self.patient.pk), 1000)  # zero is refused
+        self.bill('50')  # no balance question here: balance is 1000, fine
+        stranger, _ = make_professional('stranger')
+        other = self.client_class()
+        other.force_login(stranger)
+        self.assertEqual(other.post(reverse('billing:advance-add', args=[self.patient.pk]), {'amount': '5', 'payment_mode': 'cash'}).status_code, 404)
+
+    def test_no_advance_leaves_the_bill_on_credit_and_walk_ins_cannot_use_one(self):
+        self.bill('700')
+        self.assertEqual(BillingEntry.objects.get().status_key, 'due')
+        self.entry(patient_name='Walk', payment_status='advance')
+        self.assertEqual(BillingEntry.objects.get(patient_name='Walk').amount_paid, 0)

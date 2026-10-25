@@ -172,6 +172,37 @@
   </div>
 
   {% elif tab == 'billing' %}
+  <div class="section-title" style="padding-top:18px"><span class="bar">Advance paid</span><span>
+    <button type="button" class="primary-btn" style="height:34px" onclick="var f=document.getElementById('advanceForm');f.hidden=!f.hidden;if(!f.hidden)f.querySelector('[name=amount]').focus()">＋ Take advance</button>
+    {% if advance_balance > 0 %}<button type="button" class="secondary-btn" style="height:34px" onclick="var f=document.getElementById('refundForm');f.hidden=!f.hidden">Refund</button>{% endif %}</span></div>
+  <div style="margin:0 24px 12px;padding:12px 16px;border:1px solid {% if advance_balance > 0 %}#cfe6d8;background:#f1faf5{% else %}var(--line);background:#fff{% endif %};border-radius:10px">
+    <b style="font-size:15px">Advance balance: NPR {{ advance_balance }}</b>
+    <div class="patient-id">{% if advance_balance > 0 %}Choose <b>Use advance balance</b> when billing, or <b>Receive</b> a due bill with <b>From advance</b>. The balance carries to the next sessions.{% else %}Nothing held. If this patient pays ahead (for example NPR 1000 when a session is 700), take it here and the balance is used up session by session.{% endif %}</div>
+  </div>
+  <form method="post" action="{% url 'billing:advance-add' patient.pk %}" id="advanceForm" hidden style="margin:0 24px 14px;padding:14px 16px;border:1px solid var(--line);border-radius:10px;background:#f6faf7">
+    {% csrf_token %}
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;align-items:end">
+      <label>Amount (NPR) {{ advance_form.amount }}</label><label>Paid by {{ advance_form.payment_mode }}</label><label>Notes {{ advance_form.notes }}</label>
+    </div>
+    <label style="display:flex;gap:8px;align-items:center;margin-top:10px;font-size:12px"><input type="checkbox" name="settle" value="1"> Use it to clear this patient's unpaid bills first</label>
+    <div style="margin-top:10px;display:flex;gap:8px"><button type="submit" class="primary-btn">Save advance</button><button type="button" class="secondary-btn" onclick="var f=document.getElementById('advanceForm');f.reset();f.hidden=true">Cancel</button></div>
+  </form>
+  <form method="post" action="{% url 'billing:advance-refund' patient.pk %}" id="refundForm" hidden style="margin:0 24px 14px;padding:14px 16px;border:1px solid var(--line);border-radius:10px;background:#fff7f0">
+    {% csrf_token %}
+    <div class="patient-id" style="margin-bottom:8px">Pay back part of the advance (up to NPR {{ advance_balance }}).</div>
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;align-items:end">
+      <label>Amount (NPR) {{ advance_form.amount }}</label><label>Paid back by {{ advance_form.payment_mode }}</label><label>Notes {{ advance_form.notes }}</label>
+    </div>
+    <div style="margin-top:10px;display:flex;gap:8px"><button type="submit" class="primary-btn">Refund</button><button type="button" class="secondary-btn" onclick="document.getElementById('refundForm').hidden=true">Cancel</button></div>
+  </form>
+  {% if advance_moves %}
+  <div class="table-wrap" style="padding:0 24px 14px"><table>
+    <thead><tr><th>DATE</th><th>ADVANCE ACTIVITY</th><th>DETAIL</th><th style="text-align:right">AMOUNT</th></tr></thead>
+    <tbody>{% for m in advance_moves %}<tr><td>{{ m.paid_on|date:"Y-m-d" }}</td><td>{{ m.get_kind_display }}</td><td>{% if m.entry %}{{ m.entry.invoice_number }}{% elif m.payment_mode %}{{ m.get_payment_mode_display }}{% endif %}{% if m.notes %} · {{ m.notes }}{% endif %}</td>
+      <td style="text-align:right;font-weight:700;color:{% if m.amount < 0 %}#b78317{% else %}#16834f{% endif %}">{% if m.amount > 0 %}+{% endif %}NPR {{ m.amount }}</td></tr>{% endfor %}</tbody>
+  </table></div>
+  {% endif %}
+
   <div class="section-title" style="padding-top:18px"><span class="bar">Packages</span><a class="primary-btn" href="{% url 'billing:packages' %}?patient={{ patient.pk }}" style="height:34px;text-decoration:none;display:inline-flex;align-items:center">＋ Start package</a></div>
   <div style="padding:0 24px 8px">
   {% for pk in packages %}

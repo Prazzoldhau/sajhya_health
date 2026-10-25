@@ -7,6 +7,8 @@ from django.db import models
 from django.utils import timezone
 
 PAYMENT_MODE_CHOICES = [('cash', 'Cash'), ('card', 'Card'), ('online', 'Online'), ('other', 'Other')]
+ADVANCE = 'advance'  # not money changing hands: a bill settled out of what the patient paid in advance
+RECEIVED_MODE_CHOICES = PAYMENT_MODE_CHOICES + [(ADVANCE, 'From advance')]
 
 
 class BillingEntry(models.Model):
@@ -81,6 +83,32 @@ class BillingEntry(models.Model):
         return payment
 
 
+    def use_advance(self, user=None, limit=None):
+        """Settle this bill (as far as it goes) out of the patient's advance balance. Returns the amount used (0 if none)."""
+        if self.patient_id is None or self.is_cancelled or self.amount_due <= 0:
+            return Decimal('0')
+        amount = min(advance_balance(self.patient_id), self.amount_due, Decimal(limit) if limit is not None else self.amount_due)
+        if amount <= 0:
+            return Decimal('0')
+        payment = self.record_payment(amount, ADVANCE, notes='From advance', user=user)
+        if payment is None:
+            return Decimal('0')
+        PatientAdvance.objects.create(patient_id=self.patient_id, professional=self.professional, kind=PatientAdvance.USED, amount=-payment.amount,
+                                      entry=self, paid_on=payment.paid_on, recorded_by=user)
+        return payment.amount
+
+    def release_advance(self, user=None):
+        """Hand back to the patient's advance balance whatever this bill took from it (the bill was cancelled)."""
+        taken = self.payments.filter(payment_mode=ADVANCE)
+        total = sum((p.amount for p in taken), Decimal('0'))
+        if total > 0 and self.patient_id:
+            taken.delete()
+            self.amount_paid -= total
+            self.save(update_fields=['amount_paid', 'updated_at'])
+            PatientAdvance.objects.create(patient_id=self.patient_id, professional=self.professional, kind=PatientAdvance.RETURNED, amount=total,
+                                          entry=self, recorded_by=user, notes='Bill cancelled')
+        return total
+
     def set_amount_paid(self, target, payment_mode='cash', user=None):
         """Correct what has been received in total (a reception mistake): add the missing payment, or take the surplus back off the
         most recent payments. The ledger always adds up to amount_paid."""
@@ -93,13 +121,16 @@ class BillingEntry(models.Model):
             for payment in self.payments.order_by('-created_at', '-id'):
                 if remove <= 0:
                     break
-                if payment.amount <= remove:
-                    remove -= payment.amount
+                cut = min(payment.amount, remove)
+                if payment.payment_mode == ADVANCE and self.patient_id:  # what came out of the advance goes back into it
+                    PatientAdvance.objects.create(patient_id=self.patient_id, professional=self.professional, kind=PatientAdvance.RETURNED,
+                                                  amount=cut, entry=self, recorded_by=user, notes='Bill corrected')
+                remove -= cut
+                if cut >= payment.amount:
                     payment.delete()
                 else:
-                    payment.amount -= remove
+                    payment.amount -= cut
                     payment.save(update_fields=['amount'])
-                    remove = Decimal('0')
             self.amount_paid = target
             self.save(update_fields=['amount_paid', 'updated_at'])
 
@@ -108,7 +139,7 @@ class EntryPayment(models.Model):
     """Money received against a billing entry - on the day of the bill, or later when the patient settles a credit."""
     entry = models.ForeignKey(BillingEntry, on_delete=models.CASCADE, related_name='payments')
     amount = models.DecimalField(max_digits=10, decimal_places=2)
-    payment_mode = models.CharField(max_length=10, choices=PAYMENT_MODE_CHOICES, default='cash')
+    payment_mode = models.CharField(max_length=10, choices=RECEIVED_MODE_CHOICES, default='cash')
     notes = models.CharField(max_length=255, blank=True, default='')
     paid_on = models.DateField(default=timezone.localdate)
     recorded_by = models.ForeignKey(settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.SET_NULL, related_name='+')
@@ -119,6 +150,36 @@ class EntryPayment(models.Model):
 
     def __str__(self):
         return f'NPR {self.amount} - {self.entry.invoice_number}'
+
+
+class PatientAdvance(models.Model):
+    """Money a patient pays ahead of their sessions (for example NPR 1000 when a session costs 700). Deposits and returns add to the
+    balance; bills settled from it and refunds take away. The balance is the sum of the signed amounts."""
+    DEPOSIT, USED, REFUND, RETURNED = 'deposit', 'used', 'refund', 'returned'
+    KIND_CHOICES = [(DEPOSIT, 'Advance taken'), (USED, 'Used for a bill'), (REFUND, 'Refunded'), (RETURNED, 'Returned to balance')]
+
+    patient = models.ForeignKey('accounts.Patient', on_delete=models.CASCADE, related_name='advances')
+    professional = models.ForeignKey('accounts.ProfessionalProfile', on_delete=models.CASCADE, related_name='patient_advances')
+    kind = models.CharField(max_length=10, choices=KIND_CHOICES)
+    amount = models.DecimalField(max_digits=10, decimal_places=2, help_text='Positive adds to the balance, negative takes from it.')
+    payment_mode = models.CharField(max_length=10, choices=PAYMENT_MODE_CHOICES, blank=True, help_text='How the money was paid in (or paid back).')
+    entry = models.ForeignKey(BillingEntry, null=True, blank=True, on_delete=models.SET_NULL, related_name='advance_moves')
+    notes = models.CharField(max_length=255, blank=True)
+    paid_on = models.DateField(default=timezone.localdate)
+    recorded_by = models.ForeignKey(settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.SET_NULL, related_name='+')
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['-paid_on', '-created_at', '-id']
+
+    def __str__(self):
+        return f'{self.patient} {self.get_kind_display()} {self.amount}'
+
+
+def advance_balance(patient_id):
+    """What the patient still has in advance with this practice."""
+    from django.db.models import Sum
+    return PatientAdvance.objects.filter(patient_id=patient_id).aggregate(t=Sum('amount'))['t'] or Decimal('0')
 
 
 class Plan(models.Model):
