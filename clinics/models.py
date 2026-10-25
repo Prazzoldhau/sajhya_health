@@ -162,6 +162,8 @@ class ClinicMember(models.Model):
     clinic = models.ForeignKey(Clinic, on_delete=models.CASCADE, related_name='members')
     role = models.CharField(max_length=15, choices=ROLE_CHOICES, default=PHYSIO)
     physio = models.ForeignKey('accounts.ProfessionalProfile', null=True, blank=True, on_delete=models.CASCADE, related_name='clinic_memberships')
+    user = models.OneToOneField('auth.User', null=True, blank=True, on_delete=models.SET_NULL, related_name='clinic_staff',
+                                help_text='Staff only: the sign-in the owner gave this person.')
     name = models.CharField(max_length=150, blank=True, help_text='Staff only; physios use their profile name.')
     phone = models.CharField(max_length=20, blank=True)
     email = models.EmailField(blank=True)
@@ -183,6 +185,17 @@ class ClinicMember(models.Model):
     @property
     def is_physio(self):
         return self.role == self.PHYSIO
+
+    # what each staff role may do at the front desk (clinical records are never part of it)
+    PERMISSIONS = {
+        MANAGER: {'overview', 'patients', 'contact', 'register', 'queue', 'queue_manage', 'team'},
+        RECEPTIONIST: {'patients', 'contact', 'register', 'queue', 'queue_manage'},
+        ASSISTANT: {'patients', 'queue', 'queue_manage'},
+        OTHER: {'queue'},
+    }
+
+    def can(self, permission):
+        return permission in self.PERMISSIONS.get(self.role, ())
 
 
 class QueueEntry(models.Model):

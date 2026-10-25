@@ -45,11 +45,13 @@ class Account(models.Model):
     PROFESSIONAL = 'professional'
     CLINIC = 'clinic'
     ENTERPRISE = 'enterprise'
+    STAFF = 'staff'
     ACCOUNT_TYPES = [
         (CLIENT, 'Client'),
         (PROFESSIONAL, 'Professional'),
         (CLINIC, 'Clinic'),
         (ENTERPRISE, 'Enterprise'),
+        (STAFF, 'Clinic staff'),
     ]
 
     user = models.OneToOneField(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='account')

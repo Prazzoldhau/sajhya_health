@@ -25,3 +25,27 @@ def set_clinic_login(clinic, username, password):
     clinic.workspace = profile
     clinic.save(update_fields=['workspace'])
     return user
+
+
+@transaction.atomic
+def set_staff_login(member, username, password):
+    """Give a staff member a sign-in, or change its username and password. Returns the user."""
+    if member.user_id:
+        user = member.user
+        user.username = username
+        user.set_password(password)
+        user.is_active = True
+        user.save()
+        return user
+    user = User.objects.create_user(username=username, password=password)
+    Account.objects.create(user=user, account_type=Account.STAFF, organization_name=member.clinic.name)
+    member.user = user
+    member.save(update_fields=['user'])
+    return user
+
+
+def close_staff_login(member):
+    """Removing someone from the team also stops them signing in."""
+    if member.user_id:
+        member.user.is_active = False
+        member.user.save(update_fields=['is_active'])

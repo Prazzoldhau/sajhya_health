@@ -1,0 +1,114 @@
+{% load static %}<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>{{ clinic.name }} | Front desk</title>
+<link rel="icon" type="image/png" href="{% static 'images/favicon.png' %}">
+<style>
+  :root { --green: #168653; --green-dark: #116b43; --green-soft: #e9f7ef; --green-border: #c8ead7; --ink: #18352b; --muted: #6c8178; --line: #e1ebe5; --page: #f5faf7; }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--page); color: var(--ink); font-family: Inter, ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif; font-size: 14px; }
+  button, input, select, textarea { font: inherit; } button { cursor: pointer; }
+  header { display: flex; align-items: center; gap: 12px; padding: 10px 20px; background: #fff; border-bottom: 1px solid var(--line); flex-wrap: wrap; }
+  header img { width: 36px; height: 36px; } header h1 { margin: 0; font-size: 17px; } header .sub { font-size: 12px; color: var(--muted); }
+  header form { margin-left: auto; } header .out { border: 1px solid var(--line); background: #fff; border-radius: 8px; padding: 7px 12px; font-weight: 600; }
+  nav { display: flex; gap: 4px; padding: 10px 20px 0; flex-wrap: wrap; }
+  nav a { padding: 9px 14px; border-radius: 8px 8px 0 0; text-decoration: none; color: var(--muted); font-weight: 700; }
+  nav a.on { background: #fff; color: var(--green-dark); border: 1px solid var(--line); border-bottom-color: #fff; }
+  main { margin: -1px 20px 30px; background: #fff; border: 1px solid var(--line); border-radius: 0 12px 12px 12px; padding: 18px 20px; min-height: 300px; }
+  .msg { margin: 12px 20px 0; padding: 10px 14px; border-radius: 8px; background: var(--green-soft); border: 1px solid var(--green-border); }
+  .msg.error { background: #fde8e8; border-color: #f2c4c4; color: #8c2b2b; }
+  .kpis { display: grid; grid-template-columns: repeat(auto-fill, minmax(170px, 1fr)); gap: 12px; }
+  .kpi { border: 1px solid var(--line); border-radius: 10px; padding: 14px; } .kpi .k { font-size: 12px; color: var(--muted); } .kpi .v { font-size: 26px; font-weight: 800; color: var(--green-dark); }
+  table { width: 100%; border-collapse: collapse; font-size: 13px; } th { text-align: left; font-size: 11px; color: var(--muted); padding: 8px 10px; border-bottom: 1px solid var(--line); }
+  td { padding: 9px 10px; border-bottom: 1px solid #eef3ef; }
+  .hint { font-size: 12px; color: var(--muted); }
+  .primary-btn, .secondary-btn { border-radius: 8px; padding: 9px 16px; font-weight: 700; border: 1px solid var(--green); }
+  .primary-btn { background: var(--green); color: #fff; } .secondary-btn { background: #fff; color: var(--green-dark); }
+  .tone { display: inline-block; padding: 3px 9px; border-radius: 12px; font-size: 11px; font-weight: 750; background: #eef3ef; color: #4b5f55; }
+  .tone.good { background: #e7f7ed; color: #16834f; } .tone.warn { background: #fff3d6; color: #a97510; }
+  .q { display: flex; align-items: center; gap: 12px; border: 1px solid var(--line); border-radius: 10px; padding: 10px 14px; margin-bottom: 8px; flex-wrap: wrap; }
+  .q.called { border-color: #7dc99d; background: #f1faf5; } .q form { margin: 0; } .q .acts { margin-left: auto; display: flex; gap: 6px; }
+  .q .no { width: 30px; height: 30px; border-radius: 50%; background: #e7f7ed; color: #16834f; font-weight: 800; display: grid; place-items: center; }
+  .form { display: grid; gap: 10px; max-width: 520px; } .form label { display: grid; gap: 3px; font-size: 12px; font-weight: 700; color: var(--muted); }
+  .form input, .form select, .form textarea { border: 1px solid var(--line); border-radius: 8px; padding: 8px 10px; background: #fff; }
+  .form .errorlist { color: #b83b3b; font-size: 12px; margin: 0; padding: 0; list-style: none; }
+  .search { position: relative; } .search input { width: 100%; height: 38px; border: 1px solid var(--line); border-radius: 8px; padding: 0 10px; }
+  .icd-list { position: absolute; left: 0; right: 0; top: 100%; z-index: 60; margin: 4px 0 0; padding: 4px; list-style: none; max-height: 240px; overflow-y: auto; background: #fff; border: 1px solid var(--green-border); border-radius: 8px; box-shadow: 0 8px 24px #0002; }
+  .icd-list li { padding: 8px 10px; border-radius: 6px; cursor: pointer; font-size: 12px; } .icd-list li:hover { background: var(--green-soft); }
+  .paused { background: #fff3d6; border: 1px solid #ecd9a0; color: #7a5a0c; padding: 10px 14px; border-radius: 8px; margin-bottom: 14px; }
+</style>
+</head>
+<body>
+<header>
+  <img src="{% static 'images/logo-128.png' %}" alt="Sajhya Health">
+  <div><h1>{{ clinic.name }}</h1><div class="sub">Front desk · {{ user.get_username }} · {{ member.name }} ({{ member.get_role_display }})</div></div>
+  <form method="post" action="{% url 'accounts:logout' %}">{% csrf_token %}<button class="out" type="submit">Log out</button></form>
+</header>
+{% for m in messages %}<div class="msg {{ m.tags }}">{{ m }}</div>{% endfor %}
+<nav>{% for key, label in tabs %}<a href="?tab={{ key }}" class="{% if key == tab %}on{% endif %}">{{ label }}</a>{% endfor %}</nav>
+<main>
+{% if not usable %}<div class="paused">The clinic's plan is not active, so registering patients and running the queue are paused. Please ask the clinic owner.</div>{% endif %}
+
+{% if tab == 'overview' %}
+  <div class="kpis">
+    <div class="kpi"><div class="k">Patients</div><div class="v">{{ patient_total }}</div></div>
+    <div class="kpi"><div class="k">Team members</div><div class="v">{{ team_count }}</div></div>
+    <div class="kpi"><div class="k">Waiting today</div><div class="v">{{ queue_counts.waiting }}</div></div>
+    <div class="kpi"><div class="k">In session</div><div class="v">{{ queue_counts.called }}</div></div>
+    <div class="kpi"><div class="k">Completed today</div><div class="v">{{ queue_counts.completed }}</div></div>
+  </div>
+
+{% elif tab == 'queue' %}
+  {% if can_manage_queue %}
+  <form method="post" action="{% url 'clinics:desk-queue-add' %}" style="display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-bottom:16px">{% csrf_token %}
+    <div class="search" style="flex:1;min-width:240px"><input type="text" id="queueSearch" placeholder="Search the clinic's patients to add to today's queue..." autocomplete="off"></div>
+    <input type="hidden" name="patient_id" id="queuePatient"><span class="hint" id="queueChosen"></span>
+    <button class="primary-btn" type="submit">＋ Add to queue</button>
+  </form>
+  {% endif %}
+  {% for e in entries %}
+  <div class="q {% if e.status == 'called' %}called{% endif %}">
+    <span class="no">{{ forloop.counter }}</span>
+    <div><b>{{ e.patient.name }}</b> <span class="hint">{{ e.patient.patient_code }}</span><div class="hint">Joined {{ e.joined_at|time:"H:i" }}{% if can_contact and e.patient.phone %} · {{ e.patient.phone }}{% endif %}</div></div>
+    <span class="tone {% if e.status == 'called' %}good{% elif e.status == 'waiting' %}warn{% endif %}">{{ e.get_status_display }}</span>
+    {% if can_manage_queue and e.status == 'waiting' or can_manage_queue and e.status == 'called' %}
+    <div class="acts">
+      {% if e.status == 'waiting' %}<form method="post" action="{% url 'clinics:desk-queue-action' e.pk %}">{% csrf_token %}<button class="primary-btn" name="action" value="call">Call in</button></form>{% endif %}
+      <form method="post" action="{% url 'clinics:desk-queue-action' e.pk %}">{% csrf_token %}<button class="secondary-btn" name="action" value="complete">Done</button></form>
+      {% if can_register %}<form method="post" action="{% url 'clinics:desk-queue-action' e.pk %}">{% csrf_token %}<button class="secondary-btn" name="action" value="cancel">Cancel</button></form>{% endif %}
+    </div>
+    {% endif %}
+  </div>
+  {% empty %}<p class="hint">Nobody in the queue yet today.</p>{% endfor %}
+  {% if can_manage_queue %}
+  <script src="{% static 'js/sajhya-ui.js' %}"></script>
+  <script>SajhyaUI.patientPicker(document.getElementById('queueSearch'), document.getElementById('queuePatient'), { url: "{% url 'clinics:desk-patient-search' %}", hint: document.getElementById('queueChosen') });</script>
+  {% endif %}
+
+{% elif tab == 'patients' %}
+  <form method="get" style="display:flex;gap:8px;margin-bottom:14px"><input type="hidden" name="tab" value="patients">
+    <input type="search" name="q" value="{{ q }}" placeholder="Search name{% if can_contact %}, phone{% endif %} or ID" style="height:38px;border:1px solid var(--line);border-radius:8px;padding:0 10px;min-width:260px">
+    <button class="secondary-btn" type="submit">Search</button><span class="hint" style="align-self:center">{{ patient_total }} patients at this clinic.</span></form>
+  <table><thead><tr><th>PATIENT</th><th>ID</th>{% if can_contact %}<th>PHONE</th>{% endif %}<th>STATUS</th></tr></thead><tbody>
+  {% for p in patients %}<tr><td><b>{{ p.name }}</b></td><td>{{ p.patient_code }}</td>{% if can_contact %}<td>{{ p.phone }}</td>{% endif %}<td>{{ p.get_status_display }}</td></tr>
+  {% empty %}<tr><td colspan="4" class="hint">No patients found.</td></tr>{% endfor %}</tbody></table>
+  <p class="hint">Clinical records are only visible to the clinic's physiotherapists.</p>
+
+{% elif tab == 'register' %}
+  <p class="hint" style="margin-top:0">Register a walk-in patient. The physiotherapist adds the diagnosis and treatment.</p>
+  <form method="post" action="{% url 'clinics:desk-register' %}" class="form">{% csrf_token %}
+    {% for f in form %}<label>{{ f.label }}{{ f }}{{ f.errors }}</label>{% endfor %}
+    <button class="primary-btn" type="submit" style="width:fit-content">Register patient</button>
+  </form>
+
+{% elif tab == 'team' %}
+  <table><thead><tr><th>NAME</th><th>ROLE</th></tr></thead><tbody>
+    <tr><td><b>{{ clinic.owner.full_name }}</b></td><td>Owner / physiotherapist</td></tr>
+    {% for m in members %}<tr><td><b>{{ m.display_name }}</b></td><td>{{ m.get_role_display }}</td></tr>{% endfor %}
+  </tbody></table>
+{% endif %}
+</main>
+</body>
+</html>

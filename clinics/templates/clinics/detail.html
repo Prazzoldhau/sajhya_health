@@ -106,7 +106,8 @@
           <td>{{ m.get_role_display }}</td>
           <td>{% if m.status == 'invited' %}<span class="tone warn">Invitation sent</span>{% else %}<span class="tone good">Active</span>{% endif %}</td>
           <td>{% if m.physio %}{{ m.physio.mobile }}{% else %}{{ m.phone }}{% if m.email %}<div class="hint">{{ m.email }}</div>{% endif %}{% endif %}</td>
-          <td>{% if is_owner %}<form method="post" action="{% url 'clinics:member-remove' clinic.pk m.pk %}" onsubmit="return confirm('Remove {{ m.display_name|escapejs }} from the team?')">{% csrf_token %}<button class="text-link" title="Remove">✕ Remove</button></form>{% endif %}</td>
+          <td>{% if clinic.owner_id == profile.pk and not m.physio_id %}<button type="button" class="text-link" data-staff-login="{{ m.pk }}" data-name="{{ m.name }}" data-username="{{ m.user.username }}" data-role="{{ m.get_role_display }}">{% if m.user_id %}🔑 Login: {{ m.user.username }}{% else %}🔑 Give a login{% endif %}</button>{% endif %}
+          {% if is_owner %}<form method="post" action="{% url 'clinics:member-remove' clinic.pk m.pk %}" onsubmit="return confirm('Remove {{ m.display_name|escapejs }} from the team?')">{% csrf_token %}<button class="text-link" title="Remove">✕ Remove</button></form>{% endif %}</td>
         </tr>
         {% endfor %}
       </tbody>
@@ -129,7 +130,7 @@
       </form>
         </div>
         <div data-teampane="staff" hidden>
-            <p class="hint" style="margin-top:0">Receptionists, assistants and managers are kept as records (they do not sign in).</p>
+            <p class="hint" style="margin-top:0">Add receptionists, assistants and managers here, then use <b>Give a login</b> on their row so they can sign in with limited access.</p>
       <form method="post" action="{% url 'clinics:staff-add' clinic.pk %}" class="cl-form">{% csrf_token %}
         <label>Name{{ staff_form.name }}</label><label>Role{{ staff_form.role }}</label><label>Phone{{ staff_form.phone }}</label><label>Email{{ staff_form.email }}</label>
         <button class="primary-btn" type="submit" style="width:fit-content">Add staff member</button>
@@ -138,6 +139,40 @@
       </div>
     </div>
   </div>
+  {% if clinic.owner_id == profile.pk %}
+  <div class="modal-backdrop" id="staffLoginModal" role="dialog" aria-modal="true">
+    <div class="modal-card" style="max-width:480px">
+      <div class="modal-head"><h2 id="slTitle">Staff login</h2><button type="button" class="modal-x" data-close aria-label="Close">×</button></div>
+      <form method="post" id="staffLoginForm" class="cl-form" autocomplete="off" style="padding:6px 18px 18px" data-url="{% url 'clinics:staff-login' clinic.pk 0 %}">{% csrf_token %}
+        <p class="hint" id="slHint" style="margin:0"></p>
+        <label>Username<input type="text" name="username" id="slUser" required autocapitalize="none"></label>
+        <label>Password<input type="password" name="password1" required autocomplete="new-password"></label>
+        <label>Repeat the password<input type="password" name="password2" required autocomplete="new-password"></label>
+        <button class="primary-btn" type="submit" style="width:fit-content">Save login</button>
+      </form>
+    </div>
+  </div>
+  <script>
+  (function () {
+    var HINTS = {
+      Manager: 'A manager sees the clinic overview, team, patients (with phone numbers) and the queue, and can register patients and run the queue.',
+      Receptionist: 'A receptionist sees patients (with phone numbers) and the queue, and can register patients and run the queue.',
+      'Therapy assistant': 'A therapy assistant sees patient names and the queue, and can call patients and mark them complete. No phone numbers.',
+      'Other staff': 'Other staff can see today\'s queue only.'
+    };
+    document.querySelectorAll('[data-staff-login]').forEach(function (b) {
+      b.addEventListener('click', function () {
+        var f = document.getElementById('staffLoginForm');
+        f.action = f.dataset.url.replace('/0/', '/' + b.dataset.staffLogin + '/');
+        document.getElementById('slTitle').textContent = 'Login for ' + b.dataset.name;
+        document.getElementById('slHint').textContent = (HINTS[b.dataset.role] || '') + ' Clinical records are never shown to staff.';
+        document.getElementById('slUser').value = b.dataset.username || '';
+        SajhyaUI.openModal('staffLoginModal');
+      });
+    });
+  })();
+  </script>
+  {% endif %}
   <script>
   (function () {
     var tabs = document.querySelectorAll('[data-teamtab]'), panes = document.querySelectorAll('[data-teampane]');

@@ -603,3 +603,105 @@ class ClinicLoginTests(Base):
         self.assertContains(page, 'data-open="addTeamModal"')
         self.assertContains(page, reverse('clinics:invite', args=[clinic.pk]))
         self.assertContains(page, reverse('clinics:staff-add', args=[clinic.pk]))
+
+
+class StaffLoginTests(Base):
+    """Staff (manager, receptionist, assistant, other) sign in to a limited front desk the owner gave them."""
+    CREDS = {'username': 'ram-desk', 'password1': PASSWORD, 'password2': PASSWORD}
+
+    def add_staff(self, clinic, name='Ram', role='receptionist', **creds):
+        self.client.post(reverse('clinics:staff-add', args=[clinic.pk]), {'name': name, 'role': role})
+        member = ClinicMember.objects.get(clinic=clinic, name=name)
+        self.client.post(reverse('clinics:staff-login', args=[clinic.pk, member.pk]), {**self.CREDS, **creds})
+        member.refresh_from_db()
+        return member
+
+    def test_owner_gives_a_staff_member_a_login_that_opens_the_front_desk(self):
+        clinic = self.make_clinic()
+        member = self.add_staff(clinic)
+        self.assertEqual((member.user.username, member.user.account.account_type), ('ram-desk', 'staff'))
+        self.assertContains(self.client.get(reverse('clinics:detail', args=[clinic.pk]), {'tab': 'team'}), 'Login: ram-desk')
+        self.client.logout()
+        r = self.client.post(reverse('accounts:login'), {'username': 'ram-desk', 'password': PASSWORD})
+        self.assertEqual(r.status_code, 302)
+        self.assertRedirects(self.client.get(reverse('accounts:welcome')), reverse('clinics:desk'), fetch_redirect_response=False)
+        page = self.client.get(reverse('clinics:desk'))
+        self.assertContains(page, 'Himal Clinic')
+        self.assertContains(page, 'Register patient')
+        self.assertNotContains(page, 'Clinic details')
+        self.assertEqual(self.client.get(reverse('accounts:dashboard')).status_code, 404)  # no clinical workspace
+        self.assertEqual(self.client.get(reverse('clinics:detail', args=[clinic.pk])).status_code, 404)
+
+    def test_only_the_owner_can_set_staff_logins_and_usernames_are_unique(self):
+        clinic = self.make_clinic()
+        member = self.add_staff(clinic)
+        other = self.add_staff(clinic, name='Sita', username='ram-desk')
+        self.assertIsNone(other.user)  # taken
+        self.add_staff(clinic, name='Gita', username='gita-desk')
+        self.client.post(reverse('clinics:staff-login', args=[clinic.pk, member.pk]), {'username': 'ram2', 'password1': PASSWORD, 'password2': PASSWORD})
+        member.refresh_from_db()
+        self.assertEqual(member.user.username, 'ram2')  # changed, same user
+        self.client.post(reverse('clinics:staff-login', args=[clinic.pk, member.pk]), {'username': 'ram3', 'password1': 'short', 'password2': 'short'})
+        member.refresh_from_db()
+        self.assertEqual(member.user.username, 'ram2')  # weak password refused
+        self.as_user('gita-desk')
+        r = self.client.post(reverse('clinics:staff-login', args=[clinic.pk, member.pk]), {'username': 'hacked', 'password1': PASSWORD, 'password2': PASSWORD})
+        self.assertEqual(r.status_code, 404)
+
+    def test_receptionist_registers_patients_and_runs_the_queue_but_sees_no_clinical_data(self):
+        clinic = self.make_clinic()
+        self.add_staff(clinic)
+        self.as_user('ram-desk')
+        r = self.client.post(reverse('clinics:desk-register'), {'name': 'Walk In', 'phone': '9841000111', 'gender': 'F', 'date_of_birth': '1991-03-04', 'diagnosis': 'Injected'})
+        patient = Patient.objects.get(name='Walk In')
+        self.assertEqual((patient.clinic, patient.professional, patient.diagnosis), (clinic, self.owner, ''))
+        self.assertRedirects(r, reverse('clinics:desk') + '?tab=queue', fetch_redirect_response=False)
+        self.client.post(reverse('clinics:desk-queue-add'), {'patient_id': patient.pk})
+        entry = QueueEntry.objects.get()
+        self.client.post(reverse('clinics:desk-queue-action', args=[entry.pk]), {'action': 'call'})
+        entry.refresh_from_db()
+        self.assertEqual(entry.status, 'called')
+        page = self.client.get(reverse('clinics:desk'), {'tab': 'patients'})
+        self.assertContains(page, '9841000111')
+        self.assertNotContains(page, 'Injected')
+        self.assertNotContains(self.client.get(reverse('clinics:desk'), {'tab': 'team'}), 'Owner / physiotherapist')  # a receptionist has no team tab
+
+    def test_roles_limit_what_staff_can_do(self):
+        clinic = self.make_clinic()
+        patient = make_patient(self.owner, name='Someone', phone='9841999999')
+        patient.clinic = clinic
+        patient.save()
+        self.add_staff(clinic, 'Asha', 'assistant', username='asha')
+        self.add_staff(clinic, 'Omi', 'other', username='omi')
+        self.add_staff(clinic, 'Mani', 'manager', username='mani')
+        self.as_user('asha')
+        page = self.client.get(reverse('clinics:desk'), {'tab': 'patients'})
+        self.assertContains(page, 'Someone')
+        self.assertNotContains(page, '9841999999')  # no contact details for an assistant
+        self.assertEqual(self.client.post(reverse('clinics:desk-register'), {'name': 'No'}).status_code, 404)
+        self.client.post(reverse('clinics:desk-queue-add'), {'patient_id': patient.pk})
+        entry = QueueEntry.objects.get()
+        self.client.post(reverse('clinics:desk-queue-action', args=[entry.pk]), {'action': 'cancel'})
+        entry.refresh_from_db()
+        self.assertEqual(entry.status, 'waiting')  # an assistant cannot cancel
+        self.as_user('omi')
+        self.assertNotContains(self.client.get(reverse('clinics:desk'), {'tab': 'patients'}), 'tab=patients')  # only the queue tab exists
+        self.assertEqual(self.client.post(reverse('clinics:desk-queue-add'), {'patient_id': patient.pk}).status_code, 404)
+        self.as_user('mani')
+        self.assertContains(self.client.get(reverse('clinics:desk')), 'Waiting today')
+
+    def test_removed_staff_cannot_sign_in(self):
+        clinic = self.make_clinic()
+        member = self.add_staff(clinic)
+        self.client.post(reverse('clinics:member-remove', args=[clinic.pk, member.pk]))
+        self.client.logout()
+        self.assertFalse(self.client.login(username='ram-desk', password=PASSWORD))
+
+    def test_the_desk_is_for_staff_only(self):
+        clinic = self.make_clinic()
+        self.add_staff(clinic)
+        make_professional('stranger')
+        self.as_user('stranger')
+        self.assertEqual(self.client.get(reverse('clinics:desk')).status_code, 404)
+        self.client.logout()
+        self.assertEqual(self.client.get(reverse('clinics:desk')).status_code, 302)

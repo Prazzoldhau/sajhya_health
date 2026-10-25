@@ -72,6 +72,8 @@ def welcome(request):
     account = getattr(request.user, 'account', None)
     if profile is None and account is not None and account.account_type == Account.CLIENT:
         return redirect('portal:home')  # every Client account has a patient dashboard (services, and treatment once linked)
+    if profile is None and account is not None and account.account_type == Account.STAFF:
+        return redirect('clinics:desk')  # clinic staff work from the front desk
     next_step = None
     if profile and profile.status == ProfessionalProfile.DRAFT:
         next_step = min(profile.completed_step + 1, 5)

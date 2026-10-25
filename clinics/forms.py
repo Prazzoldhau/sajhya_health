@@ -6,6 +6,7 @@ from django.core.exceptions import ValidationError
 from django.core.files.uploadedfile import UploadedFile
 
 from accounts.images import normalize_photo
+from accounts.models import Patient
 
 from .models import AMENITIES, PROVINCES, SLOT_CHOICES, SPECIALIZATIONS, WEEKDAYS, Clinic, ClinicMember, ClinicSubscription
 
@@ -157,8 +158,9 @@ class ClinicLoginForm(forms.Form):
     def __init__(self, *args, clinic, **kwargs):
         super().__init__(*args, **kwargs)
         self.clinic = clinic
-        if clinic.workspace_id:
-            self.fields['username'].initial = clinic.workspace.account.user.get_username()
+        self.current_user = clinic.workspace.account.user if clinic.workspace_id else None
+        if self.current_user:
+            self.fields['username'].initial = self.current_user.get_username()
 
     def clean_username(self):
         from django.contrib.auth.models import User
@@ -166,8 +168,8 @@ class ClinicLoginForm(forms.Form):
         username = self.cleaned_data['username'].strip()
         UnicodeUsernameValidator()(username)
         taken = User.objects.filter(username__iexact=username)
-        if self.clinic.workspace_id:
-            taken = taken.exclude(pk=self.clinic.workspace.account.user_id)
+        if self.current_user:
+            taken = taken.exclude(pk=self.current_user.pk)
         if taken.exists():
             raise ValidationError('That username is already taken. Choose another.')
         return username
@@ -184,4 +186,36 @@ class ClinicLoginForm(forms.Form):
                 validate_password(data['password1'], candidate)
             except ValidationError as exc:
                 self.add_error('password1', exc)
+        return data
+
+
+class StaffLoginForm(ClinicLoginForm):
+    """The owner chooses the sign-in of one staff member (their own username and password, with the role's limited access)."""
+    username = forms.CharField(max_length=150, label='Username', help_text='Letters, digits and @ . + - _ only.')
+    password1 = forms.CharField(label='Password', widget=forms.PasswordInput(attrs={'autocomplete': 'new-password'}), strip=False)
+
+    def __init__(self, *args, member, **kwargs):
+        super().__init__(*args, clinic=member.clinic, **kwargs)
+        self.member = member
+        self.current_user = member.user
+        if member.user_id:
+            self.fields['username'].initial = member.user.get_username()
+
+
+class FrontDeskPatientForm(forms.ModelForm):
+    """What a receptionist or manager records when a patient walks in: identity and contact only, no clinical notes."""
+    class Meta:
+        model = Patient
+        fields = ('name', 'date_of_birth', 'gender', 'phone', 'email', 'address', 'occupation', 'referral_source')
+        widgets = {'date_of_birth': forms.DateInput(attrs={'type': 'date'}), 'address': forms.Textarea(attrs={'rows': 2})}
+        labels = {'name': 'Full name', 'date_of_birth': 'Date of birth', 'phone': 'Phone number'}
+
+    def clean_date_of_birth(self):
+        from accounts.forms import PatientForm
+        return PatientForm.clean_date_of_birth(self)
+
+    def clean(self):
+        data = super().clean()
+        if not (data.get('phone') or '').strip():
+            self.add_error('phone', 'Enter a phone number.')
         return data

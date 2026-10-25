@@ -13,8 +13,8 @@ from accounts.access import first_error, require_workspace, workspace_context, w
 from accounts.models import Patient, ProfessionalProfile, Visit
 
 from .access import clinic_allowance, clinic_for_member, clinic_for_owner
-from .forms import ClinicForm, ClinicLoginForm, StaffForm
-from .login import set_clinic_login
+from .forms import ClinicForm, ClinicLoginForm, StaffForm, StaffLoginForm
+from .login import close_staff_login, set_clinic_login, set_staff_login
 from .models import Clinic, ClinicMember, ClinicSubscription, QueueEntry
 
 TABS = [('overview', 'Overview'), ('team', 'Team'), ('patients', 'Patients'), ('queue', 'Queue'), ('settings', 'Clinic details')]
@@ -175,6 +175,24 @@ def clinic_login(request, pk):
     return render(request, 'clinics/detail.html', _detail_context(request, profile, clinic, True, 'settings', login_form=form))
 
 
+@login_required
+@require_POST
+def staff_login(request, pk, member_id):
+    """The owner gives a staff member a sign-in, or changes its username and password."""
+    profile, clinic = clinic_for_owner(request, pk)
+    if clinic.owner_id != profile.pk:
+        raise Http404
+    member = get_object_or_404(ClinicMember, pk=member_id, clinic=clinic, physio__isnull=True, status=ClinicMember.ACTIVE)
+    form = StaffLoginForm(request.POST, member=member)
+    if form.is_valid():
+        set_staff_login(member, form.cleaned_data['username'], form.cleaned_data['password1'])
+        messages.success(request, f'{member.name} can now sign in with the username "{form.cleaned_data["username"]}" '
+                                  f'and sees only what a {member.get_role_display().lower()} needs.')
+    else:
+        messages.error(request, first_error(form))
+    return _back(clinic, 'team')
+
+
 def _plan_needed(request, clinic):
     """Team and queue work once the Clinic plan is active; until then send the owner back with an explanation."""
     if clinic.is_usable:
@@ -255,6 +273,7 @@ def member_remove(request, pk, member_id):
     member.status = ClinicMember.LEFT
     member.save(update_fields=['status'])
     _release_patients(member)
+    close_staff_login(member)
     messages.success(request, f'{member.display_name} removed from the team.')
     return _back(clinic, 'team')
 

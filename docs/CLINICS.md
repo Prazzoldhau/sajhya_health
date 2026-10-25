@@ -32,7 +32,7 @@ Code: the `clinics` app. Ported from the old project's `clinic_account` app, wit
    **verified credentials** appear; licence shown masked) and sends an **invitation**. The physio is told in three places: a
    red badge on **Clinic Connect** in the sidebar, a banner on their dashboard, and an **Invitations** section at the top of
    Clinic Connect. Accepting makes them an active member (declining or leaving is always possible). *Staff* (manager,
-   receptionist, assistant, other) are records without logins.
+   receptionist, assistant, other) can be given their own login (see "Staff logins" below).
 7. **Working at a clinic (physio view)**: Clinic Connect lists **Clinics I work at** (owner, joined date, number of clinic
    patients, buttons *View patients* and *Queue*) and **Previous clinics**. From the clinic's **Patients** tab a physio
    opens any clinic patient and **treats** them: visits, treatment plans, exercise prescriptions, assessments, profile entries.
@@ -108,3 +108,22 @@ appointments shared across physios; per-clinic reports export; calling a patient
 - *Invitation not visible to the physio*: it appears at the top of **their** Clinic Connect page.
 - *A physio cannot see a phone number*: by design (see Privacy rules). Ask the clinic owner.
 - *A physio lost access to a clinic's patients*: they left/were removed, or the owner's Clinic plan expired.
+
+## Staff logins and the front desk
+
+In the Team tab, each staff row has **Give a login**. The owning physiotherapist picks a username and password for that person
+(same password rules as everywhere; usernames are unique) and can change them at any time. Removing the person from the team
+also stops them signing in. Staff sign in at the normal login page and land on the **front desk** (`/clinics/desk/`). They have no
+physiotherapist workspace and never see clinical records (diagnosis, notes, treatment, billing).
+
+| Role | Overview | Patients (names/IDs) | Phone numbers | Register patient | Queue |
+|---|---|---|---|---|---|
+| Manager | yes | yes | yes | yes | add, call, done, cancel; plus team list |
+| Receptionist | - | yes | yes | yes | add, call, done, cancel |
+| Therapy assistant | - | yes | no | no | call, done (cannot add or cancel) |
+| Other staff | - | - | - | - | view only |
+
+Patients a staff member registers belong to the clinic (they count toward the monthly cap) and to the owning physiotherapist's team.
+The queue and registration pause while the Clinic plan is not active. Staff logins have no email, so a forgotten password is reset
+by the owner from the same button.
+
