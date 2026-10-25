@@ -97,7 +97,7 @@
         <td><b>{{ m.latest|default_if_none:"—" }}</b>{% if m.latest != None %} {{ m.unit }}{% endif %}</td>
         <td>{{ m.target|default_if_none:"—" }}{% if m.target != None %} {{ m.unit }}{% endif %}</td>
         <td>{% if m.progress_pct != None %}<div class="bar-track"><div class="bar-fill" style="width:{{ m.progress_pct }}%"></div></div><span class="patient-id">{{ m.progress_pct }}% to target</span>{% else %}<span class="patient-id">Set a baseline and target to track</span>{% endif %}</td>
-        <td class="no-print"><form method="post" action="{% url 'accounts:plan-action' plan.pk %}" class="log-form">{% csrf_token %}<input type="hidden" name="action" value="log_reading"><input type="hidden" name="measure" value="{{ m.pk }}"><input type="number" step="any" name="value" placeholder="Value" required><input type="date" name="date" value="{{ today|date:'Y-m-d' }}"><button type="submit">Log</button></form></td>
+        <td class="no-print"><form method="post" action="{% url 'accounts:plan-action' plan.pk %}" class="log-form">{% csrf_token %}<input type="hidden" name="action" value="log_reading"><input type="hidden" name="measure" value="{{ m.pk }}"><input type="number" step="any" name="value" placeholder="Value" autocomplete="off" required><input type="date" name="date" value="{{ today|date:'Y-m-d' }}"><button type="submit">Log</button></form></td>
       </tr>
       {% if m.readings.all %}<tr><td colspan="6" style="padding:0 9px 10px;color:var(--muted);font-size:10px">History: {% for r in m.readings.all %}{{ r.date|date:"M j" }}: <b>{{ r.value }}</b>{% if not forloop.last %} → {% endif %}{% endfor %}</td></tr>{% endif %}
     {% empty %}
