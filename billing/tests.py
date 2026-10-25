@@ -380,3 +380,42 @@ class CreditBillTests(BillingBase):
         import_module('billing.migrations.0008_existing_bills_are_paid').mark_existing_paid(apps, None)
         legacy.refresh_from_db()
         self.assertEqual((legacy.amount_paid, legacy.payments.get().payment_mode), (400, 'card'))
+
+
+class CancelBillTests(BillingBase):
+    def test_a_paid_bill_can_still_be_edited_and_a_bill_can_be_cancelled_and_restored(self):
+        self.entry(rate='500')
+        entry = BillingEntry.objects.get()
+        # edit after it was paid: raise the amount, the extra becomes due
+        self.client.post(reverse('billing:entry-edit', args=[entry.pk]), {'entry_date': self.today.isoformat(), 'patient_name': 'Walk In', 'service': 'Consult + gel', 'rate': '650', 'payment_mode': 'cash'})
+        entry.refresh_from_db()
+        self.assertEqual((entry.rate, entry.amount_paid, entry.amount_due, entry.status_key), (650, 500, 150, 'partial'))
+        self.assertContains(self.client.get(reverse('billing:billing'), {'edit': entry.pk}), f'/{entry.pk}/save/')
+        # cancel: stays on record, counts for nothing
+        r = self.client.post(reverse('billing:entry-cancel', args=[entry.pk]), {'reason': 'Entered twice'})
+        self.assertEqual(r.status_code, 302)
+        entry.refresh_from_db()
+        self.assertEqual((entry.status_key, entry.cancel_reason, entry.amount_due), ('cancelled', 'Entered twice', 0))
+        page = self.client.get(reverse('billing:billing'))
+        self.assertEqual((page.context['total'], page.context['bills_due'], page.context['collected'], page.context['month_total']), (0, 0, 0, 0))
+        self.assertEqual(revenue_for(self.profile, self.today), 0)
+        self.assertContains(page, 'Entered twice')
+        self.assertIsNone(entry.record_payment(10))
+        self.client.post(reverse('billing:entry-edit', args=[entry.pk]), {'entry_date': self.today.isoformat(), 'patient_name': 'Walk In', 'service': 'X', 'rate': '900', 'payment_mode': 'cash'})
+        entry.refresh_from_db()
+        self.assertEqual(entry.rate, 650)  # cancelled bills are not editable
+        self.client.post(reverse('billing:entry-restore', args=[entry.pk]))
+        entry.refresh_from_db()
+        self.assertEqual((entry.status_key, revenue_for(self.profile, self.today)), ('partial', 500))
+
+    def test_cancel_from_the_patient_tab_and_ownership(self):
+        tab = reverse('accounts:patient-detail', args=[self.patient.pk]) + '?tab=billing'
+        self.client.post(reverse('billing:patient-bill', args=[self.patient.pk]), {'entry_date': self.today.isoformat(), 'service': 'T', 'rate': '300', 'payment_mode': 'cash', 'payment_status': 'due'})
+        entry = BillingEntry.objects.get()
+        self.assertContains(self.client.get(tab), 'Cancel bill')
+        self.assertRedirects(self.client.post(reverse('billing:entry-cancel', args=[entry.pk]), {'next': tab}), tab, fetch_redirect_response=False)
+        self.assertContains(self.client.get(tab), 'Cancelled')
+        stranger, _ = make_professional('stranger')
+        other = self.client_class()
+        other.force_login(stranger)
+        self.assertEqual(other.post(reverse('billing:entry-cancel', args=[entry.pk])).status_code, 404)

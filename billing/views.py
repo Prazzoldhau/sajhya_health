@@ -17,7 +17,7 @@ def revenue_for(profile, date):
     """Money actually received on one day: payments on bills (including late settlements of credit) plus package payments."""
     start = timezone.make_aware(datetime.datetime.combine(date, datetime.time.min))
     end = start + datetime.timedelta(days=1)
-    entries = EntryPayment.objects.filter(entry__professional=profile, paid_on=date).aggregate(t=Sum('amount'))['t'] or 0
+    entries = EntryPayment.objects.filter(entry__professional=profile, entry__cancelled_at__isnull=True, paid_on=date).aggregate(t=Sum('amount'))['t'] or 0
     packages = PackagePayment.objects.filter(package__professional=profile, created_at__gte=start, created_at__lt=end).aggregate(t=Sum('amount'))['t'] or 0
     return entries + packages
 
@@ -51,14 +51,15 @@ def billing(request):
     by_mode = {m: 0 for m in mode_names}
     total = 0
     for e in entries:
-        total += e.rate
-    received = EntryPayment.objects.filter(entry__professional=profile, paid_on=selected)
+        if not e.is_cancelled:
+            total += e.rate
+    received = EntryPayment.objects.filter(entry__professional=profile, entry__cancelled_at__isnull=True, paid_on=selected)
     for mode, amount in received.values_list('payment_mode', 'amount'):
         by_mode[mode] += amount
     collected = sum(by_mode.values())
-    month_total = profile.billing_entries.filter(entry_date__year=selected.year, entry_date__month=selected.month).aggregate(t=Sum('rate'))['t'] or 0
+    month_total = profile.billing_entries.filter(cancelled_at__isnull=True, entry_date__year=selected.year, entry_date__month=selected.month).aggregate(t=Sum('rate'))['t'] or 0
     packages_due = sum((p.amount_due for p in PatientPackage.objects.filter(professional=profile).exclude(status='cancelled')), 0)
-    owed = [e for e in profile.billing_entries.filter(amount_paid__lt=F('rate')).select_related('patient').order_by('entry_date', 'id')]
+    owed = [e for e in profile.billing_entries.filter(cancelled_at__isnull=True, amount_paid__lt=F('rate')).select_related('patient').order_by('entry_date', 'id')]
     bills_due = sum((e.amount_due for e in owed), 0)
 
     context = workspace_context(request.user, profile)
@@ -67,7 +68,7 @@ def billing(request):
         'prev_date': selected - datetime.timedelta(days=1), 'next_date': selected + datetime.timedelta(days=1),
         'total': total, 'by_mode': [(mode_names[m], v) for m, v in by_mode.items()],
         'month_total': month_total, 'month_label': f'{selected:%B %Y}', 'package_payments': revenue_for(profile, selected) - collected, 'collected': collected,
-        'packages_due': packages_due, 'owed': owed, 'bills_due': bills_due, 'pay_form': EntryPaymentForm(), 'open_new': request.GET.get('new') == '1',
+        'packages_due': packages_due, 'owed': owed, 'bills_due': bills_due, 'pay_form': EntryPaymentForm(), 'open_new': request.GET.get('new') == '1', 'open_edit': request.GET.get('edit', '') if request.GET.get('edit', '').isdigit() else '',
     })
     return render(request, 'billing/billing.html', context)
 
@@ -79,6 +80,9 @@ def entry_save(request, pk=None):
     entry = get_object_or_404(BillingEntry, pk=pk, professional=profile) if pk else None
     if request.method != 'POST':
         return redirect('billing:billing')
+    if entry is not None and entry.is_cancelled:
+        messages.error(request, 'A cancelled bill cannot be edited. Restore it first.')
+        return _back(entry.entry_date)
     form = BillingEntryForm(request.POST, instance=entry, profile=profile)
     if form.is_valid():
         obj = form.save(commit=False)
@@ -139,6 +143,37 @@ def entry_payment(request, pk):
         messages.info(request, 'That bill is already fully paid.')
     else:
         messages.success(request, f'NPR {paid.amount:g} received for {entry.invoice_number}.' + (f' NPR {entry.amount_due:g} still due.' if entry.amount_due else ' Fully paid.'))
+    return back
+
+
+@login_required
+def entry_cancel(request, pk):
+    """Cancel a bill (a mistake, or the patient never came): it stays on record, struck through, and counts for nothing."""
+    profile = require_workspace(request)
+    entry = get_object_or_404(BillingEntry, pk=pk, professional=profile)
+    nxt = request.POST.get('next', '')
+    back = redirect(nxt if nxt.startswith('/') and not nxt.startswith('//') else f"{reverse('billing:billing')}?date={entry.entry_date.isoformat()}")
+    if request.method != 'POST':
+        return back
+    if entry.is_cancelled:
+        return back
+    entry.cancelled_at, entry.cancel_reason = timezone.now(), request.POST.get('reason', '').strip()[:255]
+    entry.save(update_fields=['cancelled_at', 'cancel_reason', 'updated_at'])
+    note = f' NPR {entry.amount_paid:g} that was received is no longer counted as money taken - refund it to the patient.' if entry.amount_paid else ''
+    messages.success(request, f'{entry.invoice_number} cancelled.{note}')
+    return back
+
+
+@login_required
+def entry_restore(request, pk):
+    profile = require_workspace(request)
+    entry = get_object_or_404(BillingEntry, pk=pk, professional=profile)
+    nxt = request.POST.get('next', '')
+    back = redirect(nxt if nxt.startswith('/') and not nxt.startswith('//') else f"{reverse('billing:billing')}?date={entry.entry_date.isoformat()}")
+    if request.method == 'POST' and entry.is_cancelled:
+        entry.cancelled_at, entry.cancel_reason = None, ''
+        entry.save(update_fields=['cancelled_at', 'cancel_reason', 'updated_at'])
+        messages.success(request, f'{entry.invoice_number} restored.')
     return back
 
 

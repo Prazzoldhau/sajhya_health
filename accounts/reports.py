@@ -100,9 +100,9 @@ def build_report(profile, start, end):
     patients = Patient.objects.filter(professional=profile)
     visits = Visit.objects.filter(patient__professional=profile, date__gte=start, date__lte=end)
     appointments = Appointment.objects.filter(professional=profile, kind=Appointment.APPOINTMENT, start__gte=lo, start__lt=hi)
-    entries = BillingEntry.objects.filter(professional=profile, entry_date__gte=start, entry_date__lte=end)
+    entries = BillingEntry.objects.filter(professional=profile, cancelled_at__isnull=True, entry_date__gte=start, entry_date__lte=end)
     payments = PackagePayment.objects.filter(package__professional=profile, created_at__gte=lo, created_at__lt=hi)
-    received = EntryPayment.objects.filter(entry__professional=profile, paid_on__gte=start, paid_on__lte=end)  # money actually received on bills
+    received = EntryPayment.objects.filter(entry__professional=profile, entry__cancelled_at__isnull=True, paid_on__gte=start, paid_on__lte=end)  # money actually received on bills
 
     # ---- who was seen, and are they new or follow-up ----
     seen_ids = set(visits.values_list('patient_id', flat=True))
@@ -117,7 +117,7 @@ def build_report(profile, start, end):
     missed = appointments.filter(status=Appointment.SCHEDULED, end__lt=now).count()
     billed = entries.aggregate(t=Sum('rate'))['t'] or 0
     taken = received.aggregate(t=Sum('amount'))['t'] or 0
-    credit_open = sum((e.amount_due for e in BillingEntry.objects.filter(professional=profile, amount_paid__lt=F('rate'))), Decimal(0))
+    credit_open = sum((e.amount_due for e in BillingEntry.objects.filter(professional=profile, cancelled_at__isnull=True, amount_paid__lt=F('rate'))), Decimal(0))
     paid_pkg = payments.aggregate(t=Sum('amount'))['t'] or 0
     packages_live = list(PatientPackage.objects.filter(professional=profile).exclude(status='cancelled').select_related('patient'))
     outstanding = sum((p.amount_due for p in packages_live), Decimal(0))

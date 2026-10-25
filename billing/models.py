@@ -30,6 +30,8 @@ class BillingEntry(models.Model):
     payment_mode = models.CharField(max_length=10, choices=PAYMENT_MODE_CHOICES, default='cash')
     notes = models.TextField(blank=True)
     amount_paid = models.DecimalField(max_digits=10, decimal_places=2, default=0, help_text='Total received so far; the rest is on credit (due).')
+    cancelled_at = models.DateTimeField(null=True, blank=True, help_text='Set when the bill was cancelled. A cancelled bill stays on record but counts for nothing.')
+    cancel_reason = models.CharField(max_length=255, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
@@ -46,22 +48,30 @@ class BillingEntry(models.Model):
         super().save(*args, **kwargs)
 
     @property
+    def is_cancelled(self):
+        return self.cancelled_at is not None
+
+    @property
     def amount_due(self):
+        if self.is_cancelled:
+            return Decimal('0')
         return max(Decimal('0'), self.rate - self.amount_paid)
 
     @property
     def status_key(self):
+        if self.is_cancelled:
+            return 'cancelled'
         if self.amount_due <= 0:
             return 'paid'
         return 'partial' if self.amount_paid > 0 else 'due'
 
     @property
     def status_label(self):
-        return {'paid': 'Paid', 'partial': 'Part paid', 'due': 'Due'}[self.status_key]
+        return {'paid': 'Paid', 'partial': 'Part paid', 'due': 'Due', 'cancelled': 'Cancelled'}[self.status_key]
 
     def record_payment(self, amount, payment_mode='cash', notes='', paid_on=None, user=None):
         """Log money received against this bill, capped at what is still owed. Returns the EntryPayment, or None if nothing was recorded."""
-        if amount is None or amount <= 0 or self.amount_due <= 0:
+        if amount is None or amount <= 0 or self.amount_due <= 0 or self.is_cancelled:
             return None
         amount = min(Decimal(amount), self.amount_due)
         payment = EntryPayment.objects.create(entry=self, amount=amount, payment_mode=payment_mode, notes=notes,
