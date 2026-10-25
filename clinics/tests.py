@@ -572,7 +572,7 @@ class ClinicLoginTests(Base):
         ClinicMember.objects.create(clinic=clinic, physio=guest, role=ClinicMember.PHYSIO, status=ClinicMember.ACTIVE)
         self.as_user('himal-desk')
         r = self.client.post(reverse('accounts:patient-add'), {'name': 'Front Desk Patient', 'phone': '9841111111', 'gender': 'F', 'date_of_birth': '1990-01-02'})
-        self.assertEqual(r.status_code, 302)
+        self.assertRedirects(r, reverse('accounts:patients'), fetch_redirect_response=False)  # stays in the clinic's workspace
         clinic.refresh_from_db()
         patient = Patient.objects.get(name='Front Desk Patient')
         self.assertEqual((patient.clinic, patient.professional), (clinic, clinic.workspace))

@@ -324,7 +324,7 @@ def patient_add(request):
             patient.clinic = clinic
             patient.save()
         messages.success(request, f'{patient.name} added ({patient.patient_code}){f" to {clinic.name}" if clinic else ""}.')
-        if clinic:
+        if clinic and own_clinic is None:  # a clinic's own login stays in its workspace; the owner returns to the clinic page
             return redirect(f"{reverse('clinics:detail', args=[clinic.pk])}?tab=patients")
         return redirect('accounts:patients')
     context = workspace_context(request.user, profile)
