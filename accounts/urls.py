@@ -39,6 +39,7 @@ urlpatterns = [
     path('appointments/patients/', appointments.patient_search, name='appointment-patient-search'),
     path('appointments/create/', appointments.appointment_create, name='appointment-create'),
     path('appointments/block/', appointments.block_create, name='block-create'),
+    path('appointments/<int:pk>/edit/', appointments.appointment_edit, name='appointment-edit'),
     path('appointments/<int:pk>/action/', appointments.appointment_action, name='appointment-action'),
     path('tasks/add/', appointments.task_add, name='task-add'),
     path('tasks/<int:pk>/toggle/', appointments.task_toggle, name='task-toggle'),

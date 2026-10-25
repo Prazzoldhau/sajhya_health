@@ -151,7 +151,7 @@
           {% for e in col.events %}
           <div class="ev ev-{{ e.css }} {{ e.status }}" style="top:{{ e.top }}px;height:{{ e.height }}px;left:calc({{ e.left }}% + 2px);width:calc({{ e.width }}% - 4px)"
                data-id="{{ e.id }}" data-kind="{{ e.kind }}" data-status="{{ e.status }}" data-title="{{ e.title }}" data-time="{{ e.time_label }}"
-               data-type="{{ e.type_label }}" data-patient-url="{{ e.patient_url }}" data-code="{{ e.patient_code }}" data-notes="{{ e.notes }}">
+               data-type="{{ e.type_label }}" data-date="{{ e.date }}" data-start="{{ e.start_hm }}" data-end="{{ e.end_hm }}" data-session="{{ e.session_type }}" data-raw-title="{{ e.raw_title }}" data-patient-url="{{ e.patient_url }}" data-code="{{ e.patient_code }}" data-notes="{{ e.notes }}">
             <b>{{ e.title }}</b>{{ e.time_label }}{% if e.height > 52 %}<div class="tag">{{ e.type_label }}</div>{% endif %}
           </div>
           {% endfor %}
@@ -211,8 +211,25 @@
       <input type="hidden" name="days" value="{{ days }}">
       <a class="secondary-btn" id="dOpen" href="#" style="text-decoration:none;display:inline-flex;align-items:center">Open patient</a>
       <button class="primary-btn" name="action" value="attend" id="dAttend">Mark attended</button>
+      <button type="button" class="secondary-btn" id="dEdit">Reschedule / edit</button>
       <button class="secondary-btn" name="action" value="cancel" id="dCancel">Cancel appointment</button>
       <button class="secondary-btn" name="action" value="delete" id="dDelete" onclick="return confirm('Remove this from the calendar?')">Remove</button>
+    </form>
+  </div>
+</div>
+
+<div class="modal-backdrop" id="editModal" role="dialog" aria-modal="true">
+  <div class="modal-card" style="max-width:440px">
+    <div class="modal-head"><h2 id="eTitle">Reschedule</h2><button type="button" class="modal-x" data-close aria-label="Close">×</button></div>
+    <form method="post" id="editForm" class="mini-form" data-url="{% url 'accounts:appointment-edit' 0 %}">
+      {% csrf_token %}
+      <input type="hidden" name="days" value="{{ days }}">
+      <div class="two"><label>Date <input type="date" name="date" id="e_date" required></label><label>Start time <input type="time" name="start_time" id="e_start" required></label></div>
+      <div class="two"><label>End time <input type="time" name="end_time" id="e_end" required></label>
+        <label id="e_type_wrap">Type <select name="session_type" id="e_type">{% for value, label in session_choices %}<option value="{{ value }}">{{ label }}</option>{% endfor %}</select></label></div>
+      <label id="e_label_wrap">Label <input type="text" name="title" id="e_label" maxlength="150"></label>
+      <label id="e_notes_wrap">Notes <textarea name="notes" id="e_notes" rows="2"></textarea></label>
+      <div class="pf-actions" style="padding:10px 0 0"><button type="button" class="secondary-btn" data-close>Cancel</button><button type="submit" class="primary-btn">Save changes</button></div>
     </form>
   </div>
 </div>
@@ -273,6 +290,17 @@
       $('actionForm').action = $('actionForm').dataset.url.replace('/0/', '/' + d.id + '/');
       $('dOpen').style.display = isAppt ? '' : 'none';
       $('dOpen').href = d.patientUrl || '#';
+      $('dEdit').style.display = !isAppt || d.status === 'scheduled' ? '' : 'none';
+      $('dEdit').onclick = function () {
+        var f = $('editForm');
+        f.action = f.dataset.url.replace('/0/', '/' + d.id + '/');
+        $('eTitle').textContent = isAppt ? 'Reschedule ' + d.title : 'Edit ' + d.title;
+        $('e_date').value = d.date; $('e_start').value = d.start; $('e_end').value = d.end;
+        $('e_type').value = d.session; $('e_label').value = d.rawTitle; $('e_notes').value = d.notes || '';
+        $('e_type_wrap').hidden = $('e_notes_wrap').hidden = !isAppt;
+        $('e_label_wrap').hidden = isAppt;
+        openModal('editModal');
+      };
       $('dAttend').style.display = isAppt && d.status === 'scheduled' ? '' : 'none';
       $('dCancel').style.display = isAppt && d.status === 'scheduled' ? '' : 'none';
       openModal('detailModal');

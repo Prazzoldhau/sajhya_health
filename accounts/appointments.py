@@ -9,7 +9,7 @@ from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
 from django.utils import timezone
 
-from .forms import AppointmentForm, BlockForm, TaskForm
+from .forms import AppointmentForm, BlockForm, RescheduleForm, TaskForm
 from .models import Appointment, Task, Visit
 from .services import record_visit
 from .access import can_see_contact, first_error, workspace_context, workspace_profile
@@ -123,7 +123,8 @@ def appointments(request):
                 'height': max(round((end_min - start_min) * PX_PER_MIN), 26),
                 'patient_url': reverse('accounts:patient-detail', args=[ev.patient_id]) if ev.patient else '',
                 'patient_code': ev.patient.patient_code if ev.patient else '',
-                'notes': ev.notes,
+                'notes': ev.notes, 'raw_title': ev.title, 'session_type': ev.session_type,
+                'date': s.date().isoformat(), 'start_hm': s.strftime('%H:%M'), 'end_hm': e.strftime('%H:%M'),
             })
         _layout_lanes(items)
         columns.append({
@@ -161,7 +162,7 @@ def appointments(request):
         'appointment_form': AppointmentForm(profile=profile, initial={'date': today, 'duration': profile.default_session_minutes}),
         'block_form': BlockForm(initial={'date': today}, auto_id='blk_%s'),
         'task_form': TaskForm(),
-        'open_new': request.GET.get('new') == '1',
+        'open_new': request.GET.get('new') == '1', 'session_choices': Visit.SESSION_CHOICES,
         'duration_default': profile.default_session_minutes,
     })
     return render(request, 'accounts/appointments.html', context)
@@ -206,6 +207,37 @@ def block_create(request):
         professional=profile, kind=d['kind'], title=d['title'],
         start=aware(d['date'], d['start_time']), end=aware(d['date'], d['end_time']))
     messages.success(request, 'Calendar updated.')
+    return _back(d['date'], days)
+
+
+@login_required
+def appointment_edit(request, pk):
+    """Move an appointment (or a block) to another day or time and change its type, label or notes."""
+    profile = workspace_profile(request)
+    if profile is None:
+        raise Http404
+    appt = get_object_or_404(Appointment, pk=pk, professional=profile)
+    if request.method != 'POST':
+        return redirect('accounts:appointments')
+    days = request.POST.get('days', 3)
+    form = RescheduleForm(request.POST)
+    if appt.status != Appointment.SCHEDULED and appt.kind == Appointment.APPOINTMENT:
+        messages.error(request, 'Only a scheduled appointment can be changed.')
+        return _back(timezone.localtime(appt.start).date(), days)
+    if not form.is_valid():
+        messages.error(request, first_error(form))
+        return _back(timezone.localtime(appt.start).date(), days)
+    d = form.cleaned_data
+    appt.start, appt.end = aware(d['date'], d['start_time']), aware(d['date'], d['end_time'])
+    if appt.kind == Appointment.APPOINTMENT:
+        appt.session_type = d['session_type'] or appt.session_type
+        appt.notes = d['notes']
+    else:
+        appt.title = d['title']
+    appt.save()
+    if appt.patient:
+        sync_next_appointment(appt.patient)
+    messages.success(request, 'Appointment rescheduled.' if appt.kind == Appointment.APPOINTMENT else 'Calendar updated.')
     return _back(d['date'], days)
 
 

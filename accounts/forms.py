@@ -306,6 +306,22 @@ class AppointmentForm(forms.Form):
         self.fields['patient'].queryset = profile.patients.exclude(status=Patient.DISCHARGED).order_by('name')
 
 
+class RescheduleForm(forms.Form):
+    """Change the day, time or details of an appointment or a calendar block already on the calendar."""
+    date = forms.DateField(widget=date_widget())
+    start_time = forms.TimeField(widget=time_widget())
+    end_time = forms.TimeField(widget=time_widget())
+    session_type = forms.ChoiceField(choices=Visit.SESSION_CHOICES, required=False)
+    title = forms.CharField(max_length=150, required=False)
+    notes = forms.CharField(required=False)
+
+    def clean(self):
+        data = super().clean()
+        if data.get('start_time') and data.get('end_time') and data['end_time'] <= data['start_time']:
+            raise forms.ValidationError('End time must be after the start time.')
+        return data
+
+
 class BlockForm(forms.Form):
     kind = forms.ChoiceField(choices=[(Appointment.UNAVAILABLE, 'Unavailable block'), (Appointment.AVAILABLE, 'One-off availability')])
     title = forms.CharField(max_length=150, required=False, widget=forms.TextInput(attrs={'placeholder': 'e.g. Lunch, Training'}))

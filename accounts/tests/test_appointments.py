@@ -87,6 +87,38 @@ class AppointmentTests(TestCase):
         events = [e for col in self.client.get(reverse('accounts:appointments'), {'date': self.tomorrow.isoformat(), 'days': 1}).context['columns'] for e in col['events']]
         self.assertEqual(events, [])  # cancelled appointments leave the calendar
 
+    def test_reschedule_moves_the_appointment_and_updates_the_next_visit(self):
+        self.book()
+        appt = Appointment.objects.get()
+        later = self.today + datetime.timedelta(days=4)
+        r = self.client.post(reverse('accounts:appointment-edit', args=[appt.pk]), {
+            'date': later.isoformat(), 'start_time': '14:30', 'end_time': '15:15', 'session_type': 'follow_up', 'notes': 'Moved'})
+        self.assertEqual(r.status_code, 302)
+        appt.refresh_from_db()
+        local = timezone.localtime(appt.start)
+        self.assertEqual((local.date(), local.strftime('%H:%M'), appt.session_type, appt.notes), (later, '14:30', 'follow_up', 'Moved'))
+        self.assertEqual(int((appt.end - appt.start).total_seconds() // 60), 45)
+        self.patient.refresh_from_db()
+        self.assertEqual(self.patient.next_appointment, later)
+
+    def test_reschedule_rejects_bad_times_attended_and_strangers(self):
+        self.book()
+        appt = Appointment.objects.get()
+        url = reverse('accounts:appointment-edit', args=[appt.pk])
+        before = appt.start
+        self.client.post(url, {'date': self.tomorrow.isoformat(), 'start_time': '12:00', 'end_time': '11:00'})
+        appt.refresh_from_db()
+        self.assertEqual(appt.start, before)
+        stranger, _ = make_professional('stranger2')
+        other = self.client_class()
+        other.force_login(stranger)
+        self.assertEqual(other.post(url, {'date': self.tomorrow.isoformat(), 'start_time': '09:00', 'end_time': '10:00'}).status_code, 404)
+        appt.status = Appointment.ATTENDED
+        appt.save()
+        self.client.post(url, {'date': self.tomorrow.isoformat(), 'start_time': '09:00', 'end_time': '10:00'})
+        appt.refresh_from_db()
+        self.assertEqual(appt.start, before)
+
     def test_delete_and_ownership(self):
         self.book()
         appt = Appointment.objects.get()
