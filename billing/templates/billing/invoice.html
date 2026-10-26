@@ -65,7 +65,7 @@
     <button type="button" class="btn main" id="picShare">🖼 Send as picture</button>
     <button type="button" class="btn wa" id="picWa" data-chat="{{ whatsapp_chat }}">WhatsApp: picture only{% if phone %} · {{ phone }}{% endif %}</button>
     <button type="button" class="btn" id="picSave">⬇ Save picture (PNG)</button>
-    <p class="hint" id="picNote">Sends just the picture of this invoice, with no link. On a phone it opens the share sheet. On a computer it copies the picture, opens the WhatsApp chat, and you paste it (Ctrl+V).</p>
+    <p class="hint" id="picNote">Sends just the picture, with no link. <b>Send as picture</b> opens your phone's share sheet, where you choose the person (an app cannot choose the contact for you). <b>WhatsApp: picture only</b> opens this patient's own chat directly and copies the picture, so you just paste it.</p>
     <div class="sep"></div>
     <a class="btn" href="{% url 'billing:invoice-pdf' entry.pk %}?download=1">⬇ Download PDF</a>
     <button type="button" class="btn" onclick="window.print()">🖨 Print / save as PDF</button>
@@ -112,18 +112,19 @@
       save(blob); say('Picture saved (this browser cannot open the share sheet). Attach it in your app.');
     }).catch(function (e) { if (e && e.name === 'AbortError') { say(''); } else { say('The picture could not be made. Use the PDF instead.'); } });
   });
+  // WhatsApp cannot be told to attach a picture to a chat, so this opens that patient's own chat (no searching for the number) and puts the
+  // picture on the clipboard: paste it into the message box (Ctrl+V, or press and hold > Paste on a phone). If the browser will not copy it,
+  // the picture is saved instead and you attach it with the paperclip.
   document.getElementById('picWa').addEventListener('click', function () {
     var chat = this.dataset.chat;
+    var win = window.open(chat, '_blank', 'noopener');  // opened straight away so the browser does not block it
     say('Making the picture...');
     picture().then(function (blob) {
-      var file = new File([blob], name, { type: 'image/png' });
-      if (navigator.canShare && navigator.canShare({ files: [file] })) { return navigator.share({ files: [file] }).then(function () { say('Shared.'); }); }
-      var opened = window.open(chat, '_blank', 'noopener');
       if (navigator.clipboard && window.ClipboardItem) {
-        return navigator.clipboard.write([new ClipboardItem({ 'image/png': blob })]).then(function () { say('Picture copied. In the WhatsApp chat press Ctrl+V and send.'); }, function () { save(blob); say('Picture saved: attach it in the WhatsApp chat.'); });
+        return navigator.clipboard.write([new ClipboardItem({ 'image/png': blob })]).then(function () { say('Picture copied. In the WhatsApp chat that just opened, paste it (Ctrl+V, or press and hold the message box and tap Paste) and send.'); }, function () { save(blob); say('Picture saved. In the WhatsApp chat that just opened, tap the paperclip and attach it.'); });
       }
-      save(blob); say('Picture saved: attach it in the WhatsApp chat.');
-    }).catch(function (e) { if (e && e.name === 'AbortError') { say(''); } else { say('The picture could not be made. Use the PDF instead.'); } });
+      save(blob); say('Picture saved. In the WhatsApp chat that just opened, tap the paperclip and attach it.');
+    }).catch(function () { say('The picture could not be made. Use the PDF instead.'); });
   });
 
   var link = "{{ public_url|escapejs }}", msg = "{{ message|escapejs }}";
