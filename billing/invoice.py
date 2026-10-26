@@ -52,6 +52,12 @@ def share_message(entry, url):
             f'NPR {entry.rate:g}.{owing}{remaining} Invoice: {url}')
 
 
+def whatsapp_chat(phone):
+    """The bare WhatsApp chat with this number (no message), for sending the invoice as a picture."""
+    number = normalize_phone(phone)
+    return f'https://wa.me/{number}' if number else 'https://web.whatsapp.com/'
+
+
 def whatsapp_link(entry, phone, url):
     """wa.me opens WhatsApp with the message ready; with no usable number it opens the contact picker instead."""
     number = normalize_phone(phone)

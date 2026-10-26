@@ -1,4 +1,5 @@
 {% extends 'accounts/pro_base.html' %}
+{% load static %}
 {% block title %}Invoice {{ entry.invoice_number }} | Sajhya Health{% endblock %}
 {% block extra_css %}
   .inv-wrap { display: grid; grid-template-columns: minmax(0, 1fr) 340px; gap: 16px; align-items: start; }
@@ -61,10 +62,14 @@
 
   <aside class="share no-print">
     <h3>Send this bill</h3>
-    <a class="btn main" href="{% url 'billing:invoice-pdf' entry.pk %}?download=1">⬇ Download PDF</a>
+    <button type="button" class="btn main" id="picShare">🖼 Send as picture</button>
+    <button type="button" class="btn wa" id="picWa" data-chat="{{ whatsapp_chat }}">WhatsApp: picture only{% if phone %} · {{ phone }}{% endif %}</button>
+    <button type="button" class="btn" id="picSave">⬇ Save picture (PNG)</button>
+    <p class="hint" id="picNote">Sends just the picture of this invoice, with no link. On a phone it opens the share sheet. On a computer it copies the picture, opens the WhatsApp chat, and you paste it (Ctrl+V).</p>
+    <div class="sep"></div>
+    <a class="btn" href="{% url 'billing:invoice-pdf' entry.pk %}?download=1">⬇ Download PDF</a>
     <button type="button" class="btn" onclick="window.print()">🖨 Print / save as PDF</button>
-    <a class="btn wa" href="{{ whatsapp }}" target="_blank" rel="noopener">WhatsApp{% if phone %} · {{ phone }}{% endif %}</a>
-    <p class="hint">{% if phone %}Opens WhatsApp with the message and a link to the PDF, ready to send.{% else %}No phone number on the bill: WhatsApp opens so you can choose the contact.{% endif %}</p>
+    <a class="btn" href="{{ whatsapp }}" target="_blank" rel="noopener">WhatsApp with a link to the PDF</a>
     <button type="button" class="btn" id="shareBtn" hidden>↗ Share the PDF…</button>
     <button type="button" class="btn" id="copyBtn">⧉ Copy link</button>
     <div class="sep"></div>
@@ -76,8 +81,41 @@
     <p class="hint">The link works without signing in for {{ link_days }} days. Anyone with it can open this invoice, so send it only to the patient.</p>
   </aside>
 </div>
+<script src="{% static 'vendor/html2canvas/html2canvas.min.js' %}"></script>
 <script>
 (function () {
+  // the invoice as a picture (works for Nepali text too, because the browser draws it)
+  var note = document.getElementById('picNote'), name = "{{ entry.invoice_number }}.png";
+  function say(t) { note.textContent = t; }
+  function picture() {
+    return html2canvas(document.getElementById('invoice'), { scale: 2, backgroundColor: '#ffffff', useCORS: true }).then(function (canvas) {
+      return new Promise(function (resolve, reject) { canvas.toBlob(function (b) { b ? resolve(b) : reject(new Error('no image')); }, 'image/png'); });
+    });
+  }
+  function save(blob) { var a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = name; document.body.appendChild(a); a.click(); a.remove(); setTimeout(function () { URL.revokeObjectURL(a.href); }, 4000); }
+  document.getElementById('picSave').addEventListener('click', function () { say('Making the picture...'); picture().then(function (b) { save(b); say('Picture saved. Attach it in WhatsApp, Messenger or any app.'); }).catch(function () { say('The picture could not be made. Use the PDF instead.'); }); });
+  document.getElementById('picShare').addEventListener('click', function () {
+    say('Making the picture...');
+    picture().then(function (blob) {
+      var file = new File([blob], name, { type: 'image/png' });
+      if (navigator.canShare && navigator.canShare({ files: [file] })) { return navigator.share({ files: [file] }).then(function () { say('Shared.'); }); }
+      save(blob); say('Picture saved (this browser cannot open the share sheet). Attach it in your app.');
+    }).catch(function (e) { if (e && e.name === 'AbortError') { say(''); } else { say('The picture could not be made. Use the PDF instead.'); } });
+  });
+  document.getElementById('picWa').addEventListener('click', function () {
+    var chat = this.dataset.chat;
+    say('Making the picture...');
+    picture().then(function (blob) {
+      var file = new File([blob], name, { type: 'image/png' });
+      if (navigator.canShare && navigator.canShare({ files: [file] })) { return navigator.share({ files: [file] }).then(function () { say('Shared.'); }); }
+      var opened = window.open(chat, '_blank', 'noopener');
+      if (navigator.clipboard && window.ClipboardItem) {
+        return navigator.clipboard.write([new ClipboardItem({ 'image/png': blob })]).then(function () { say('Picture copied. In the WhatsApp chat press Ctrl+V and send.'); }, function () { save(blob); say('Picture saved: attach it in the WhatsApp chat.'); });
+      }
+      save(blob); say('Picture saved: attach it in the WhatsApp chat.');
+    }).catch(function (e) { if (e && e.name === 'AbortError') { say(''); } else { say('The picture could not be made. Use the PDF instead.'); } });
+  });
+
   var link = "{{ public_url|escapejs }}", msg = "{{ message|escapejs }}";
   var copy = document.getElementById('copyBtn');
   copy.addEventListener('click', function () {

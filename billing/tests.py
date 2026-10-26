@@ -769,3 +769,17 @@ class InvoiceExtraTests(BillingBase):
         page = self.client.get(reverse('billing:invoice', args=[entry.pk]))
         self.assertNotContains(page, 'Extra kept as advance')
         self.assertNotIn('extra', page.context['message'])
+
+
+class InvoicePictureTests(BillingBase):
+    def test_the_invoice_page_can_send_a_picture_without_a_link(self):
+        self.client.post(reverse('billing:patient-bill', args=[self.patient.pk]), {'entry_date': self.today.isoformat(), 'service': 'S', 'rate': '500', 'payment_mode': 'cash', 'payment_status': 'paid'})
+        entry = BillingEntry.objects.get()
+        page = self.client.get(reverse('billing:invoice', args=[entry.pk]))
+        for needle in ('id="picShare"', 'id="picWa"', 'id="picSave"', 'vendor/html2canvas/html2canvas.min.js'):
+            self.assertContains(page, needle)
+        self.assertEqual(page.context['whatsapp_chat'], 'https://wa.me/9779841000000')  # the chat only, no message and no link
+        from . import invoice as inv
+        self.assertEqual(inv.whatsapp_chat(''), 'https://web.whatsapp.com/')
+        from django.contrib.staticfiles import finders
+        self.assertTrue(finders.find('vendor/html2canvas/html2canvas.min.js'))
