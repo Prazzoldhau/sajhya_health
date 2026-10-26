@@ -758,7 +758,7 @@ class InvoiceExtraTests(BillingBase):
         self.assertContains(page, 'Extra kept as advance: NPR 200')
         self.assertContains(page, 'You handed over NPR 700.00 for a NPR 500.00 bill')
         self.assertEqual((page.context['carried'], page.context['advance_now']), (200, 200))
-        self.assertIn('Your extra NPR 200 is kept as advance', page.context['message'])
+        self.assertIn('Your extra NPR 200.00 is kept as advance', page.context['message'])
         self.assertTrue(self.client.get(reverse('billing:invoice-pdf', args=[entry.pk])).content.startswith(b'%PDF'))
         self.assertContains(self.client.get(reverse('billing:billing')), '+NPR 200')
         self.assertContains(self.client.get(reverse('accounts:patient-detail', args=[self.patient.pk]) + '?tab=billing'), '+NPR 200')
