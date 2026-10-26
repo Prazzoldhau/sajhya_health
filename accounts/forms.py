@@ -213,8 +213,8 @@ STEP_TITLES = {1: 'Account', 2: 'Credentials', 3: 'Documents', 4: 'Practice', 5:
 
 
 class AgeOrBirthDate(forms.Form):
-    """Many patients do not know their date of birth: an age in years is accepted instead, and the date of birth is then an estimate.
-    A real date of birth always wins over an age typed beside it."""
+    """The date of birth and the age are both optional. Many patients do not know their date of birth: an age in years is accepted
+    instead, and the date of birth is then an estimate. A real date of birth always wins over an age typed beside it."""
     age = forms.IntegerField(required=False, min_value=0, max_value=120, label='Age (years)',
                              widget=forms.NumberInput(attrs={'placeholder': 'If the date of birth is not known', 'min': 0, 'max': 120}))
 
@@ -230,8 +230,8 @@ class AgeOrBirthDate(forms.Form):
             except ValueError:  # 29 February
                 data['date_of_birth'] = today.replace(year=today.year - age, day=28)
             self.instance.dob_is_estimate = True
-        elif 'date_of_birth' not in self.errors:
-            self.add_error('date_of_birth', 'Enter the date of birth, or the age if the date is not known.')
+        else:  # neither is known: that is allowed, the age simply stays blank
+            self.instance.dob_is_estimate = False
         return data
 
 

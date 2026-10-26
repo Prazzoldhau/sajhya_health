@@ -171,3 +171,17 @@ class DashboardTests(TestCase):
         self.profile.save()
         self.assertRedirects(self.client.get(reverse('accounts:dashboard')), reverse('accounts:welcome'), fetch_redirect_response=False)
         self.assertContains(self.client.get(reverse('accounts:welcome')), 'Submitted')
+
+
+
+class OptionalBirthDateTests(TestCase):
+    def test_a_patient_can_be_added_with_neither_date_of_birth_nor_age(self):
+        user, profile = make_professional()
+        self.client.force_login(user)
+        r = self.client.post(reverse('accounts:patient-add'), {'name': 'No Dob', 'phone': '9800000009', 'gender': 'M'})
+        self.assertEqual(r.status_code, 302)
+        patient = Patient.objects.get(name='No Dob')
+        self.assertEqual((patient.date_of_birth, patient.age, patient.dob_is_estimate), (None, None, False))
+        page = self.client.get(reverse('accounts:patient-add'))
+        self.assertNotContains(page, 'Date of Birth <i>*</i>')
+        self.assertContains(page, 'optional')

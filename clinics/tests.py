@@ -765,8 +765,9 @@ class FrontDeskRegisteredByAndBillingTests(Base):
         patient = Patient.objects.get(name='By Age')
         self.assertEqual((patient.age, patient.dob_is_estimate), (35, True))
         self.assertIn('approx', patient.age_label)
-        self.assertEqual(self.register(name='Nothing', date_of_birth='').status_code, 200)  # neither: asks again
-        self.assertFalse(Patient.objects.filter(name='Nothing').exists())
+        self.register(name='Nothing', date_of_birth='')  # neither is fine: both are optional
+        nothing = Patient.objects.get(name='Nothing')
+        self.assertEqual((nothing.date_of_birth, nothing.age, nothing.dob_is_estimate), (None, None, False))
         self.register(name='Both', date_of_birth='1990-05-05', age='10')  # a real date wins
         both = Patient.objects.get(name='Both')
         self.assertEqual((both.date_of_birth.isoformat(), both.dob_is_estimate), ('1990-05-05', False))
