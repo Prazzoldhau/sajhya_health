@@ -4,12 +4,17 @@ from decimal import Decimal
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.db.models import F, Q, Sum
+from django.core.exceptions import ValidationError
+from django.core.mail import EmailMessage
+from django.core.validators import validate_email
+from django.http import Http404, HttpResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
 from django.utils import timezone
 
 from accounts.access import can_see_contact, first_error, own_patient, require_workspace, workspace_context, workspace_profile
 
+from . import invoice as inv
 from .forms import AdvanceForm, BillCorrectionForm, BillingEntryForm, EntryPaymentForm, PackagePaymentForm, PatientBillForm, PatientPackageForm
 from .models import ADVANCE, BillingEntry, EntryPayment, PackagePayment, PatientAdvance, PatientPackage, advance_balance
 
@@ -454,3 +459,82 @@ def package_cancel(request, pk):
         package.save()
         messages.success(request, 'Package cancelled.')
     return _packages_back(request, package.patient)
+
+
+# ---------------------------------------------------------------------------
+# The bill as a document: invoice page, PDF, and sending it on
+# ---------------------------------------------------------------------------
+
+def _pdf_response(entry, online_url='', download=False):
+    response = HttpResponse(inv.build_pdf(entry, online_url), content_type='application/pdf')
+    disposition = 'attachment' if download else 'inline'
+    response['Content-Disposition'] = f'{disposition}; filename="{entry.invoice_number}.pdf"'
+    response['Cache-Control'] = 'private, no-store'
+    return response
+
+
+@login_required
+def invoice(request, pk):
+    """The printable invoice with the ways to send it: download, print / save as PDF, WhatsApp, share, e-mail, copy link."""
+    profile = workspace_profile(request)
+    if profile is None:
+        return redirect('accounts:welcome')
+    entry = get_object_or_404(BillingEntry.objects.select_related('patient'), pk=pk, professional=profile)
+    public_url = request.build_absolute_uri(reverse('billing:invoice-public', args=[inv.invoice_token(entry)]))
+    phone = entry.contact_number or (entry.patient.phone if entry.patient_id and can_see_contact(profile, entry.patient) else '')
+    email = entry.patient.email if entry.patient_id and can_see_contact(profile, entry.patient) else ''
+    back = request.GET.get('next', '')
+    context = workspace_context(request.user, profile)
+    context.update({
+        'active': 'billing', 'entry': entry, 'practice': inv.practice_of(entry), 'payments': entry.payments.all(), 'public_url': public_url,
+        'whatsapp': inv.whatsapp_link(entry, phone, public_url), 'message': inv.share_message(entry, public_url), 'phone': phone, 'email': email,
+        'back': back if back.startswith('/') and not back.startswith('//') else reverse('billing:billing') + f'?date={entry.entry_date.isoformat()}',
+        'link_days': inv.LINK_DAYS,
+    })
+    return render(request, 'billing/invoice.html', context)
+
+
+@login_required
+def invoice_pdf(request, pk):
+    profile = workspace_profile(request)
+    if profile is None:
+        raise Http404
+    entry = get_object_or_404(BillingEntry, pk=pk, professional=profile)
+    return _pdf_response(entry, download=request.GET.get('download') == '1')
+
+
+def invoice_public(request, token):
+    """The link a patient receives: the PDF, no sign-in needed. It is signed, so it cannot be guessed, and it expires."""
+    entry = inv.entry_from_token(token)
+    if entry is None:
+        raise Http404
+    return _pdf_response(entry, request.build_absolute_uri(request.path))
+
+
+@login_required
+def invoice_email(request, pk):
+    profile = workspace_profile(request)
+    if profile is None:
+        raise Http404
+    entry = get_object_or_404(BillingEntry, pk=pk, professional=profile)
+    back = redirect('billing:invoice', pk=entry.pk)
+    if request.method != 'POST':
+        return back
+    address = request.POST.get('email', '').strip()
+    try:
+        validate_email(address)
+    except ValidationError:
+        messages.error(request, 'Enter a valid e-mail address.')
+        return back
+    url = request.build_absolute_uri(reverse('billing:invoice-public', args=[inv.invoice_token(entry)]))
+    practice = inv.practice_of(entry)['name']
+    mail = EmailMessage(subject=f'Invoice {entry.invoice_number} from {practice}', body=inv.share_message(entry, url) + f'\n\nThe invoice is attached as a PDF.\n\n{practice}',
+                        to=[address], reply_to=[e for e in [profile.account.user.email] if e])
+    mail.attach(f'{entry.invoice_number}.pdf', inv.build_pdf(entry, url), 'application/pdf')
+    try:
+        mail.send()
+    except Exception:  # the mail server is the one thing we cannot control: say so plainly instead of a server error
+        messages.error(request, 'The e-mail could not be sent right now. Use WhatsApp or the PDF download instead, or try again later.')
+        return back
+    messages.success(request, f'Invoice {entry.invoice_number} e-mailed to {address}.')
+    return back

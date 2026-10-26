@@ -1,0 +1,99 @@
+{% extends 'accounts/pro_base.html' %}
+{% block title %}Invoice {{ entry.invoice_number }} | Sajhya Health{% endblock %}
+{% block extra_css %}
+  .inv-wrap { display: grid; grid-template-columns: minmax(0, 1fr) 340px; gap: 16px; align-items: start; }
+  .inv { background: #fff; border: 1px solid var(--line); border-radius: 12px; overflow: hidden; position: relative; }
+  .inv-head { background: #116b43; color: #fff; padding: 20px 26px; display: flex; justify-content: space-between; gap: 16px; flex-wrap: wrap; }
+  .inv-head h2 { margin: 0 0 4px; font-size: 20px; } .inv-head .sub { font-size: 12.5px; opacity: .9; }
+  .inv-head .right { text-align: right; } .inv-head .right b { font-size: 24px; letter-spacing: 1px; display: block; }
+  .inv-meta { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; padding: 20px 26px 6px; }
+  .inv-meta .l { font-size: 10px; letter-spacing: .06em; color: var(--muted); font-weight: 800; text-transform: uppercase; margin-bottom: 4px; }
+  .inv-meta .n { font-weight: 800; font-size: 15px; } .inv-meta div > div { font-size: 12.5px; line-height: 1.6; }
+  .inv-table { width: 100%; border-collapse: collapse; margin: 14px 0 0; }
+  .inv-table th { text-align: left; background: #e9f7ef; color: #116b43; font-size: 11px; padding: 9px 26px; } .inv-table th:last-child, .inv-table td:last-child { text-align: right; }
+  .inv-table td { padding: 12px 26px; border-bottom: 1px solid #eef3ef; }
+  .inv-totals { margin: 14px 26px 0 auto; width: 280px; font-size: 13px; } .inv-totals div { display: flex; justify-content: space-between; padding: 5px 0; }
+  .inv-totals .due { font-weight: 800; font-size: 15px; border-top: 1px solid var(--line); margin-top: 4px; padding-top: 9px; }
+  .inv-pays { padding: 14px 26px 6px; font-size: 12.5px; } .inv-pays .l { font-size: 10px; letter-spacing: .06em; color: var(--muted); font-weight: 800; text-transform: uppercase; margin-bottom: 4px; }
+  .inv-pays div.row { display: flex; justify-content: space-between; padding: 3px 0; max-width: 420px; }
+  .inv-foot { padding: 18px 26px 22px; font-size: 12px; color: var(--muted); }
+  .stamp { position: absolute; top: 45%; left: 50%; transform: translate(-50%, -50%) rotate(-18deg); font-size: 64px; font-weight: 800; color: rgba(184, 59, 59, .2); border: 6px solid rgba(184, 59, 59, .2); padding: 0 20px; border-radius: 10px; pointer-events: none; }
+  .badge-s { display: inline-block; padding: 3px 10px; border-radius: 12px; font-size: 11px; font-weight: 800; background: #e7f7ed; color: #16834f; }
+  .badge-s.due, .badge-s.partial { background: #fff3d6; color: #a97510; } .badge-s.cancelled { background: #fde8e8; color: #b83b3b; }
+  .share { background: #fff; border: 1px solid var(--line); border-radius: 12px; padding: 16px; display: grid; gap: 10px; position: sticky; top: 90px; }
+  .share h3 { margin: 0; font-size: 15px; } .share .hint { font-size: 11.5px; color: var(--muted); margin: 0; }
+  .share .btn { display: flex; align-items: center; justify-content: center; gap: 8px; height: 40px; border-radius: 9px; border: 1px solid #cfe6d8; background: #fff; color: var(--green-dark); font-weight: 700; text-decoration: none; cursor: pointer; width: 100%; }
+  .share .btn.wa { background: #25d366; border-color: #25d366; color: #fff; } .share .btn.main { background: var(--green); border-color: var(--green); color: #fff; }
+  .share form { display: grid; gap: 8px; margin: 0; } .share input[type=email], .share input[type=text] { height: 38px; border: 1px solid var(--line); border-radius: 8px; padding: 0 10px; width: 100%; }
+  .share .sep { border-top: 1px solid var(--line); }
+  @media (max-width: 960px) { .inv-wrap { grid-template-columns: 1fr; } .share { position: static; order: -1; } }
+  @media print { .no-print, .share { display: none !important; } .inv-wrap { display: block; } .inv { border: 0; } main { padding: 0 !important; } }
+{% endblock %}
+
+{% block main %}
+<div class="no-print" style="margin-bottom:12px"><a class="text-link" href="{{ back }}" style="text-decoration:none">← Back to billing</a></div>
+<div class="inv-wrap">
+  <article class="inv" id="invoice">
+    {% if entry.is_cancelled %}<div class="stamp">CANCELLED</div>{% endif %}
+    <div class="inv-head">
+      <div><h2>{{ practice.name }}</h2><div class="sub">{{ practice.address }}{% if practice.address and practice.phone %} · {% endif %}{{ practice.phone }}{% if practice.code %}<br>Facility code {{ practice.code }}{% endif %}</div></div>
+      <div class="right"><b>INVOICE</b><span class="sub">{{ entry.invoice_number }}</span></div>
+    </div>
+    <div class="inv-meta">
+      <div><div class="l">Billed to</div><div class="n">{{ entry.patient_name }}</div>
+        <div>{% if entry.age %}{{ entry.age }} yrs{% endif %}{% if entry.sex %}{% if entry.age %} · {% endif %}{{ entry.get_sex_display }}{% endif %}{% if entry.patient %}<br>Patient ID {{ entry.patient.patient_code }}{% endif %}{% if entry.contact_number %}<br>{{ entry.contact_number }}{% endif %}</div></div>
+      <div><div class="l">Invoice details</div><div>Date: <b>{{ entry.entry_date|date:"j M Y" }}</b><br>Status: <span class="badge-s {{ entry.status_key }}">{{ entry.status_label }}</span><br>Payment mode: {{ entry.get_payment_mode_display }}{% if practice.person %}<br>Therapist: {{ practice.person }}{% endif %}</div></div>
+    </div>
+    <table class="inv-table"><thead><tr><th>SERVICE</th><th>AMOUNT (NPR)</th></tr></thead>
+      <tbody><tr><td><b>{{ entry.service }}</b>{% if entry.notes %}<div style="font-size:12px;color:var(--muted);margin-top:3px">{{ entry.notes }}</div>{% endif %}</td><td>{{ entry.rate }}</td></tr></tbody></table>
+    <div class="inv-totals">
+      <div><span>Total</span><b>NPR {{ entry.rate }}</b></div>
+      <div><span>Received</span><span>NPR {{ entry.amount_paid }}</span></div>
+      <div class="due"><span>Balance due</span><span{% if entry.amount_due %} style="color:#b78317"{% endif %}>NPR {{ entry.amount_due }}</span></div>
+    </div>
+    {% if payments %}<div class="inv-pays"><div class="l">Payments received</div>
+      {% for p in payments %}<div class="row"><span>{{ p.paid_on|date:"j M Y" }} · {{ p.get_payment_mode_display }}</span><span>NPR {{ p.amount }}</span></div>{% endfor %}</div>{% endif %}
+    <div class="inv-foot">Thank you. Please keep this invoice for your records.</div>
+  </article>
+
+  <aside class="share no-print">
+    <h3>Send this bill</h3>
+    <a class="btn main" href="{% url 'billing:invoice-pdf' entry.pk %}?download=1">⬇ Download PDF</a>
+    <button type="button" class="btn" onclick="window.print()">🖨 Print / save as PDF</button>
+    <a class="btn wa" href="{{ whatsapp }}" target="_blank" rel="noopener">WhatsApp{% if phone %} · {{ phone }}{% endif %}</a>
+    <p class="hint">{% if phone %}Opens WhatsApp with the message and a link to the PDF, ready to send.{% else %}No phone number on the bill: WhatsApp opens so you can choose the contact.{% endif %}</p>
+    <button type="button" class="btn" id="shareBtn" hidden>↗ Share the PDF…</button>
+    <button type="button" class="btn" id="copyBtn">⧉ Copy link</button>
+    <div class="sep"></div>
+    <form method="post" action="{% url 'billing:invoice-email' entry.pk %}">{% csrf_token %}
+      <label style="font-size:12px;font-weight:700;color:var(--muted)">E-mail the PDF</label>
+      <input type="email" name="email" value="{{ email }}" placeholder="patient@example.com" required>
+      <button class="btn" type="submit">✉ Send by e-mail</button>
+    </form>
+    <p class="hint">The link works without signing in for {{ link_days }} days. Anyone with it can open this invoice, so send it only to the patient.</p>
+  </aside>
+</div>
+<script>
+(function () {
+  var link = "{{ public_url|escapejs }}", msg = "{{ message|escapejs }}";
+  var copy = document.getElementById('copyBtn');
+  copy.addEventListener('click', function () {
+    function done() { copy.textContent = '✓ Link copied'; setTimeout(function () { copy.textContent = '⧉ Copy link'; }, 2000); }
+    if (navigator.clipboard) navigator.clipboard.writeText(link).then(done, function () { window.prompt('Copy this link', link); });
+    else window.prompt('Copy this link', link);
+  });
+  // phones and tablets can hand the PDF itself to WhatsApp, Messenger, Mail... through the system share sheet
+  var share = document.getElementById('shareBtn');
+  if (navigator.share && navigator.canShare) {
+    share.hidden = false;
+    share.addEventListener('click', function () {
+      fetch("{% url 'billing:invoice-pdf' entry.pk %}", { credentials: 'same-origin' }).then(function (r) { return r.blob(); }).then(function (blob) {
+        var file = new File([blob], "{{ entry.invoice_number }}.pdf", { type: 'application/pdf' });
+        var data = navigator.canShare({ files: [file] }) ? { files: [file], text: msg } : { text: msg, url: link };
+        return navigator.share(data);
+      }).catch(function () {});
+    });
+  }
+})();
+</script>
+{% endblock %}

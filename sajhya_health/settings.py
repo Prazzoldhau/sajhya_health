@@ -222,6 +222,9 @@ if not DEBUG:
 
 # Email (used for future notifications; console in development)
 
+# Local phone numbers (10 digits, no country code) get this prefix when a bill is sent by WhatsApp.
+DEFAULT_COUNTRY_CODE = env('DEFAULT_COUNTRY_CODE', default='977')
+
 EMAIL_BACKEND = env('EMAIL_BACKEND', default='django.core.mail.backends.console.EmailBackend')
 EMAIL_HOST = env('EMAIL_HOST', default='')
 EMAIL_PORT = env.int('EMAIL_PORT', default=587)

@@ -195,3 +195,7 @@ to a temp folder). Lockout is off in tests (`AXES_ENABLED = not TESTING`); the l
 ## Advance payments
 
 `billing.PatientAdvance` is a signed ledger per patient (advance taken +, used for a bill -, refund -, returned to balance +); the balance is its sum. A bill settled from the advance gets an `EntryPayment` with mode `advance`, which is **not** counted as money taken (the cash was counted when the advance was taken, and refunds count as money paid out). Cancelling or correcting a bill puts what it took back into the balance.
+
+## Sending a bill (invoice)
+
+`billing/invoice.py` builds the PDF (reportlab, pure Python, so it installs on cPanel from `requirements.txt`) and the share links. The invoice page (`/billing/entry/N/invoice/`) offers download, print, WhatsApp (`wa.me` with the message and a link; local numbers get `DEFAULT_COUNTRY_CODE`, default 977), the phone share sheet, copy link and e-mail (PDF attached, through the normal e-mail settings). The link sent to the patient is signed with Django `signing` and expires after 90 days; it needs no sign-in and opens that one PDF only. The built-in PDF fonts are Latin: a patient name or service in Nepali script is left off the PDF (patient ID is printed instead) and shown in full on the online invoice.

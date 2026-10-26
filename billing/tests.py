@@ -665,3 +665,84 @@ class AdvanceTabTests(BillingBase):
         self.assertContains(self.client.get(reverse('billing:billing')), f'{target}?tab=billing')
         self.assertNotContains(self.client.get(reverse('billing:billing')), f'href="{target}"')
         self.assertContains(self.client.get(reverse('billing:packages')), f'{target}?tab=billing')
+
+
+class InvoiceTests(BillingBase):
+    def make(self, **extra):
+        self.client.post(reverse('billing:patient-bill', args=[self.patient.pk]), {'entry_date': self.today.isoformat(), 'service': 'Therapy session', 'rate': '700', 'payment_mode': 'cash', 'payment_status': 'paid', **extra})
+        return BillingEntry.objects.latest('id')
+
+    def test_the_invoice_page_offers_pdf_whatsapp_email_and_copy(self):
+        entry = self.make()
+        page = self.client.get(reverse('billing:invoice', args=[entry.pk]))
+        self.assertEqual(page.status_code, 200)
+        self.assertContains(page, entry.invoice_number)
+        self.assertContains(page, reverse('billing:invoice-pdf', args=[entry.pk]))
+        wa = page.context['whatsapp']
+        self.assertTrue(wa.startswith('https://wa.me/9779841000000?text='), wa)  # a local number gets the country code
+        self.assertIn(entry.invoice_number, page.context['message'])
+        self.assertContains(page, 'Send by e-mail')
+        self.assertContains(self.client.get(reverse('billing:billing')), reverse('billing:invoice', args=[entry.pk]))
+        self.assertContains(self.client.get(reverse('accounts:patient-detail', args=[self.patient.pk]) + '?tab=billing'), reverse('billing:invoice', args=[entry.pk]))
+
+    def test_pdf_is_a_real_pdf_for_the_owner_only(self):
+        entry = self.make(payment_status='partial', amount_received='200')
+        r = self.client.get(reverse('billing:invoice-pdf', args=[entry.pk]))
+        self.assertEqual((r.status_code, r['Content-Type']), (200, 'application/pdf'))
+        self.assertTrue(r.content.startswith(b'%PDF'))
+        self.assertIn('attachment', self.client.get(reverse('billing:invoice-pdf', args=[entry.pk]), {'download': '1'})['Content-Disposition'])
+        stranger, _ = make_professional('stranger')
+        other = self.client_class()
+        other.force_login(stranger)
+        self.assertEqual(other.get(reverse('billing:invoice-pdf', args=[entry.pk])).status_code, 404)
+        self.assertEqual(other.get(reverse('billing:invoice', args=[entry.pk])).status_code, 404)
+
+    def test_the_shared_link_works_without_signing_in_and_only_for_that_bill(self):
+        from . import invoice as inv
+        entry = self.make()
+        token = inv.invoice_token(entry)
+        anonymous = self.client_class()
+        r = anonymous.get(reverse('billing:invoice-public', args=[token]))
+        self.assertEqual((r.status_code, r['Content-Type']), (200, 'application/pdf'))
+        self.assertEqual(anonymous.get(reverse('billing:invoice-public', args=['not-a-real-token'])).status_code, 404)
+        self.assertEqual(anonymous.get(reverse('billing:invoice-public', args=[token[:-3] + 'abc'])).status_code, 404)
+        from django.core import signing
+        self.assertIsNone(inv.entry_from_token(signing.dumps(entry.pk, salt='something-else')))
+        entry.delete()
+        self.assertEqual(anonymous.get(reverse('billing:invoice-public', args=[token])).status_code, 404)
+
+    def test_email_sends_the_pdf_attached_and_rejects_bad_addresses(self):
+        from django.core import mail
+        entry = self.make()
+        self.client.post(reverse('billing:invoice-email', args=[entry.pk]), {'email': 'not-an-email'})
+        self.assertEqual(len(mail.outbox), 0)
+        self.client.post(reverse('billing:invoice-email', args=[entry.pk]), {'email': 'sita@example.com'})
+        self.assertEqual(len(mail.outbox), 1)
+        sent = mail.outbox[0]
+        self.assertEqual(sent.to, ['sita@example.com'])
+        self.assertIn(entry.invoice_number, sent.subject)
+        name, content, kind = sent.attachments[0]
+        self.assertEqual((name, kind), (f'{entry.invoice_number}.pdf', 'application/pdf'))
+        self.assertTrue(content.startswith(b'%PDF'))
+        stranger, _ = make_professional('stranger')
+        other = self.client_class()
+        other.force_login(stranger)
+        other.post(reverse('billing:invoice-email', args=[entry.pk]), {'email': 'x@example.com'})
+        self.assertEqual(len(mail.outbox), 1)
+
+    def test_phone_numbers_non_latin_text_and_cancelled_bills(self):
+        from . import invoice as inv
+        self.assertEqual(inv.normalize_phone('9841234567'), '9779841234567')
+        self.assertEqual(inv.normalize_phone('+977 984-1234567'), '9779841234567')
+        self.assertEqual(inv.normalize_phone('09841234567'), '9779841234567')
+        self.assertEqual(inv.normalize_phone('0097798412345'), '97798412345')
+        self.assertEqual(inv.normalize_phone('12'), '')
+        entry = self.make(service='पिठ्यूँको उपचार')
+        entry.patient_name = 'सीता गुरुङ'
+        entry.save()
+        self.assertTrue(inv.build_pdf(entry).startswith(b'%PDF'))  # a Nepali name or service never breaks the PDF
+        self.assertContains(self.client.get(reverse('billing:invoice', args=[entry.pk])), 'सीता गुरुङ')  # the online invoice shows it in full
+        self.client.post(reverse('billing:entry-cancel', args=[entry.pk]), {'reason': 'x'})
+        self.assertContains(self.client.get(reverse('billing:invoice', args=[entry.pk])), 'CANCELLED')
+        entry.refresh_from_db()
+        self.assertTrue(inv.build_pdf(entry).startswith(b'%PDF'))

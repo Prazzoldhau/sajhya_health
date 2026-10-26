@@ -75,6 +75,7 @@
           <td style="text-align:right"><b{% if e.is_cancelled %} style="text-decoration:line-through"{% endif %}>NPR {{ e.rate }}</b></td>
           <td>{% if e.is_cancelled %}<span style="color:#b83b3b;font-weight:700">Cancelled</span>{% if e.cancel_reason %}<div class="patient-id">{{ e.cancel_reason }}</div>{% endif %}{% elif e.status_key == 'paid' %}<span style="color:#16834f;font-weight:700">Paid</span>{% else %}<span style="color:#b78317;font-weight:700">{{ e.status_label }}</span><div class="patient-id">NPR {{ e.amount_due }} due</div>{% endif %}</td>
           <td class="no-print"><div class="row-actions">
+            <a class="table-action" href="{% url 'billing:invoice' e.pk %}" style="text-decoration:none" title="Invoice: PDF, WhatsApp, e-mail">Invoice</a>
             {% if e.is_cancelled %}
             <form method="post" action="{% url 'billing:entry-restore' e.pk %}">{% csrf_token %}<button class="table-action" type="submit">Restore</button></form>
             {% else %}
