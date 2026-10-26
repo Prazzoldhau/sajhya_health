@@ -45,7 +45,9 @@
       <button type="button" class="primary-btn" data-open="patientModal">＋ Add Patient</button>
     </div>
 
+    {% if followup %}<div style="margin:0 18px 12px;padding:9px 14px;border-radius:9px;background:#fff8e6;border:1px solid #f0d58a;color:#7a5a10;display:flex;gap:10px;align-items:center;flex-wrap:wrap">Showing active patients due for a follow-up (not seen for 14 days, or never seen). <a href="{% url 'accounts:patients' %}" style="margin-left:auto;color:inherit;font-weight:700">Show all patients</a></div>{% endif %}
     <form method="get" class="filters" id="filterForm">
+      {% if followup %}<input type="hidden" name="followup" value="due">{% endif %}
       <div class="filter-search"><span>⌕</span><input type="search" name="q" value="{{ q }}" placeholder="Search by name, phone, patient ID..."></div>
       <select class="filter" name="status" onchange="this.form.submit()">
         <option value="">All Status</option>

@@ -191,16 +191,21 @@ def dashboard(request):
     return render(request, 'accounts/dashboard.html', context)
 
 
+def followups_due(patients, today):
+    """Active patients not seen for 14 days (or never): the dashboard's Follow-ups Due card and the patient-list filter share this."""
+    stale = today - datetime.timedelta(days=14)
+    return patients.filter(status=Patient.ACTIVE).filter(Q(last_visit__isnull=True) | Q(last_visit__lte=stale))
+
+
 def _dashboard_data(profile):
     from billing.views import revenue_for
     today = timezone.localdate()
     patients = profile.patients.all()
-    stale = today - datetime.timedelta(days=14)
     day_start = timezone.make_aware(datetime.datetime.combine(today, datetime.time.min))
     day_end = day_start + datetime.timedelta(days=1)
     week_end_dt = day_start + datetime.timedelta(days=8)
     live = profile.appointments.filter(kind=Appointment.APPOINTMENT, status=Appointment.SCHEDULED)
-    needs_followup = patients.filter(status=Patient.ACTIVE).filter(Q(last_visit__isnull=True) | Q(last_visit__lte=stale))
+    needs_followup = followups_due(patients, today)
 
     visits = Visit.objects.filter(patient__professional=profile)
     window_start = today - datetime.timedelta(days=6)
@@ -258,12 +263,15 @@ def patient_list(request):
 
     q = request.GET.get('q', '').strip()
     status = request.GET.get('status', '')
+    followup = request.GET.get('followup') == 'due'
     age = request.GET.get('age', '')
     sort = request.GET.get('sort', 'recent')
     if q:
         patients = patients.filter(Q(name__icontains=q) | (Q(phone__icontains=q) & (Q(clinic__isnull=True) | Q(clinic__owner=profile) | Q(clinic__workspace=profile))) | Q(patient_code__icontains=q))
     if status in dict(Patient.STATUS_CHOICES):
         patients = patients.filter(status=status)
+    if followup:
+        patients = followups_due(patients, timezone.localdate())
     if age in AGE_BUCKETS:
         low, high = AGE_BUCKETS[age]
         today = timezone.localdate()
@@ -286,7 +294,7 @@ def patient_list(request):
     hidden = {p.pk for p in list(page_obj) + recent if not can_see_contact(profile, p)}
     context = workspace_context(request.user, profile)
     context.update({
-        'allowance': PatientAllowance.for_profile(profile), 'hidden_contact': hidden, 'active': 'patients', 'page_obj': page_obj, 'counts': counts, 'q': q, 'status': status,
+        'allowance': PatientAllowance.for_profile(profile), 'hidden_contact': hidden, 'active': 'patients', 'page_obj': page_obj, 'counts': counts, 'q': q, 'status': status, 'followup': followup,
         'age': age, 'sort': sort, 'querystring': params.urlencode(),
         'recent_patients': recent,
         'status_choices': Patient.STATUS_CHOICES,
@@ -405,7 +413,7 @@ def patient_visit_add(request, pk):
         if form.is_valid():
             data = form.cleaned_data
             given = parse_treatments(request.POST.get('treatments'))
-            _, used = record_visit(patient, profile.full_name, data['date'], data['session_type'], data['progress'], data['notes'], given)
+            _, used = record_visit(patient, profile.full_name, data['date'], data['session_type'], data['progress'], data['notes'], given, professional=profile)
             messages.success(request, 'Session recorded' + (f' with {len(given)} treatment{"s" if len(given) != 1 else ""}.' if given else '.') + (' One package session used.' if used else ''))
         else:
             messages.error(request, 'Could not save the session - check the date and session type.')

@@ -85,7 +85,7 @@ def _save(request, profile, patient, note):
             note.status, note.finalized_at = SoapNote.FINAL, timezone.now()
         if request.POST.get('record_visit') and note.visit_id is None:
             summary = (note.treatment_today or note.impression or note.chief_complaint or 'SOAP note recorded')[:300]
-            visit, _ = record_visit(patient, profile.full_name, note.note_date, session_type=VISIT_TYPE[note.note_type], notes=f'SOAP note: {summary}')
+            visit, _ = record_visit(patient, profile.full_name, note.note_date, session_type=VISIT_TYPE[note.note_type], notes=f'SOAP note: {summary}', professional=profile)
             note.visit = visit
         note.save()
     patient.touch()

@@ -216,3 +216,68 @@ class SessionTreatmentTests(TestCase):
         self.assertEqual(self.client.get(reverse('accounts:treatment-search'), {'q': 'electro'}).json()['results'][0]['group'], 'Electrotherapy')
         self.client.logout()
         self.assertEqual(self.client.get(reverse('accounts:treatment-search'), {'q': 'tens'}).status_code, 302)
+
+
+class SessionOnCalendarTests(TestCase):
+    """A session recorded for a patient who was never booked still lands on the calendar: it starts when it was entered and runs an hour."""
+    def setUp(self):
+        self.user, self.profile = make_professional()
+        self.client.force_login(self.user)
+        self.patient = make_patient(self.profile)
+        self.today = timezone.localdate()
+
+    def session(self, date=None, **extra):
+        return self.client.post(reverse('accounts:patient-visit-add', args=[self.patient.pk]), {
+            'date': (date or self.today).isoformat(), 'session_type': 'treatment', 'progress': '', 'notes': 'Walk-in session', **extra})
+
+    def test_unbooked_session_gets_an_attended_hour_long_appointment(self):
+        before = timezone.now()
+        self.session()
+        appt = Appointment.objects.get()
+        self.assertEqual((appt.patient, appt.professional, appt.status, appt.kind), (self.patient, self.profile, Appointment.ATTENDED, Appointment.APPOINTMENT))
+        self.assertEqual(appt.end - appt.start, datetime.timedelta(hours=1))
+        self.assertLessEqual(abs(timezone.localtime(appt.start) - timezone.localtime(before)), datetime.timedelta(minutes=2))  # started when the session was entered
+        self.assertEqual((appt.session_type, appt.notes), ('treatment', 'Walk-in session'))
+        events = [e for col in self.client.get(reverse('accounts:appointments'), {'date': self.today.isoformat(), 'days': 1}).context['columns'] for e in col['events']]
+        self.assertEqual(len(events), 1)
+
+    def test_a_booked_appointment_is_marked_attended_not_duplicated(self):
+        start = aware(self.today, datetime.time(15, 0))
+        booked = Appointment.objects.create(professional=self.profile, patient=self.patient, start=start, end=start + datetime.timedelta(minutes=30))
+        self.session()
+        self.assertEqual(Appointment.objects.count(), 1)
+        booked.refresh_from_db()
+        self.assertEqual(booked.status, Appointment.ATTENDED)
+        self.session()  # a second session the same day does not add a second entry either
+        self.assertEqual(Appointment.objects.count(), 1)
+
+    def test_other_days_cancelled_bookings_and_attending_do_not_double_up(self):
+        yesterday = self.today - datetime.timedelta(days=1)
+        self.session(yesterday)
+        self.assertEqual(timezone.localtime(Appointment.objects.get().start).date(), yesterday)
+        self.session()  # a different day gets its own entry
+        self.assertEqual(Appointment.objects.count(), 2)
+        start = aware(self.today + datetime.timedelta(days=3), datetime.time(9, 0))
+        appt = Appointment.objects.create(professional=self.profile, patient=self.patient, start=start, end=start + datetime.timedelta(minutes=30))
+        self.client.post(reverse('accounts:appointment-action', args=[appt.pk]), {'action': 'attend'})
+        self.assertEqual(Appointment.objects.count(), 3)  # marking attended records the session without adding another entry
+
+
+class DashboardCardTests(TestCase):
+    def test_the_cards_open_the_matching_screens(self):
+        user, profile = make_professional()
+        self.client.force_login(user)
+        old = make_patient(profile, 'Stale Patient')
+        fresh = make_patient(profile, 'Fresh Patient')
+        old.last_visit = timezone.localdate() - datetime.timedelta(days=30)
+        old.save()
+        fresh.last_visit = timezone.localdate()
+        fresh.save()
+        page = self.client.get(reverse('accounts:dashboard'))
+        for target in (reverse('accounts:appointments') + f'?date={timezone.localdate().isoformat()}&days=1', reverse('accounts:patients') + '?status=active',
+                       reverse('accounts:patients') + '?followup=due', reverse('billing:billing')):
+            self.assertContains(page, f'href="{target}"')
+        listing = self.client.get(reverse('accounts:patients'), {'followup': 'due'})
+        self.assertEqual([p.name for p in listing.context['page_obj']], ['Stale Patient'])
+        self.assertContains(listing, 'due for a follow-up')
+        self.assertEqual(len(self.client.get(reverse('accounts:patients'), {'status': 'active'}).context['page_obj']), 2)
