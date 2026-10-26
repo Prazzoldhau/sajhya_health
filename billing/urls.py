@@ -13,6 +13,7 @@ urlpatterns = [
     path('entry/<int:pk>/save/', views.entry_save, name='entry-edit'),
     path('entry/<int:pk>/payment/', views.entry_payment, name='entry-payment'),
     path('entry/<int:pk>/invoice/', views.invoice, name='invoice'),
+    path('entry/<int:pk>/invoice.png', views.invoice_png, name='invoice-png'),
     path('entry/<int:pk>/invoice.pdf', views.invoice_pdf, name='invoice-pdf'),
     path('entry/<int:pk>/invoice/email/', views.invoice_email, name='invoice-email'),
     path('invoice/<str:token>/', views.invoice_public, name='invoice-public'),

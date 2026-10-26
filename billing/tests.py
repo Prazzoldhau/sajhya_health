@@ -783,3 +783,22 @@ class InvoicePictureTests(BillingBase):
         self.assertEqual(inv.whatsapp_chat(''), 'https://web.whatsapp.com/')
         from django.contrib.staticfiles import finders
         self.assertTrue(finders.find('vendor/html2canvas/html2canvas.min.js'))
+
+
+class InvoicePngTests(BillingBase):
+    def test_the_server_draws_the_invoice_picture_as_a_fallback(self):
+        self.client.post(reverse('billing:patient-bill', args=[self.patient.pk]), {'entry_date': self.today.isoformat(), 'service': 'Session', 'rate': '500', 'payment_mode': 'cash', 'payment_status': 'paid', 'amount_given': '700'})
+        entry = BillingEntry.objects.get()
+        r = self.client.get(reverse('billing:invoice-png', args=[entry.pk]))
+        self.assertEqual((r.status_code, r['Content-Type']), (200, 'image/png'))
+        self.assertTrue(r.content.startswith(b'\x89PNG'))
+        entry.patient_name, entry.service = 'सीता गुरुङ', 'पिठ्यूँको उपचार'  # non-Latin text never breaks it
+        entry.save()
+        self.assertTrue(self.client.get(reverse('billing:invoice-png', args=[entry.pk])).content.startswith(b'\x89PNG'))
+        self.client.post(reverse('billing:entry-cancel', args=[entry.pk]), {'reason': 'x'})
+        self.assertEqual(self.client.get(reverse('billing:invoice-png', args=[entry.pk])).status_code, 200)
+        stranger, _ = make_professional('stranger')
+        other = self.client_class()
+        other.force_login(stranger)
+        self.assertEqual(other.get(reverse('billing:invoice-png', args=[entry.pk])).status_code, 404)
+        self.assertContains(self.client.get(reverse('billing:invoice', args=[entry.pk])), reverse('billing:invoice-png', args=[entry.pk]))

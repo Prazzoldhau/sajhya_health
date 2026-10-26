@@ -87,11 +87,21 @@
   // the invoice as a picture (works for Nepali text too, because the browser draws it)
   var note = document.getElementById('picNote'), name = "{{ entry.invoice_number }}.png";
   function say(t) { note.textContent = t; }
-  function picture() {
-    return html2canvas(document.getElementById('invoice'), { scale: 2, backgroundColor: '#ffffff', useCORS: true }).then(function (canvas) {
-      return new Promise(function (resolve, reject) { canvas.toBlob(function (b) { b ? resolve(b) : reject(new Error('no image')); }, 'image/png'); });
+  // The picture is drawn in the browser (so Nepali text shows). If that cannot happen - the script did not load, an old browser, or it takes
+  // too long - the server draws the same invoice instead, so a picture always comes out.
+  function fromServer() { return fetch("{% url 'billing:invoice-png' entry.pk %}", { credentials: 'same-origin' }).then(function (r) { if (!r.ok) throw new Error('server'); return r.blob(); }); }
+  function fromBrowser() {
+    return new Promise(function (resolve, reject) {
+      if (typeof html2canvas === 'undefined') { reject(new Error('library missing')); return; }
+      var timer = setTimeout(function () { reject(new Error('timeout')); }, 12000);
+      try {
+        html2canvas(document.getElementById('invoice'), { scale: 2, backgroundColor: '#ffffff', useCORS: true, logging: false }).then(function (canvas) {
+          canvas.toBlob(function (b) { clearTimeout(timer); b ? resolve(b) : reject(new Error('no image')); }, 'image/png');
+        }, function (e) { clearTimeout(timer); reject(e); });
+      } catch (e) { clearTimeout(timer); reject(e); }
     });
   }
+  function picture() { return fromBrowser().catch(function () { return fromServer(); }); }
   function save(blob) { var a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = name; document.body.appendChild(a); a.click(); a.remove(); setTimeout(function () { URL.revokeObjectURL(a.href); }, 4000); }
   document.getElementById('picSave').addEventListener('click', function () { say('Making the picture...'); picture().then(function (b) { save(b); say('Picture saved. Attach it in WhatsApp, Messenger or any app.'); }).catch(function () { say('The picture could not be made. Use the PDF instead.'); }); });
   document.getElementById('picShare').addEventListener('click', function () {

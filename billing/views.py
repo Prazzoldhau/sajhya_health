@@ -500,6 +500,19 @@ def invoice(request, pk):
 
 
 @login_required
+def invoice_png(request, pk):
+    """The invoice as a picture drawn on the server: what the page falls back to when the browser cannot draw it."""
+    profile = workspace_profile(request)
+    if profile is None:
+        raise Http404
+    entry = get_object_or_404(BillingEntry, pk=pk, professional=profile)
+    response = HttpResponse(inv.build_png(entry), content_type='image/png')
+    response['Content-Disposition'] = f'inline; filename="{entry.invoice_number}.png"'
+    response['Cache-Control'] = 'private, no-store'
+    return response
+
+
+@login_required
 def invoice_pdf(request, pk):
     profile = workspace_profile(request)
     if profile is None:

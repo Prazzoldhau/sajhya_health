@@ -196,3 +196,80 @@ def build_pdf(entry, online_url=''):
     c.showPage()
     c.save()
     return buf.getvalue()
+
+
+# ---------------------------------------------------------------- the picture (server-side, used when the browser cannot draw it)
+def _font(bold, size):
+    import os
+
+    import reportlab
+    from PIL import ImageFont
+    path = os.path.join(os.path.dirname(reportlab.__file__), 'fonts', 'VeraBd.ttf' if bold else 'Vera.ttf')
+    try:
+        return ImageFont.truetype(path, size)
+    except OSError:
+        return ImageFont.load_default(size=size)
+
+
+def build_png(entry):
+    """The invoice as a PNG. Same content as the PDF (Latin text only; text in another script is left to the online invoice)."""
+    from PIL import Image, ImageDraw
+
+    from .models import advance_balance
+    practice = practice_of(entry)
+    W, pad = 1000, 50
+    green, ink, muted, soft = (17, 107, 67), (24, 53, 43), (108, 129, 120), (233, 247, 239)
+    code = entry.patient.patient_code if entry.patient_id else ''
+    lines_right = [f'Date: {entry.entry_date:%d %b %Y}', f'Status: {entry.status_label}', f'Payment mode: {entry.get_payment_mode_display()}']
+    extra = entry.carried_over if not entry.is_cancelled else 0
+    payments = list(entry.payments.all())[:8]
+    H = 660 + (110 if extra > 0 else 0) + (50 + 32 * len(payments) if payments else 0)
+    img = Image.new('RGB', (W, H), 'white')
+    d = ImageDraw.Draw(img)
+    d.rectangle([0, 0, W, 120], fill=green)
+    d.text((pad, 28), _latin(practice['name'], 'Physiotherapy practice'), font=_font(True, 34), fill='white')
+    d.text((pad, 74), _latin(', '.join(x for x in (practice['address'], practice['phone']) if x), ''), font=_font(False, 20), fill='white')
+    d.text((W - pad, 30), 'INVOICE', font=_font(True, 36), fill='white', anchor='ra')
+    d.text((W - pad, 78), entry.invoice_number, font=_font(False, 22), fill='white', anchor='ra')
+    y = 160
+    d.text((pad, y), 'BILLED TO', font=_font(True, 16), fill=muted)
+    d.text((W // 2 + 40, y), 'INVOICE DETAILS', font=_font(True, 16), fill=muted)
+    d.text((pad, y + 28), _latin(entry.patient_name, code or 'Patient'), font=_font(True, 26), fill=ink)
+    sub = ' / '.join(x for x in (f'{entry.age} yrs' if entry.age else '', entry.get_sex_display() if entry.sex else '', code) if x)
+    d.text((pad, y + 66), _latin(sub, ''), font=_font(False, 20), fill=ink)
+    for i, text in enumerate(lines_right):
+        d.text((W // 2 + 40, y + 28 + i * 30), text, font=_font(False, 21), fill=ink)
+    y += 150
+    d.rectangle([pad, y, W - pad, y + 46], fill=soft)
+    d.text((pad + 14, y + 12), 'SERVICE', font=_font(True, 18), fill=green)
+    d.text((W - pad - 14, y + 12), 'AMOUNT (NPR)', font=_font(True, 18), fill=green, anchor='ra')
+    d.text((pad + 14, y + 66), _latin(entry.service, 'Service'), font=_font(False, 24), fill=ink)
+    d.text((W - pad - 14, y + 66), f'{entry.rate:,.2f}', font=_font(False, 24), fill=ink, anchor='ra')
+    d.line([pad, y + 110, W - pad, y + 110], fill=(225, 235, 229), width=2)
+    y += 140
+    for label, value, bold in (('Total', entry.rate, True), ('Received', entry.amount_paid, False), ('Balance due', entry.amount_due, True)):
+        d.text((W // 2 + 40, y), label, font=_font(bold, 24), fill=ink)
+        d.text((W - pad - 14, y), f'NPR {value:,.2f}', font=_font(bold, 24), fill=ink, anchor='ra')
+        y += 40
+    if extra > 0:
+        y += 10
+        d.rectangle([W // 2 - 80, y, W - pad, y + 96], fill=(231, 247, 237))
+        d.text((W // 2 - 60, y + 12), 'Extra kept as advance', font=_font(True, 22), fill=green)
+        d.text((W - pad - 14, y + 12), f'NPR {extra:,.2f}', font=_font(True, 22), fill=green, anchor='ra')
+        d.text((W // 2 - 60, y + 46), f'Cash handed over NPR {entry.cash_handed_over:,.2f}; the extra stays with us', font=_font(False, 16), fill=ink)
+        d.text((W // 2 - 60, y + 68), f'for your next session. Advance balance: NPR {advance_balance(entry.patient_id):,.2f}.', font=_font(False, 16), fill=ink)
+        y += 110
+    if payments:
+        y += 14
+        d.text((pad, y), 'PAYMENTS RECEIVED', font=_font(True, 16), fill=muted)
+        for p in payments:
+            y += 32
+            d.text((pad, y), f'{p.paid_on:%d %b %Y}  -  {p.get_payment_mode_display()}', font=_font(False, 20), fill=ink)
+            d.text((pad + 420, y), f'NPR {p.amount:,.2f}', font=_font(False, 20), fill=ink, anchor='ra')
+    d.text((pad, H - 50), 'Thank you. Please keep this invoice for your records.', font=_font(False, 18), fill=muted)
+    d.text((W - pad, H - 50), 'Sajhya Health', font=_font(False, 18), fill=muted, anchor='ra')
+    if entry.is_cancelled:
+        d.text((W // 2, H // 2), 'CANCELLED', font=_font(True, 120), fill=(240, 205, 205), anchor='mm')
+    out = io.BytesIO()
+    img.save(out, 'PNG')
+    return out.getvalue()
