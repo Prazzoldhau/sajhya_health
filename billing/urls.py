@@ -17,6 +17,7 @@ urlpatterns = [
     path('entry/<int:pk>/restore/', views.entry_restore, name='entry-restore'),
     path('entry/<int:pk>/delete/', views.entry_delete, name='entry-delete'),
     # patient packages (1 / 2 / 3 / 4 weeks)
+    path('advances/', views.advances, name='advances'),
     path('packages/', views.packages, name='packages'),
     path('packages/create/', views.package_create, name='package-create'),
     path('packages/<int:pk>/payment/', views.package_payment, name='package-payment'),

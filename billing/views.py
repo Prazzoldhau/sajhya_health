@@ -94,7 +94,7 @@ def billing(request):
         'active': 'billing', 'billing_tab': 'book', 'search': search, 'form': form, 'entries': entries, 'selected': selected, 'today': today,
         'prev_date': selected - datetime.timedelta(days=1), 'next_date': selected + datetime.timedelta(days=1),
         'total': total, 'by_mode': [(mode_names[m], v) for m, v in by_mode.items()],
-        'month_total': month_total, 'month_label': f'{selected:%B %Y}', 'package_payments': revenue_for(profile, selected) - collected - advance_net, 'collected': collected, 'advance_net': advance_net, 'received_total': revenue_for(profile, selected), 'advance_held': advance_held,
+        'month_total': month_total, 'month_label': f'{selected:%B %Y}', 'package_payments': revenue_for(profile, selected) - collected - advance_net, 'collected': collected, 'advance_net': advance_net, 'received_total': revenue_for(profile, selected), 'advance_held': advance_held, 'advance_held_total': advance_held,
         'packages_due': packages_due, 'owed': owed, 'bills_due': bills_due, 'pay_form': EntryPaymentForm(), 'correct_form': BillCorrectionForm(), 'open_new': request.GET.get('new') == '1', 'open_edit': request.GET.get('edit', '') if request.GET.get('edit', '').isdigit() else '',
     })
     return render(request, 'billing/billing.html', context)
@@ -157,11 +157,74 @@ def patient_bill(request, patient_id):
     return back
 
 
+def _advance_back(request, patient):
+    """Where to return after taking or refunding an advance: the page it came from, else the patient's billing tab."""
+    nxt = request.POST.get('next', '')
+    if nxt.startswith('/') and not nxt.startswith('//'):
+        return redirect(nxt)
+    return redirect(f"{reverse('accounts:patient-detail', args=[patient.pk])}?tab=billing")
+
+
+@login_required
+def advances(request):
+    """Advances held: who has paid ahead, how much is left, and the full movement history of one patient."""
+    profile = workspace_profile(request)
+    if profile is None:
+        return redirect('accounts:welcome')
+    moves = list(PatientAdvance.objects.filter(professional=profile).select_related('patient', 'entry').order_by('paid_on', 'created_at', 'id'))
+    today = timezone.localdate()
+    month_start = today.replace(day=1)
+    people = {}
+    month = {PatientAdvance.DEPOSIT: Decimal('0'), PatientAdvance.USED: Decimal('0'), PatientAdvance.REFUND: Decimal('0')}
+    for m in moves:
+        p = people.setdefault(m.patient_id, {'patient': m.patient, 'balance': Decimal('0'), 'taken': Decimal('0'), 'used': Decimal('0'), 'refunded': Decimal('0'), 'last': m.paid_on})
+        p['balance'] += m.amount
+        p['last'] = max(p['last'], m.paid_on)
+        if m.kind == PatientAdvance.DEPOSIT:
+            p['taken'] += m.amount
+        elif m.kind == PatientAdvance.USED:
+            p['used'] += -m.amount
+        elif m.kind == PatientAdvance.REFUND:
+            p['refunded'] += -m.amount
+        if m.paid_on >= month_start and m.kind in month:
+            month[m.kind] += abs(m.amount)
+    text = request.GET.get('q', '').strip().lower()
+    show = 'all' if request.GET.get('show') == 'all' else 'balance'
+    rows = [p for p in people.values() if (show == 'all' or p['balance'] > 0)
+            and (not text or text in p['patient'].name.lower() or text in p['patient'].patient_code.lower())]
+    rows.sort(key=lambda p: (-p['balance'], p['patient'].name.lower()))
+    for p in rows:
+        p['contact'] = p['patient'].phone if can_see_contact(profile, p['patient']) else ''
+
+    chosen = None
+    pid = request.GET.get('patient', '')
+    if pid.isdigit() and int(pid) in people:
+        chosen = people[int(pid)]
+    elif rows:
+        chosen = people[rows[0]['patient'].pk]
+    ledger = []
+    if chosen:
+        running = Decimal('0')
+        for m in (m for m in moves if m.patient_id == chosen['patient'].pk):
+            running += m.amount
+            ledger.append({'move': m, 'running': running})
+        ledger.reverse()  # newest first
+    held = sum((p['balance'] for p in people.values()), Decimal('0'))
+    context = workspace_context(request.user, profile)
+    context.update({
+        'active': 'billing', 'billing_tab': 'advances', 'rows': rows, 'chosen': chosen, 'ledger': ledger, 'q': request.GET.get('q', '').strip(), 'show': show,
+        'advance_held_total': held, 'held': held, 'holders': sum(1 for p in people.values() if p['balance'] > 0), 'month_taken': month[PatientAdvance.DEPOSIT],
+        'month_used': month[PatientAdvance.USED], 'month_refunded': month[PatientAdvance.REFUND], 'month_label': f'{today:%B %Y}',
+        'advance_form': AdvanceForm(), 'next_url': request.get_full_path(),
+    })
+    return render(request, 'billing/advances.html', context)
+
+
 @login_required
 def advance_add(request, patient_id):
     """Take money from a patient in advance, to be used against their next bills."""
     profile, patient = own_patient(request, patient_id)
-    back = redirect(f"{reverse('accounts:patient-detail', args=[patient.pk])}?tab=billing")
+    back = _advance_back(request, patient)
     if request.method != 'POST':
         return back
     form = AdvanceForm(request.POST)
@@ -184,7 +247,7 @@ def advance_add(request, patient_id):
 def advance_refund(request, patient_id):
     """Pay back part or all of what a patient has left in advance."""
     profile, patient = own_patient(request, patient_id)
-    back = redirect(f"{reverse('accounts:patient-detail', args=[patient.pk])}?tab=billing")
+    back = _advance_back(request, patient)
     if request.method != 'POST':
         return back
     form = AdvanceForm(request.POST)
@@ -328,6 +391,7 @@ def packages(request):
     live = [p for p in all_packages if p.effective_status == 'active']
     context = workspace_context(request.user, profile)
     context.update({
+        'advance_held_total': PatientAdvance.objects.filter(professional=profile).aggregate(t=Sum('amount'))['t'] or 0,
         'active': 'billing', 'billing_tab': 'packages', 'packages': shown, 'show': flt, 'filters': PACKAGE_FILTERS,
         'form': PatientPackageForm(profile=profile, initial={'start_date': timezone.localdate(), 'amount_paid_now': 0}),
         'payment_form': PackagePaymentForm(),

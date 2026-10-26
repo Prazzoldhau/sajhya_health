@@ -1,4 +1,5 @@
 <div class="tabs2 no-print">
   <a href="{% url 'billing:billing' %}" class="{% if billing_tab == 'book' %}on{% endif %}">Daily billing book</a>
   <a href="{% url 'billing:packages' %}" class="{% if billing_tab == 'packages' %}on{% endif %}">Patient packages</a>
+  <a href="{% url 'billing:advances' %}" class="{% if billing_tab == 'advances' %}on{% endif %}">Advances held{% if advance_held_total %} <span style="font-weight:700;color:#16834f">· NPR {{ advance_held_total }}</span>{% endif %}</a>
 </div>

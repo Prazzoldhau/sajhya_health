@@ -623,3 +623,45 @@ class CarryOverTests(BillingBase):
         entry.refresh_from_db()
         self.assertEqual((entry.status_key, advance_balance(self.patient.pk)), ('paid', 600))
         self.assertEqual(revenue_for(self.profile, self.today), 1000)
+
+
+class AdvanceTabTests(BillingBase):
+    def test_the_advances_tab_lists_holders_and_shows_one_patients_full_history(self):
+        other = make_patient(self.profile, 'Maya Rai')
+        self.client.post(reverse('billing:advance-add', args=[self.patient.pk]), {'amount': '1000', 'payment_mode': 'cash'})
+        self.client.post(reverse('billing:advance-add', args=[other.pk]), {'amount': '500', 'payment_mode': 'online'})
+        self.client.post(reverse('billing:patient-bill', args=[self.patient.pk]), {'entry_date': self.today.isoformat(), 'service': 'S', 'rate': '700', 'payment_mode': 'cash', 'payment_status': 'advance'})
+        self.client.post(reverse('billing:advance-refund', args=[other.pk]), {'amount': '500', 'payment_mode': 'cash'})  # Maya is now at zero
+        page = self.client.get(reverse('billing:advances'))
+        self.assertEqual((page.context['held'], page.context['holders']), (300, 1))
+        self.assertEqual([r['patient'].pk for r in page.context['rows']], [self.patient.pk])  # only people with a balance by default
+        chosen = page.context['chosen']
+        self.assertEqual((chosen['balance'], chosen['taken'], chosen['used'], chosen['refunded']), (300, 1000, 700, 0))
+        self.assertEqual([r['running'] for r in page.context['ledger']], [300, 1000])  # newest first, with the balance after each
+        self.assertContains(page, 'Used for a bill')
+        everyone = self.client.get(reverse('billing:advances'), {'show': 'all'})
+        self.assertEqual(len(everyone.context['rows']), 2)
+        detail = self.client.get(reverse('billing:advances'), {'patient': other.pk, 'show': 'all'})
+        self.assertEqual((detail.context['chosen']['balance'], detail.context['chosen']['refunded']), (0, 500))
+        self.assertEqual(len(self.client.get(reverse('billing:advances'), {'q': 'zzz', 'show': 'all'}).context['rows']), 0)
+        self.assertContains(self.client.get(reverse('billing:billing')), reverse('billing:advances'))  # the card opens the tab
+
+    def test_actions_from_the_tab_return_to_it_and_other_professionals_see_nothing(self):
+        url = reverse('billing:advances') + f'?patient={self.patient.pk}'
+        r = self.client.post(reverse('billing:advance-add', args=[self.patient.pk]), {'amount': '200', 'payment_mode': 'cash', 'next': url})
+        self.assertRedirects(r, url, fetch_redirect_response=False)
+        r = self.client.post(reverse('billing:advance-add', args=[self.patient.pk]), {'amount': '50', 'payment_mode': 'cash', 'next': 'https://evil.example/'})
+        self.assertRedirects(r, reverse('accounts:patient-detail', args=[self.patient.pk]) + '?tab=billing', fetch_redirect_response=False)
+        stranger, _ = make_professional('stranger')
+        other = self.client_class()
+        other.force_login(stranger)
+        page = other.get(reverse('billing:advances'), {'patient': self.patient.pk})
+        self.assertEqual((page.context['held'], page.context['rows'], page.context['chosen']), (0, [], None))
+
+    def test_links_from_billing_open_the_patients_billing_tab_directly(self):
+        self.client.post(reverse('billing:patient-bill', args=[self.patient.pk]), {'entry_date': self.today.isoformat(), 'service': 'S', 'rate': '700', 'payment_mode': 'cash'})
+        self.package()
+        target = reverse('accounts:patient-detail', args=[self.patient.pk])
+        self.assertContains(self.client.get(reverse('billing:billing')), f'{target}?tab=billing')
+        self.assertNotContains(self.client.get(reverse('billing:billing')), f'href="{target}"')
+        self.assertContains(self.client.get(reverse('billing:packages')), f'{target}?tab=billing')

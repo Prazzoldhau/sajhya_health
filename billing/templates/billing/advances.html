@@ -1,0 +1,117 @@
+{% extends 'accounts/pro_base.html' %}
+{% block title %}Advances held | Sajhya Health{% endblock %}
+{% block extra_css %}
+  .adv-head { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; margin-bottom: 14px; }
+  .adv-head h1 { margin: 0 10px 0 0; font-size: 24px; }
+  .adv-layout { display: grid; grid-template-columns: minmax(300px, 380px) minmax(0, 1fr); gap: 14px; align-items: start; }
+  .adv-list { background: #fff; border: 1px solid var(--line); border-radius: 12px; overflow: hidden; }
+  .adv-list form.find { display: flex; gap: 6px; padding: 10px; border-bottom: 1px solid var(--line); background: #f6faf7; }
+  .adv-list form.find input { flex: 1; height: 34px; border: 1px solid var(--line); border-radius: 18px; padding: 0 12px; min-width: 0; }
+  .adv-row { display: flex; align-items: center; gap: 10px; padding: 11px 14px; border-bottom: 1px solid #eef3ef; text-decoration: none; color: inherit; }
+  .adv-row:hover { background: #f6faf7; } .adv-row.on { background: #e9f7ef; box-shadow: inset 3px 0 0 var(--green); }
+  .adv-row .nm { font-weight: 700; font-size: 13px; } .adv-row .sub { font-size: 11px; color: var(--muted); }
+  .adv-row .bal { margin-left: auto; font-weight: 800; color: #16834f; white-space: nowrap; } .adv-row .bal.zero { color: var(--muted); font-weight: 600; }
+  .adv-detail { background: #fff; border: 1px solid var(--line); border-radius: 12px; overflow: hidden; }
+  .adv-top { display: flex; gap: 14px; align-items: center; flex-wrap: wrap; padding: 16px 18px; background: linear-gradient(135deg, #f1faf5, #fff); border-bottom: 1px solid var(--line); }
+  .adv-top .who { font-size: 18px; font-weight: 800; } .adv-top .who a { color: inherit; text-decoration: none; }
+  .adv-top .big { margin-left: auto; text-align: right; } .adv-top .big .v { font-size: 28px; font-weight: 800; color: #16834f; } .adv-top .big .k { font-size: 11px; text-transform: uppercase; color: var(--muted); font-weight: 800; }
+  .adv-stats { display: grid; grid-template-columns: repeat(4, 1fr); gap: 1px; background: var(--line); border-bottom: 1px solid var(--line); }
+  .adv-stats div { background: #fff; padding: 12px 16px; } .adv-stats .k { font-size: 10px; text-transform: uppercase; color: #7c9186; font-weight: 800; } .adv-stats .v { font-weight: 800; font-size: 16px; margin-top: 3px; }
+  .adv-acts { display: flex; gap: 8px; padding: 12px 18px; flex-wrap: wrap; }
+  .adv-form { margin: 0 18px 14px; padding: 14px 16px; border: 1px solid var(--line); border-radius: 10px; background: #f6faf7; }
+  .adv-form .g { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px; align-items: end; }
+  .tl { padding: 4px 18px 18px; }
+  .tl-item { display: grid; grid-template-columns: 92px 1fr auto; gap: 12px; padding: 10px 0; border-bottom: 1px solid #eef3ef; align-items: center; }
+  .tl-item .d { font-size: 12px; color: var(--muted); font-weight: 700; }
+  .tl-item .t { font-weight: 700; font-size: 13px; } .tl-item .s { font-size: 11px; color: var(--muted); margin-top: 2px; }
+  .tl-item .amt { text-align: right; font-weight: 800; white-space: nowrap; } .amt.in { color: #16834f; } .amt.out { color: #b78317; }
+  .tl-item .run { font-size: 10.5px; color: var(--muted); font-weight: 600; }
+  .dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-right: 6px; } .dot.in { background: #16834f; } .dot.out { background: #d9a13b; }
+  .empty-adv { padding: 36px 20px; text-align: center; color: var(--muted); }
+  @media (max-width: 900px) { .adv-layout { grid-template-columns: 1fr; } .adv-stats { grid-template-columns: 1fr 1fr; } .tl-item { grid-template-columns: 1fr auto; } .tl-item .d { grid-column: 1 / -1; } }
+{% endblock %}
+
+{% block main %}
+{% include 'billing/_tabs.html' %}
+<div class="adv-head">
+  <h1>Advances held</h1>
+  <span class="patient-id" style="display:inline">Money patients paid ahead. It is used up session by session and the rest can be refunded.</span>
+</div>
+
+<div class="kpis">
+  <div class="kpi"><div class="k">Advance held now</div><div class="v" style="color:#16834f">NPR {{ held }}</div><div class="n">{{ holders }} patient{{ holders|pluralize }} with a balance</div></div>
+  <div class="kpi"><div class="k">Taken in {{ month_label }}</div><div class="v">NPR {{ month_taken }}</div><div class="n">Paid in ahead</div></div>
+  <div class="kpi"><div class="k">Used in {{ month_label }}</div><div class="v">NPR {{ month_used }}</div><div class="n">Settled against bills</div></div>
+  <div class="kpi"><div class="k">Refunded in {{ month_label }}</div><div class="v" style="color:#b78317">NPR {{ month_refunded }}</div><div class="n">Paid back to patients</div></div>
+</div>
+
+<div class="adv-layout">
+  <aside class="adv-list">
+    <form class="find" method="get">
+      <input type="search" name="q" value="{{ q }}" placeholder="Search patient or ID..." autocomplete="off">
+      <input type="hidden" name="show" value="{{ show }}">
+      <button class="secondary-btn" type="submit" style="height:34px">Search</button>
+    </form>
+    <div class="chipbar" style="padding:8px 10px;margin:0">
+      <a href="?show=balance{% if q %}&q={{ q|urlencode }}{% endif %}" class="{% if show == 'balance' %}on{% endif %}">With balance</a>
+      <a href="?show=all{% if q %}&q={{ q|urlencode }}{% endif %}" class="{% if show == 'all' %}on{% endif %}">All with activity</a>
+    </div>
+    {% for p in rows %}
+    <a class="adv-row {% if chosen and chosen.patient.pk == p.patient.pk %}on{% endif %}" href="?patient={{ p.patient.pk }}&show={{ show }}{% if q %}&q={{ q|urlencode }}{% endif %}">
+      <span class="patient-avatar">{{ p.patient.name|slice:":2"|upper }}</span>
+      <span><div class="nm">{{ p.patient.name }}</div><div class="sub">{{ p.patient.patient_code }} · last activity {{ p.last|date:"M j" }}</div></span>
+      <span class="bal {% if p.balance <= 0 %}zero{% endif %}">NPR {{ p.balance }}</span>
+    </a>
+    {% empty %}
+    <div class="empty-adv">{% if show == 'balance' %}No patient is holding an advance right now.{% else %}No advance activity found.{% endif %}<br><span class="patient-id">Take one from a patient's Billing tab.</span></div>
+    {% endfor %}
+  </aside>
+
+  <section class="adv-detail">
+  {% if chosen %}
+    <div class="adv-top">
+      <span class="patient-avatar" style="width:46px;height:46px;font-size:15px">{{ chosen.patient.name|slice:":2"|upper }}</span>
+      <div><div class="who"><a href="{% url 'accounts:patient-detail' chosen.patient.pk %}?tab=billing">{{ chosen.patient.name }}</a></div>
+        <div class="patient-id">{{ chosen.patient.patient_code }}{% if chosen.contact %} · {{ chosen.contact }}{% endif %}</div></div>
+      <div class="big"><div class="k">Balance</div><div class="v">NPR {{ chosen.balance }}</div></div>
+    </div>
+    <div class="adv-stats">
+      <div><div class="k">Taken in total</div><div class="v">NPR {{ chosen.taken }}</div></div>
+      <div><div class="k">Used for bills</div><div class="v">NPR {{ chosen.used }}</div></div>
+      <div><div class="k">Refunded</div><div class="v">NPR {{ chosen.refunded }}</div></div>
+      <div><div class="k">Last activity</div><div class="v">{{ chosen.last|date:"M j, Y" }}</div></div>
+    </div>
+    <div class="adv-acts">
+      <button type="button" class="primary-btn" style="height:34px" onclick="var f=document.getElementById('advTake');f.hidden=!f.hidden;document.getElementById('advRefund').hidden=true">＋ Take advance</button>
+      {% if chosen.balance > 0 %}<button type="button" class="secondary-btn" style="height:34px" onclick="var f=document.getElementById('advRefund');f.hidden=!f.hidden;document.getElementById('advTake').hidden=true">Refund</button>{% endif %}
+      <a class="secondary-btn" style="height:34px;text-decoration:none;display:inline-flex;align-items:center" href="{% url 'billing:billing' %}?patient={{ chosen.patient.pk }}">Their bills</a>
+    </div>
+    <form method="post" action="{% url 'billing:advance-add' chosen.patient.pk %}" id="advTake" class="adv-form" hidden>{% csrf_token %}
+      <input type="hidden" name="next" value="{{ next_url }}">
+      <div class="g"><label>Amount (NPR) {{ advance_form.amount }}</label><label>Paid by {{ advance_form.payment_mode }}</label><label>Notes {{ advance_form.notes }}</label></div>
+      <label style="display:flex;gap:8px;align-items:center;margin-top:10px;font-size:12px"><input type="checkbox" name="settle" value="1"> Use it to clear this patient's unpaid bills first</label>
+      <div style="margin-top:10px;display:flex;gap:8px"><button type="submit" class="primary-btn">Save advance</button><button type="button" class="secondary-btn" onclick="document.getElementById('advTake').hidden=true">Cancel</button></div>
+    </form>
+    <form method="post" action="{% url 'billing:advance-refund' chosen.patient.pk %}" id="advRefund" class="adv-form" hidden style="background:#fff7f0">{% csrf_token %}
+      <input type="hidden" name="next" value="{{ next_url }}">
+      <div class="patient-id" style="margin-bottom:8px">Pay back part or all of the balance (up to NPR {{ chosen.balance }}).</div>
+      <div class="g"><label>Amount (NPR) {{ advance_form.amount }}</label><label>Paid back by {{ advance_form.payment_mode }}</label><label>Notes {{ advance_form.notes }}</label></div>
+      <div style="margin-top:10px;display:flex;gap:8px"><button type="submit" class="primary-btn">Refund</button><button type="button" class="secondary-btn" onclick="document.getElementById('advRefund').hidden=true">Cancel</button></div>
+    </form>
+    <div class="cl-h" style="margin:6px 18px 0;font-size:12px;font-weight:800;color:var(--green-dark);text-transform:uppercase;letter-spacing:.04em">History</div>
+    <div class="tl">
+      {% for row in ledger %}{% with m=row.move %}
+      <div class="tl-item">
+        <div class="d">{{ m.paid_on|date:"M j, Y" }}</div>
+        <div><div class="t"><span class="dot {% if m.amount > 0 %}in{% else %}out{% endif %}"></span>{{ m.get_kind_display }}</div>
+          <div class="s">{% if m.entry %}<a href="{% url 'billing:billing' %}?patient={{ chosen.patient.pk }}" style="color:inherit">{{ m.entry.invoice_number }}</a>{% endif %}{% if m.payment_mode %}{% if m.entry %} · {% endif %}{{ m.get_payment_mode_display }}{% endif %}{% if m.notes %}{% if m.entry or m.payment_mode %} · {% endif %}{{ m.notes }}{% endif %}</div></div>
+        <div class="amt {% if m.amount > 0 %}in{% else %}out{% endif %}">{% if m.amount > 0 %}+{% endif %}NPR {{ m.amount }}<div class="run">balance NPR {{ row.running }}</div></div>
+      </div>
+      {% endwith %}{% endfor %}
+    </div>
+  {% else %}
+    <div class="empty-adv">Pick a patient on the left to see their advance in detail.<br><span class="patient-id">To take a new advance, open the patient's Billing tab and use <b>＋ Take advance</b>.</span></div>
+  {% endif %}
+  </section>
+</div>
+{% endblock %}

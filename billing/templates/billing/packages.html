@@ -38,7 +38,7 @@
 {% for pk in packages %}
 <article class="pk">
   <div class="pk-top">
-    <span class="who"><a href="{% url 'accounts:patient-detail' pk.patient.pk %}">{{ pk.patient.name }}</a> <span class="patient-id" style="display:inline">{{ pk.patient.patient_code }}</span></span>
+    <span class="who"><a href="{% url 'accounts:patient-detail' pk.patient.pk %}?tab=billing">{{ pk.patient.name }}</a> <span class="patient-id" style="display:inline">{{ pk.patient.patient_code }}</span></span>
     <b>{{ pk.get_duration_display }} package</b>
     <span class="patient-id" style="display:inline">{{ pk.start_date|date:"M j" }} – {{ pk.end_date|date:"M j, Y" }}</span>
     <span class="st {{ pk.effective_status }}">{{ pk.effective_status_display }}</span>
