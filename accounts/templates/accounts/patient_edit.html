@@ -14,6 +14,7 @@
       <div class="pf-field"><label>Date of Birth <i>*</i></label>{{ form.date_of_birth }}{{ form.date_of_birth.errors }}</div>
     </div>
     <div class="pf-row">
+      <div class="pf-field"><label>…or Age <span style="font-weight:500;color:#7c9186">(if the date of birth is not known)</span></label>{{ form.age }}{{ form.age.errors }}</div>
       <div class="pf-field"><label>Gender <i>*</i></label>{{ form.gender }}{{ form.gender.errors }}</div>
       {% if show_contact %}<div class="pf-field"><label>Phone Number <i>*</i></label>{{ form.phone }}{{ form.phone.errors }}</div>{% endif %}
     </div>

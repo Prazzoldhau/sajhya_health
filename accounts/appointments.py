@@ -308,7 +308,7 @@ def patient_search(request):
     if profile is None:
         return JsonResponse({'results': []})
     q = request.GET.get('q', '').strip()
-    patients = profile.patients.exclude(status='discharged').select_related('clinic')
+    patients = profile.workspace_patients().exclude(status='discharged').select_related('clinic')
     if q:
         patients = patients.filter(Q(name__icontains=q) | Q(phone__icontains=q) | Q(patient_code__icontains=q))
     return JsonResponse({'results': [

@@ -188,8 +188,8 @@ class ClinicMember(models.Model):
 
     # what each staff role may do at the front desk (clinical records are never part of it)
     PERMISSIONS = {
-        MANAGER: {'overview', 'patients', 'contact', 'register', 'queue', 'queue_manage', 'team'},
-        RECEPTIONIST: {'patients', 'contact', 'register', 'queue', 'queue_manage'},
+        MANAGER: {'overview', 'patients', 'contact', 'register', 'queue', 'queue_manage', 'billing', 'team'},
+        RECEPTIONIST: {'patients', 'contact', 'register', 'queue', 'queue_manage', 'billing'},
         ASSISTANT: {'patients', 'queue', 'queue_manage'},
         OTHER: {'queue'},
     }

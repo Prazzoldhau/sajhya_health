@@ -83,7 +83,7 @@
             <td>{% patient_cell p sub="diagnosis" %}</td>
             <td>{{ p.patient_code }}</td>
             <td>{% if p.pk in hidden_contact %}<span class="hint" title="Contact details of clinic patients are visible to the clinic owner only">Hidden</span>{% else %}{{ p.phone|default:"—" }}{% endif %}</td>
-            <td>{% if p.age != None %}{{ p.age }}{% else %}—{% endif %} / {{ p.gender|default:"—" }}</td>
+            <td>{% if p.age != None %}{{ p.age }}{% if p.dob_is_estimate %}~{% endif %}{% else %}—{% endif %} / {{ p.gender|default:"—" }}</td>
             <td>{{ p.last_visit|date:"Y-m-d"|default:"—" }}</td>
             <td><span class="status {% if p.status == 'on_hold' %}hold{% elif p.status == 'discharged' %}discharged{% endif %}">● {{ p.get_status_display }}</span></td>
             <td><a class="text-link" href="{% url 'accounts:patient-detail' p.pk %}" style="text-decoration:none">View</a></td>

@@ -161,7 +161,12 @@ class ProfessionalProfile(models.Model):
     def recent_patients(self, limit=5):
         """Patients added, opened or seen most recently, newest first. Empty only when there are no patients.
         Used by the dashboard and the patients page so both show the same list."""
-        return self.patients.select_related('clinic').order_by(models.F('last_activity').desc(nulls_last=True), '-id')[:limit]
+        return self.workspace_patients().select_related('clinic').order_by(models.F('last_activity').desc(nulls_last=True), '-id')[:limit]
+
+    def workspace_patients(self):
+        """This workspace's patients: the ones registered under it, plus - for a clinic's own login - every patient of that clinic
+        (including those the front desk registered on behalf of the owner)."""
+        return Patient.objects.filter(models.Q(professional=self) | models.Q(clinic__workspace=self)).distinct()
 
 
 def patient_photo_path(instance, filename):
@@ -178,6 +183,7 @@ class Patient(models.Model):
     name = models.CharField(max_length=200)
     phone = models.CharField(max_length=20, blank=True)
     date_of_birth = models.DateField(null=True, blank=True)
+    dob_is_estimate = models.BooleanField(default=False, help_text='The date of birth was worked out from an age the patient gave, so it is approximate.')
     gender = models.CharField(max_length=1, choices=GENDER_CHOICES, blank=True)
     email = models.EmailField(blank=True)
     address = models.TextField(blank=True)
@@ -205,6 +211,8 @@ class Patient(models.Model):
     activation_expires_at = models.DateTimeField(null=True, blank=True, help_text='When the old patient-app activation ended.')
     enterprise = models.ForeignKey('extras.Enterprise', null=True, blank=True, on_delete=models.SET_NULL, related_name='patients',
                                    help_text='The hospital / enterprise this patient was registered under (optional).')
+    registered_by_name = models.CharField(max_length=200, blank=True, help_text='Who entered this patient (the physiotherapist, the clinic login or a staff member).')
+    registered_by_role = models.CharField(max_length=40, blank=True)
     last_visit = models.DateField(null=True, blank=True)
     last_activity = models.DateTimeField(null=True, blank=True, help_text='Last time the patient was added, opened or seen; drives "Recent patients".')
     created_at = models.DateTimeField(auto_now_add=True)
@@ -235,6 +243,19 @@ class Patient(models.Model):
         today = timezone.localdate()
         dob = self.date_of_birth
         return today.year - dob.year - ((today.month, today.day) < (dob.month, dob.day))
+
+    @property
+    def age_label(self):
+        """'35 years', or '35 years (approx.)' when it came from an age rather than a date of birth."""
+        if self.age is None:
+            return ''
+        return f'{self.age} years' + (' (approx.)' if self.dob_is_estimate else '')
+
+    @property
+    def registered_by_label(self):
+        """Who registered the patient, for lists: the person recorded at the time, else the owning physiotherapist."""
+        name = self.registered_by_name or self.professional.full_name
+        return f'{name} ({self.registered_by_role})' if self.registered_by_name and self.registered_by_role else name
 
     @property
     def initials(self):

@@ -6,6 +6,7 @@ from django.core.exceptions import ValidationError
 from django.core.files.uploadedfile import UploadedFile
 
 from accounts.images import normalize_photo
+from accounts.forms import AgeOrBirthDate
 from accounts.models import Patient
 
 from .models import AMENITIES, PROVINCES, SLOT_CHOICES, SPECIALIZATIONS, WEEKDAYS, Clinic, ClinicMember, ClinicSubscription
@@ -202,7 +203,7 @@ class StaffLoginForm(ClinicLoginForm):
             self.fields['username'].initial = member.user.get_username()
 
 
-class FrontDeskPatientForm(forms.ModelForm):
+class FrontDeskPatientForm(AgeOrBirthDate, forms.ModelForm):
     """What a receptionist or manager records when a patient walks in: identity and contact only, no clinical notes."""
     class Meta:
         model = Patient
@@ -215,7 +216,7 @@ class FrontDeskPatientForm(forms.ModelForm):
         return PatientForm.clean_date_of_birth(self)
 
     def clean(self):
-        data = super().clean()
+        data = super().clean()  # age or date of birth
         if not (data.get('phone') or '').strip():
             self.add_error('phone', 'Enter a phone number.')
         return data

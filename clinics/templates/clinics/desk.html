@@ -91,9 +91,9 @@
   <form method="get" style="display:flex;gap:8px;margin-bottom:14px"><input type="hidden" name="tab" value="patients">
     <input type="search" name="q" value="{{ q }}" placeholder="Search name{% if can_contact %}, phone{% endif %} or ID" style="height:38px;border:1px solid var(--line);border-radius:8px;padding:0 10px;min-width:260px">
     <button class="secondary-btn" type="submit">Search</button><span class="hint" style="align-self:center">{{ patient_total }} patients at this clinic.</span></form>
-  <table><thead><tr><th>PATIENT</th><th>ID</th>{% if can_contact %}<th>PHONE</th>{% endif %}<th>STATUS</th></tr></thead><tbody>
-  {% for p in patients %}<tr><td><b>{{ p.name }}</b></td><td>{{ p.patient_code }}</td>{% if can_contact %}<td>{{ p.phone }}</td>{% endif %}<td>{{ p.get_status_display }}</td></tr>
-  {% empty %}<tr><td colspan="4" class="hint">No patients found.</td></tr>{% endfor %}</tbody></table>
+  <table><thead><tr><th>PATIENT</th><th>ID</th>{% if can_contact %}<th>PHONE</th>{% endif %}<th>REGISTERED BY</th><th>STATUS</th></tr></thead><tbody>
+  {% for p in patients %}<tr><td><b>{{ p.name }}</b>{% if p.age_label %}<div class="hint">{{ p.age_label }}</div>{% endif %}</td><td>{{ p.patient_code }}</td>{% if can_contact %}<td>{{ p.phone }}</td>{% endif %}<td>{{ p.registered_by_label }}<div class="hint">{{ p.created_at|date:"M j" }}</div></td><td>{{ p.get_status_display }}</td></tr>
+  {% empty %}<tr><td colspan="5" class="hint">No patients found.</td></tr>{% endfor %}</tbody></table>
   <p class="hint">Clinical records are only visible to the clinic's physiotherapists.</p>
 
 {% elif tab == 'register' %}
@@ -102,6 +102,65 @@
     {% for f in form %}<label>{{ f.label }}{{ f }}{{ f.errors }}</label>{% endfor %}
     <button class="primary-btn" type="submit" style="width:fit-content">Register patient</button>
   </form>
+
+{% elif tab == 'billing' %}
+  <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:14px">
+    <a class="secondary-btn" href="?tab=billing&date={{ prev_date|date:'Y-m-d' }}" style="text-decoration:none">‹</a>
+    <form method="get" style="margin:0"><input type="hidden" name="tab" value="billing"><input type="date" name="date" value="{{ selected|date:'Y-m-d' }}" onchange="this.form.submit()" style="height:36px;border:1px solid var(--line);border-radius:8px;padding:0 10px"></form>
+    <a class="secondary-btn" href="?tab=billing&date={{ next_date|date:'Y-m-d' }}" style="text-decoration:none">›</a>
+    <a class="secondary-btn" href="?tab=billing" style="text-decoration:none">Today</a>
+    {% if can_bill %}<button type="button" class="primary-btn" style="margin-left:auto" onclick="var f=document.getElementById('deskBill');f.hidden=!f.hidden;if(!f.hidden)document.getElementById('billSearch').focus()">＋ New bill</button>{% endif %}
+  </div>
+  <div class="kpis" style="margin-bottom:16px">
+    <div class="kpi"><div class="k">Billed on {{ selected|date:"M j" }}</div><div class="v">NPR {{ billed }}</div></div>
+    <div class="kpi"><div class="k">Received on {{ selected|date:"M j" }}</div><div class="v">NPR {{ received }}</div></div>
+    <div class="kpi"><div class="k">Credit due (all dates)</div><div class="v" style="color:#b78317">NPR {{ due_total }}</div></div>
+  </div>
+  {% if can_bill %}
+  <form method="post" action="{% url 'clinics:desk-bill-create' %}" id="deskBill" class="form" hidden style="max-width:none;border:1px solid var(--line);border-radius:10px;padding:14px 16px;background:#f6faf7;margin-bottom:16px">{% csrf_token %}
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:10px">
+      <label>Patient<span class="search"><input type="text" id="billSearch" placeholder="Search the clinic's patients..." autocomplete="off"></span></label>
+      <label>Date {{ bill_form.entry_date }}</label><label>Service {{ bill_form.service }}</label><label>Amount (NPR) {{ bill_form.rate }}</label>
+      <label>Payment {{ bill_form.payment_status }}</label><label>Payment mode {{ bill_form.payment_mode }}</label>
+      <label id="dbReceived" hidden>{{ bill_form.amount_received.label }} {{ bill_form.amount_received }}</label>
+      <label id="dbGiven">{{ bill_form.amount_given.label }} {{ bill_form.amount_given }}</label>
+    </div>
+    <input type="hidden" name="patient_id" id="billPatient"><span class="hint" id="billChosen"></span>
+    <span class="hint">Patient handed over more than the bill and no change? Enter the cash handed over: the extra is kept as their advance for the next session. Notes are optional.</span>
+    {{ bill_form.notes }}
+    <div style="display:flex;gap:8px"><button class="primary-btn" type="submit">Save bill</button><button type="button" class="secondary-btn" onclick="document.getElementById('deskBill').hidden=true">Cancel</button></div>
+  </form>
+  {% endif %}
+
+  {% if owed %}
+  <h3 style="font-size:13px;margin:0 0 6px">Payments due</h3>
+  <table style="margin-bottom:18px"><thead><tr><th>PATIENT</th><th>INVOICE</th><th>DATE</th><th style="text-align:right">DUE</th><th></th></tr></thead><tbody>
+  {% for e in owed %}<tr><td><b>{{ e.patient_name }}</b>{% if can_contact and e.patient.phone %}<div class="hint">{{ e.patient.phone }}</div>{% endif %}</td><td>{{ e.invoice_number }}</td><td>{{ e.entry_date|date:"M j" }}</td><td style="text-align:right"><b style="color:#b78317">NPR {{ e.amount_due }}</b></td>
+    <td>{% if can_bill %}<details><summary class="secondary-btn" style="display:inline-block;cursor:pointer">Receive</summary>
+      <form method="post" action="{% url 'clinics:desk-bill-payment' e.pk %}" class="form" style="padding:8px 0">{% csrf_token %}<input type="hidden" name="date" value="{{ selected|date:'Y-m-d' }}">
+        <input type="number" name="amount" step="0.01" min="0.01" value="{{ e.amount_due }}" required><select name="payment_mode"><option value="cash">Cash</option><option value="card">Card</option><option value="online">Online</option><option value="other">Other</option><option value="advance">From advance</option></select><button class="primary-btn" type="submit">Record</button></form></details>{% endif %}</td></tr>
+  {% endfor %}</tbody></table>
+  {% endif %}
+
+  <h3 style="font-size:13px;margin:0 0 6px">Bills on {{ selected|date:"l, M j" }}</h3>
+  <table><thead><tr><th>INVOICE</th><th>PATIENT</th><th>SERVICE</th><th>BILLED BY</th><th style="text-align:right">AMOUNT</th><th>STATUS</th><th></th></tr></thead><tbody>
+  {% for e in day_bills %}<tr{% if e.is_cancelled %} style="opacity:.55"{% endif %}><td>{{ e.invoice_number }}</td><td><b>{{ e.patient_name }}</b></td><td>{{ e.service }}</td>
+    <td>{{ e.created_by_name|default:"—" }}{% if e.created_by_role %}<div class="hint">{{ e.created_by_role }}</div>{% endif %}</td>
+    <td style="text-align:right"><b>NPR {{ e.rate }}</b></td>
+    <td>{% if e.is_cancelled %}<span class="tone">Cancelled</span>{% elif e.status_key == 'paid' %}<span class="tone good">Paid</span>{% else %}<span class="tone warn">{{ e.status_label }} · NPR {{ e.amount_due }} due</span>{% endif %}</td>
+    <td style="white-space:nowrap"><a class="secondary-btn" href="{% url 'clinics:desk-bill-pdf' e.pk %}" style="text-decoration:none;padding:6px 10px">PDF</a> <a class="secondary-btn" href="{{ e.whatsapp }}" target="_blank" rel="noopener" style="text-decoration:none;padding:6px 10px">WhatsApp</a></td></tr>
+  {% empty %}<tr><td colspan="7" class="hint">Nothing billed on this day.</td></tr>{% endfor %}</tbody></table>
+  {% if can_bill %}
+  <script src="{% static 'js/sajhya-ui.js' %}"></script>
+  <script>
+  (function () {
+    var s = document.querySelector('#deskBill [name=payment_status]');
+    function sync() { document.getElementById('dbReceived').hidden = s.value !== 'partial'; document.getElementById('dbGiven').hidden = s.value !== 'paid' && s.value !== 'advance_cash'; }
+    s.addEventListener('change', sync);
+    SajhyaUI.patientPicker(document.getElementById('billSearch'), document.getElementById('billPatient'), { url: "{% url 'clinics:desk-patient-search' %}", hint: document.getElementById('billChosen') });
+  })();
+  </script>
+  {% endif %}
 
 {% elif tab == 'team' %}
   <table><thead><tr><th>NAME</th><th>ROLE</th></tr></thead><tbody>

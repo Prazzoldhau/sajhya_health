@@ -5,8 +5,8 @@ from functools import wraps
 
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
-from django.db.models import Q
-from django.http import Http404, JsonResponse
+from django.db.models import F, Q, Sum
+from django.http import Http404, HttpResponse, JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
 from django.utils import timezone
@@ -14,12 +14,15 @@ from django.views.decorators.http import require_GET, require_POST
 
 from accounts.access import first_error
 from accounts.models import Patient
+from billing import invoice as inv
+from billing.forms import EntryPaymentForm, PatientBillForm
+from billing.models import ADVANCE, BillingEntry, EntryPayment, PatientAdvance, advance_balance
 
 from .forms import FrontDeskPatientForm
 from .models import ClinicMember, QueueEntry
 
 TABS = [('overview', 'Overview', 'overview'), ('queue', 'Queue', 'queue'), ('patients', 'Patients', 'patients'),
-        ('register', 'Register patient', 'register'), ('team', 'Team', 'team')]
+        ('register', 'Register patient', 'register'), ('billing', 'Billing', 'billing'), ('team', 'Team', 'team')]
 
 
 def desk_member(request):
@@ -84,9 +87,101 @@ def desk(request, member):
         context.update({'patients': patients[:200], 'q': q, 'patient_total': clinic.patients.count()})
     elif tab == 'register':
         context['form'] = FrontDeskPatientForm()
+    elif tab == 'billing':
+        context.update(_billing_context(request, member))
     elif tab == 'team':
         context['members'] = clinic.members.filter(status=ClinicMember.ACTIVE).select_related('physio')
     return render(request, 'clinics/desk.html', context)
+
+
+def billing_owner(clinic):
+    """The workspace the clinic's bills are kept in: its own login when it has one, otherwise the owning physiotherapist."""
+    return clinic.workspace or clinic.owner
+
+
+def _billing_context(request, member):
+    clinic = member.clinic
+    today = timezone.localdate()
+    try:
+        selected = datetime.date.fromisoformat(request.GET.get('date', ''))
+    except ValueError:
+        selected = today
+    bills = BillingEntry.objects.filter(patient__clinic=clinic)
+    day = list(bills.filter(entry_date=selected).select_related('patient').order_by('-created_at'))
+    owed = list(bills.filter(cancelled_at__isnull=True, amount_paid__lt=F('rate')).select_related('patient').order_by('entry_date', 'id')[:60])
+    got = EntryPayment.objects.filter(entry__patient__clinic=clinic, entry__cancelled_at__isnull=True, paid_on=selected).exclude(payment_mode=ADVANCE).aggregate(t=Sum('amount'))['t'] or 0
+    got += PatientAdvance.objects.filter(patient__clinic=clinic, paid_on=selected, kind__in=[PatientAdvance.DEPOSIT, PatientAdvance.REFUND]).aggregate(t=Sum('amount'))['t'] or 0
+    for e in day + owed:  # a ready-made WhatsApp message per bill
+        url = request.build_absolute_uri(reverse('billing:invoice-public', args=[inv.invoice_token(e)]))
+        e.whatsapp = inv.whatsapp_link(e, e.contact_number or e.patient.phone, url)
+    return {
+        'selected': selected, 'today': today, 'prev_date': selected - datetime.timedelta(days=1), 'next_date': selected + datetime.timedelta(days=1),
+        'day_bills': day, 'owed': owed, 'billed': sum((e.rate for e in day if not e.is_cancelled), 0), 'received': got,
+        'due_total': sum((e.amount_due for e in owed), 0), 'bill_form': PatientBillForm(initial={'entry_date': selected}), 'pay_form': EntryPaymentForm(),
+        'can_bill': member.clinic.is_usable,
+    }
+
+
+@desk_view('billing')
+@require_POST
+def bill_create(request, member):
+    """Bill a clinic patient at the front desk. The bill is kept in the clinic's own workspace and shows who entered it."""
+    clinic = member.clinic
+    if not _usable(request, member):
+        return _back('billing')
+    patient = clinic.patients.filter(pk=request.POST.get('patient_id') or 0).first()
+    if patient is None:
+        messages.error(request, 'Search and pick one of the clinic\'s patients to bill.')
+        return _back('billing')
+    form = PatientBillForm(request.POST)
+    if not form.is_valid():
+        messages.error(request, first_error(form))
+        return _back('billing')
+    entry = form.save(commit=False)
+    entry.professional, entry.patient, entry.patient_name, entry.age, entry.sex = billing_owner(clinic), patient, patient.name, patient.age, patient.gender
+    entry.contact_number = patient.phone if member.can('contact') else ''
+    entry.created_by_name, entry.created_by_role = member.name, member.get_role_display()
+    entry.save()
+    form.apply_payment(entry, request.user)
+    carried = getattr(form, 'carried', 0)
+    messages.success(request, f'Bill {entry.invoice_number} saved for {patient.name}.' + (f' NPR {entry.amount_due:g} is due.' if entry.amount_due else '')
+                     + (f' NPR {carried:g} carried over as advance - balance NPR {advance_balance(patient.pk):g}.' if carried else ''))
+    return redirect(f"{reverse('clinics:desk')}?tab=billing&date={entry.entry_date.isoformat()}")
+
+
+@desk_view('billing')
+@require_POST
+def bill_payment(request, member, entry_id):
+    """Receive money for a bill left on credit (or part paid). More than is owed is kept as the patient's advance."""
+    entry = get_object_or_404(BillingEntry, pk=entry_id, patient__clinic=member.clinic)
+    back = redirect(f"{reverse('clinics:desk')}?tab=billing&date={request.POST.get('date', '')}")
+    form = EntryPaymentForm(request.POST)
+    if not form.is_valid():
+        messages.error(request, first_error(form))
+        return back
+    given, mode = form.cleaned_data['amount'], form.cleaned_data['payment_mode']
+    if mode == ADVANCE:
+        used = entry.use_advance(request.user, limit=given)
+        messages.success(request, f'NPR {used:g} taken from the advance for {entry.invoice_number}.') if used else messages.error(request, 'This patient has no advance balance to use.')
+        return back
+    paid = entry.record_payment(given, mode, form.cleaned_data['notes'], user=request.user)
+    if paid is None:
+        messages.info(request, 'That bill is already fully paid.')
+        return back
+    if given > paid.amount:
+        entry.carry_over(given - paid.amount, mode, user=request.user)
+    messages.success(request, f'NPR {paid.amount:g} received for {entry.invoice_number}.' + (f' NPR {entry.amount_due:g} still due.' if entry.amount_due else ' Fully paid.')
+                     + (f' NPR {given - paid.amount:g} extra kept as advance.' if given > paid.amount else ''))
+    return back
+
+
+@desk_view('billing')
+def bill_pdf(request, member, entry_id):
+    entry = get_object_or_404(BillingEntry, pk=entry_id, patient__clinic=member.clinic)
+    response = HttpResponse(inv.build_pdf(entry), content_type='application/pdf')
+    response['Content-Disposition'] = f'attachment; filename="{entry.invoice_number}.pdf"'
+    response['Cache-Control'] = 'private, no-store'
+    return response
 
 
 @desk_view('register')
@@ -103,6 +198,7 @@ def register_patient(request, member):
             'tabs': [(key, label) for key, label, perm in TABS if member.can(perm)]})
     patient = form.save(commit=False)
     patient.professional, patient.clinic = member.clinic.owner, member.clinic
+    patient.registered_by_name, patient.registered_by_role = member.name, member.get_role_display()
     patient.save()
     messages.success(request, f'{patient.name} registered ({patient.patient_code}). Add them to the queue when they are ready.')
     return _back('queue' if member.can('queue') else 'patients')

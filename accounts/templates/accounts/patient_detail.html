@@ -45,7 +45,7 @@
     <div class="pd-grow">
       <h1 class="pd-name">{{ patient.name }}</h1>
       {% if patient.profile_info.allergies %}<div class="pd-meta" style="color:#b83b3b;font-weight:700">⚠ Allergies: {{ patient.profile_info.allergies|truncatechars:90 }}</div>{% endif %}
-      <div class="pd-meta"><b>{{ patient.patient_code }}</b>{% if patient.age != None %} &nbsp;•&nbsp; {{ patient.age }} years{% endif %}{% if patient.gender %} &nbsp;•&nbsp; {{ patient.get_gender_display }}{% endif %} &nbsp;•&nbsp; {{ session_count }} session{{ session_count|pluralize }} completed &nbsp;•&nbsp; <span class="status {% if patient.status == 'on_hold' %}hold{% elif patient.status == 'discharged' %}discharged{% endif %}">● {{ patient.get_status_display }}</span></div>
+      <div class="pd-meta"><b>{{ patient.patient_code }}</b>{% if patient.age != None %} &nbsp;•&nbsp; {{ patient.age_label }}{% endif %}{% if patient.gender %} &nbsp;•&nbsp; {{ patient.get_gender_display }}{% endif %} &nbsp;•&nbsp; {{ session_count }} session{{ session_count|pluralize }} completed &nbsp;•&nbsp; <span class="status {% if patient.status == 'on_hold' %}hold{% elif patient.status == 'discharged' %}discharged{% endif %}">● {{ patient.get_status_display }}</span></div>
       {% if patient.phone and show_contact %}<div class="pd-meta">☎ <b>{{ patient.phone }}</b>{% if patient.email %} &nbsp;•&nbsp; {{ patient.email }}{% endif %}</div>{% endif %}
       {% if patient.address and show_contact %}<div class="pd-meta">⌖ {{ patient.address }}</div>{% endif %}
       {% if not show_contact %}<div class="pd-meta">☎ Contact details are kept private by the clinic</div>{% endif %}
@@ -257,7 +257,7 @@
       <thead><tr><th>DATE</th><th>INVOICE</th><th>SERVICE</th><th>PAYMENT</th><th style="text-align:right">AMOUNT</th><th style="text-align:right">STATUS</th><th></th></tr></thead>
       <tbody>
       {% for b in bill_entries %}
-        <tr><td>{{ b.entry_date|date:"Y-m-d" }}</td><td>{{ b.invoice_number }}</td><td>{{ b.service }}</td><td>{{ b.get_payment_mode_display }}</td><td style="text-align:right"><b>NPR {{ b.rate }}</b></td>
+        <tr><td>{{ b.entry_date|date:"Y-m-d" }}</td><td>{{ b.invoice_number }}</td><td>{{ b.service }}{% if b.created_by_name %}<div class="patient-id">by {{ b.created_by_name }}{% if b.created_by_role %} ({{ b.created_by_role }}){% endif %}</div>{% endif %}</td><td>{{ b.get_payment_mode_display }}</td><td style="text-align:right"><b>NPR {{ b.rate }}</b></td>
           <td style="text-align:right">{% if b.is_cancelled %}<span style="color:#b83b3b;font-weight:700">Cancelled</span>{% elif b.status_key == 'paid' %}<span style="color:#16834f;font-weight:700">Paid</span>{% else %}<span style="color:#b78317;font-weight:700">{{ b.status_label }} · NPR {{ b.amount_due }} due</span> <button type="button" class="table-action" data-pay data-url="{% url 'billing:entry-payment' b.pk %}" data-next="{% url 'accounts:patient-detail' patient.pk %}?tab=billing" data-name="{{ patient.name }}" data-due="{{ b.amount_due }}" data-invoice="{{ b.invoice_number }}">Receive</button>{% endif %}</td>
           <td style="text-align:right;white-space:nowrap">
             <a class="table-action" href="{% url 'billing:invoice' b.pk %}?next={% url 'accounts:patient-detail' patient.pk %}%3Ftab%3Dbilling" style="text-decoration:none" title="Invoice: PDF, WhatsApp, e-mail">Invoice</a>

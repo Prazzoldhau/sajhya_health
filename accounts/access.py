@@ -67,6 +67,21 @@ def first_error(form, default='Please check the form.'):
     return default
 
 
+def actor_of(user, profile=None):
+    """(name, role) of whoever is doing the work, to stamp on what they register or bill: a front-desk staff member, a clinic's own
+    login, or a physiotherapist."""
+    from clinics.models import ClinicMember
+    member = ClinicMember.objects.filter(user=user, physio__isnull=True, status=ClinicMember.ACTIVE).first()
+    if member is not None:
+        return member.name, member.get_role_display()
+    clinic = getattr(profile, 'clinic_workspace', None) if profile is not None else None
+    if clinic is not None:
+        return clinic.name, 'Clinic login'
+    if profile is not None:
+        return profile.full_name, 'Physiotherapist'
+    return user.get_username(), ''
+
+
 def workspace_context(user, profile):
     """Template context shared by every page of the workspace (name, initials, role for the header)."""
     display_name = profile.full_name or user.get_username()

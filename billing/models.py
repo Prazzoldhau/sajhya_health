@@ -34,6 +34,8 @@ class BillingEntry(models.Model):
     amount_paid = models.DecimalField(max_digits=10, decimal_places=2, default=0, help_text='Total received so far; the rest is on credit (due).')
     cancelled_at = models.DateTimeField(null=True, blank=True, help_text='Set when the bill was cancelled. A cancelled bill stays on record but counts for nothing.')
     cancel_reason = models.CharField(max_length=255, blank=True)
+    created_by_name = models.CharField(max_length=200, blank=True, help_text='Who entered this bill.')
+    created_by_role = models.CharField(max_length=40, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 

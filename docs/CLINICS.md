@@ -127,3 +127,8 @@ Patients a staff member registers belong to the clinic (they count toward the mo
 The queue and registration pause while the Clinic plan is not active. Staff logins have no email, so a forgotten password is reset
 by the owner from the same button.
 
+### Front desk: billing, who registered, age
+
+- Managers and receptionists have a **Billing** tab at the front desk: bill a clinic patient (paid / part paid / credit / from advance, with the cash-handed-over carry-over), receive payments on credit, download the PDF or open WhatsApp. Bills are kept in the clinic's own workspace (its login when it has one, otherwise the owner) and each shows **who billed**. Staff cannot edit or cancel a bill; the owner or the clinic login can.
+- Every patient records **who registered them** (name and role: Physiotherapist, Clinic login, Receptionist, Manager...). It shows in the clinic Patients tab, the front desk list and the clinic login. The clinic's own login sees all of the clinic's patients in its workspace, including those reception registered.
+- A patient can be registered with an **age** when the date of birth is not known; the date is then an estimate and the age is shown as approximate. A real date of birth always wins.

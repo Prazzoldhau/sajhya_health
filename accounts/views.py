@@ -15,7 +15,7 @@ from django.utils import timezone
 from clinics.access import resolve_clinic
 from sajhya_health.throttle import too_many
 
-from .access import can_see_contact, first_error, own_patient, own_profile, staff_required, workspace_context, workspace_profile
+from .access import actor_of, can_see_contact, first_error, own_patient, own_profile, staff_required, workspace_context, workspace_profile
 from .services import record_visit
 from .forms import SUBTYPES, STEP_FORMS, STEP_TITLES, NextVisitForm, PatientEditForm, PatientForm, PatientNotesForm, PatientPhotoForm, ProfilePictureForm, SignupForm, VisitForm
 from .treatments import parse_treatments
@@ -200,14 +200,14 @@ def followups_due(patients, today):
 def _dashboard_data(profile):
     from billing.views import revenue_for
     today = timezone.localdate()
-    patients = profile.patients.all()
+    patients = profile.workspace_patients()
     day_start = timezone.make_aware(datetime.datetime.combine(today, datetime.time.min))
     day_end = day_start + datetime.timedelta(days=1)
     week_end_dt = day_start + datetime.timedelta(days=8)
     live = profile.appointments.filter(kind=Appointment.APPOINTMENT, status=Appointment.SCHEDULED)
     needs_followup = followups_due(patients, today)
 
-    visits = Visit.objects.filter(patient__professional=profile)
+    visits = Visit.objects.filter(patient__in=patients)
     window_start = today - datetime.timedelta(days=6)
     prev_start = window_start - datetime.timedelta(days=7)
     visits_week = visits.filter(date__gte=window_start, date__lte=today).count()
@@ -258,7 +258,7 @@ def patient_list(request):
     if profile is None:
         return redirect('accounts:welcome')
     from billing.models import PatientAllowance
-    all_patients = profile.patients.all()
+    all_patients = profile.workspace_patients()
     patients = all_patients.select_related('clinic')
 
     q = request.GET.get('q', '').strip()
@@ -334,6 +334,7 @@ def patient_add(request):
             patient = form.save(commit=False)
             patient.professional = profile
             patient.clinic = clinic
+            patient.registered_by_name, patient.registered_by_role = actor_of(request.user, profile)
             patient.save()
         messages.success(request, f'{patient.name} added ({patient.patient_code}){f" to {clinic.name}" if clinic else ""}.')
         if clinic and own_clinic is None:  # a clinic's own login stays in its workspace; the owner returns to the clinic page

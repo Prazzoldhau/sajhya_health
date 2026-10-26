@@ -12,7 +12,7 @@ from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
 from django.utils import timezone
 
-from accounts.access import can_see_contact, first_error, own_patient, require_workspace, workspace_context, workspace_profile
+from accounts.access import actor_of, can_see_contact, first_error, own_patient, require_workspace, workspace_context, workspace_profile
 
 from . import invoice as inv
 from .forms import AdvanceForm, BillCorrectionForm, BillingEntryForm, EntryPaymentForm, PackagePaymentForm, PatientBillForm, PatientPackageForm
@@ -82,7 +82,7 @@ def billing(request):
         found = profile.billing_entries.select_related('patient')
         if patient_id.isdigit():
             found = found.filter(patient_id=int(patient_id))
-            patient = profile.patients.filter(pk=int(patient_id)).first()
+            patient = profile.workspace_patients().filter(pk=int(patient_id)).first()
             label = patient.name if patient else 'this patient'
         else:
             found = found.filter(Q(patient_name__icontains=text) | Q(contact_number__icontains=text) | Q(invoice_number__icontains=text) | Q(patient__patient_code__icontains=text))
@@ -124,6 +124,8 @@ def entry_save(request, pk=None):
             obj.age = obj.age if obj.age is not None else patient.age
             obj.sex = obj.sex or patient.gender
             obj.contact_number = obj.contact_number or (patient.phone if can_see_contact(profile, patient) else '')
+        if not pk:
+            obj.created_by_name, obj.created_by_role = actor_of(request.user, profile)
         obj.save()
         carried = None
         if not pk:
@@ -151,6 +153,7 @@ def patient_bill(request, patient_id):
         entry.age = patient.age
         entry.sex = patient.gender
         entry.contact_number = patient.phone if can_see_contact(profile, patient) else ''
+        entry.created_by_name, entry.created_by_role = actor_of(request.user, profile)
         entry.save()
         form.apply_payment(entry, request.user)
         carried = getattr(form, 'carried', 0)
@@ -391,7 +394,7 @@ def packages(request):
 
     preset = None
     if request.GET.get('patient', '').isdigit():
-        preset = profile.patients.filter(pk=request.GET['patient']).first()
+        preset = profile.workspace_patients().filter(pk=request.GET['patient']).first()
 
     live = [p for p in all_packages if p.effective_status == 'active']
     context = workspace_context(request.user, profile)

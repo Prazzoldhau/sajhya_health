@@ -212,7 +212,30 @@ STEP_FORMS = {2: CredentialsForm, 3: DocumentsForm, 4: PracticeForm}
 STEP_TITLES = {1: 'Account', 2: 'Credentials', 3: 'Documents', 4: 'Practice', 5: 'Review'}
 
 
-class PatientForm(forms.ModelForm):
+class AgeOrBirthDate(forms.Form):
+    """Many patients do not know their date of birth: an age in years is accepted instead, and the date of birth is then an estimate.
+    A real date of birth always wins over an age typed beside it."""
+    age = forms.IntegerField(required=False, min_value=0, max_value=120, label='Age (years)',
+                             widget=forms.NumberInput(attrs={'placeholder': 'If the date of birth is not known', 'min': 0, 'max': 120}))
+
+    def clean(self):
+        data = super().clean()
+        born, age = data.get('date_of_birth'), data.get('age')
+        if born:
+            self.instance.dob_is_estimate = False
+        elif age is not None:
+            today = timezone.localdate()
+            try:
+                data['date_of_birth'] = today.replace(year=today.year - age)
+            except ValueError:  # 29 February
+                data['date_of_birth'] = today.replace(year=today.year - age, day=28)
+            self.instance.dob_is_estimate = True
+        elif 'date_of_birth' not in self.errors:
+            self.add_error('date_of_birth', 'Enter the date of birth, or the age if the date is not known.')
+        return data
+
+
+class PatientForm(AgeOrBirthDate, forms.ModelForm):
     class Meta:
         model = Patient
         fields = ('photo', 'name', 'date_of_birth', 'gender', 'phone', 'email', 'address',
@@ -256,8 +279,10 @@ class PatientForm(forms.ModelForm):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self._old_photo = self.instance.photo.name if self.instance.pk and self.instance.photo else ''
-        for name in ('name', 'date_of_birth', 'gender', 'phone'):
+        for name in ('name', 'gender', 'phone'):
             self.fields[name].required = True
+        if self.instance.pk and self.instance.dob_is_estimate and self.instance.age is not None:
+            self.fields['age'].initial = self.instance.age
         self.fields['gender'].choices = [('', 'Select gender')] + Patient.GENDER_CHOICES
         self.fields['referral_source'].choices = [('', 'Select option')] + Patient.REFERRAL_CHOICES
 
@@ -303,7 +328,7 @@ class AppointmentForm(forms.Form):
 
     def __init__(self, *args, profile, **kwargs):
         super().__init__(*args, **kwargs)
-        self.fields['patient'].queryset = profile.patients.exclude(status=Patient.DISCHARGED).order_by('name')
+        self.fields['patient'].queryset = profile.workspace_patients().exclude(status=Patient.DISCHARGED).order_by('name')
 
 
 class RescheduleForm(forms.Form):

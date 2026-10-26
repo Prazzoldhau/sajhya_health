@@ -7,6 +7,7 @@ from django.utils import timezone
 from accounts.models import Patient, Visit
 from accounts.tests.helpers import PASSWORD, make_patient, make_professional
 
+from billing.models import BillingEntry
 from .models import Clinic, ClinicMember, ClinicSubscription, QueueEntry
 
 
@@ -717,3 +718,102 @@ class PasswordToggleTests(Base):
         self.client.logout()
         self.assertContains(self.client.get(reverse('accounts:signup-client')), 'js/pw-toggle.js')
         self.assertContains(self.client.get(reverse('accounts:login')), 'js/pw-toggle.js')
+
+
+class FrontDeskRegisteredByAndBillingTests(Base):
+    CREDS = StaffLoginTests.CREDS
+    add_staff = StaffLoginTests.add_staff
+
+    """Reception's registrations show who made them and reach the clinic's own workspace; reception can bill."""
+    def setup_desk(self):
+        clinic = self.make_clinic()
+        self.client.post(reverse('clinics:login', args=[clinic.pk]), {'username': 'himal-clinic', 'password1': PASSWORD, 'password2': PASSWORD})
+        self.add_staff(clinic, 'Ram', 'receptionist', username='ram-desk')
+        self.add_staff(clinic, 'Asha', 'assistant', username='asha')
+        self.add_staff(clinic, 'Mani', 'manager', username='mani')
+        clinic.refresh_from_db()
+        return clinic
+
+    def register(self, **extra):
+        return self.client.post(reverse('clinics:desk-register'), {'name': 'Walk In', 'phone': '9841000111', 'gender': 'F', 'date_of_birth': '1991-03-04', **extra})
+
+    def test_a_patient_registered_by_reception_shows_who_registered_them_everywhere(self):
+        clinic = self.setup_desk()
+        self.as_user('ram-desk')
+        self.register()
+        patient = Patient.objects.get(name='Walk In')
+        self.assertEqual((patient.registered_by_name, patient.registered_by_role, patient.clinic), ('Ram', 'Receptionist', clinic))
+        self.assertContains(self.client.get(reverse('clinics:desk'), {'tab': 'patients'}), 'Ram (Receptionist)')
+        self.as_user('owner')
+        page = self.client.get(reverse('clinics:detail', args=[clinic.pk]), {'tab': 'patients'})
+        self.assertContains(page, 'Walk In')
+        self.assertContains(page, 'Ram')  # not the owner's name
+        self.as_user('himal-clinic')  # the clinic's own login sees it in its workspace patient list, dashboard and calendar search
+        self.assertContains(self.client.get(reverse('accounts:patients')), 'Walk In')
+        self.assertEqual(self.client.get(reverse('accounts:dashboard')).context['stats']['total'], 1)
+        self.assertEqual([p['name'] for p in self.client.get(reverse('accounts:appointment-patient-search'), {'q': 'Walk'}).json()['results']], ['Walk In'])
+        self.assertContains(self.client.get(reverse('accounts:patient-detail', args=[patient.pk])), 'Walk In')
+        # patients added by the clinic login are stamped too
+        self.client.post(reverse('accounts:patient-add'), {'name': 'Own Add', 'phone': '9800000001', 'gender': 'M', 'date_of_birth': '1980-01-01'})
+        stamp = Patient.objects.get(name='Own Add')
+        self.assertEqual((stamp.registered_by_name, stamp.registered_by_role), ('Himal Clinic', 'Clinic login'))
+
+    def test_age_can_replace_the_date_of_birth(self):
+        self.setup_desk()
+        self.as_user('ram-desk')
+        self.register(name='By Age', date_of_birth='', age='35')
+        patient = Patient.objects.get(name='By Age')
+        self.assertEqual((patient.age, patient.dob_is_estimate), (35, True))
+        self.assertIn('approx', patient.age_label)
+        self.assertEqual(self.register(name='Nothing', date_of_birth='').status_code, 200)  # neither: asks again
+        self.assertFalse(Patient.objects.filter(name='Nothing').exists())
+        self.register(name='Both', date_of_birth='1990-05-05', age='10')  # a real date wins
+        both = Patient.objects.get(name='Both')
+        self.assertEqual((both.date_of_birth.isoformat(), both.dob_is_estimate), ('1990-05-05', False))
+        self.as_user('himal-clinic')
+        self.client.post(reverse('accounts:patient-add'), {'name': 'Pro Add', 'phone': '9800000002', 'gender': 'F', 'age': '60'})
+        self.assertEqual(Patient.objects.get(name='Pro Add').age, 60)
+        self.assertContains(self.client.get(reverse('accounts:patient-edit', args=[patient.pk])), 'name="age"')
+
+    def test_reception_handles_billing_and_it_records_who_billed(self):
+        clinic = self.setup_desk()
+        self.as_user('ram-desk')
+        self.register()
+        patient = Patient.objects.get(name='Walk In')
+        self.assertContains(self.client.get(reverse('clinics:desk')), 'tab=billing')
+        bill = {'patient_id': patient.pk, 'entry_date': timezone.localdate().isoformat(), 'service': 'Therapy', 'rate': '700', 'payment_mode': 'cash'}
+        self.client.post(reverse('clinics:desk-bill-create'), {**bill, 'payment_status': 'paid', 'amount_given': '1000'})  # no change: 300 carried over
+        first = BillingEntry.objects.get()
+        self.assertEqual((first.created_by_name, first.created_by_role, first.professional, first.status_key), ('Ram', 'Receptionist', clinic.workspace, 'paid'))
+        from billing.models import advance_balance
+        self.assertEqual(advance_balance(patient.pk), 300)
+        self.client.post(reverse('clinics:desk-bill-create'), {**bill, 'payment_status': 'due'})
+        due = BillingEntry.objects.exclude(pk=first.pk).get()
+        page = self.client.get(reverse('clinics:desk'), {'tab': 'billing'})
+        self.assertContains(page, 'BILLED BY')
+        self.assertContains(page, 'wa.me')
+        self.client.post(reverse('clinics:desk-bill-payment', args=[due.pk]), {'amount': '300', 'payment_mode': 'advance'})
+        self.client.post(reverse('clinics:desk-bill-payment', args=[due.pk]), {'amount': '500', 'payment_mode': 'cash'})  # 400 owed: 100 extra kept
+        due.refresh_from_db()
+        self.assertEqual((due.status_key, advance_balance(patient.pk)), ('paid', 100))
+        pdf = self.client.get(reverse('clinics:desk-bill-pdf', args=[due.pk]))
+        self.assertTrue(pdf.content.startswith(b'%PDF'))
+        self.as_user('himal-clinic')  # the clinic's own login sees the same bills in its Billing page, with who billed
+        self.assertContains(self.client.get(reverse('billing:billing')), 'Billed by Ram')
+
+    def test_other_roles_and_clinics_are_kept_out_of_desk_billing(self):
+        self.setup_desk()
+        self.as_user('ram-desk')
+        self.register()
+        patient = Patient.objects.get(name='Walk In')
+        bill = {'patient_id': patient.pk, 'entry_date': timezone.localdate().isoformat(), 'service': 'T', 'rate': '100', 'payment_mode': 'cash', 'payment_status': 'due'}
+        self.client.post(reverse('clinics:desk-bill-create'), bill)
+        entry = BillingEntry.objects.get()
+        self.as_user('asha')  # an assistant has no billing
+        self.assertEqual(self.client.post(reverse('clinics:desk-bill-create'), bill).status_code, 404)
+        self.assertEqual(self.client.get(reverse('clinics:desk-bill-pdf', args=[entry.pk])).status_code, 404)
+        self.assertNotContains(self.client.get(reverse('clinics:desk')), 'tab=billing')
+        self.as_user('mani')  # a manager does
+        self.assertEqual(self.client.get(reverse('clinics:desk'), {'tab': 'billing'}).status_code, 200)
+        self.client.post(reverse('clinics:desk-bill-create'), {**bill, 'patient_id': 999999})
+        self.assertEqual(BillingEntry.objects.count(), 1)  # a patient that is not the clinic's cannot be billed
