@@ -360,7 +360,7 @@ def patient_detail(request, pk):
         'visits': patient.visits.prefetch_related('treatments') if tab == 'visits' else None,
         'plans': patient.plans.prefetch_related('phases') if tab == 'plan' else None,
         'prescriptions': patient.prescriptions.prefetch_related('exercises__exercise__step_images', 'exercises__feedback_logs') if tab == 'exercises' else None,
-        'bill_entries': patient.billing_entries.all()[:50] if tab == 'billing' else None,
+        'bill_entries': patient.billing_entries.prefetch_related('advance_moves')[:50] if tab == 'billing' else None,
         'packages': patient.packages.prefetch_related('payments') if tab == 'billing' else None,
         'payment_form': PackagePaymentForm(),
         'bill_form': PatientBillForm(initial={'entry_date': timezone.localdate()}) if tab == 'billing' else None,

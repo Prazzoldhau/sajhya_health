@@ -54,7 +54,7 @@ def billing(request):
     selected = _selected_date(request)
 
     form = BillingEntryForm(profile=profile, initial={'entry_date': selected})
-    entries = profile.billing_entries.filter(entry_date=selected).select_related('patient')
+    entries = profile.billing_entries.filter(entry_date=selected).select_related('patient').prefetch_related('advance_moves')
     mode_names = dict(BillingEntry._meta.get_field('payment_mode').choices)
     by_mode = {m: 0 for m in mode_names}
     total = 0
@@ -79,7 +79,7 @@ def billing(request):
     patient_id, text = request.GET.get('patient', ''), request.GET.get('q', '').strip()
     if patient_id.isdigit() or text:
         # search mode: only that patient's bills (every date), never the whole book
-        found = profile.billing_entries.select_related('patient')
+        found = profile.billing_entries.select_related('patient').prefetch_related('advance_moves')
         if patient_id.isdigit():
             found = found.filter(patient_id=int(patient_id))
             patient = profile.workspace_patients().filter(pk=int(patient_id)).first()
@@ -488,7 +488,9 @@ def invoice(request, pk):
     email = entry.patient.email if entry.patient_id and can_see_contact(profile, entry.patient) else ''
     back = request.GET.get('next', '')
     context = workspace_context(request.user, profile)
+    from .models import advance_balance
     context.update({
+        'carried': entry.carried_over, 'cash_handed_over': entry.cash_handed_over, 'advance_now': advance_balance(entry.patient_id) if entry.patient_id else 0,
         'active': 'billing', 'entry': entry, 'practice': inv.practice_of(entry), 'payments': entry.payments.all(), 'public_url': public_url,
         'whatsapp': inv.whatsapp_link(entry, phone, public_url), 'message': inv.share_message(entry, public_url), 'phone': phone, 'email': email,
         'back': back if back.startswith('/') and not back.startswith('//') else reverse('billing:billing') + f'?date={entry.entry_date.isoformat()}',

@@ -46,8 +46,10 @@ def practice_of(entry):
 def share_message(entry, url):
     practice = practice_of(entry)['name']
     owing = f' NPR {entry.amount_due:g} is still due.' if entry.amount_due > 0 and not entry.is_cancelled else ''
+    extra = entry.carried_over
+    remaining = f' Your extra NPR {extra:g} is kept as advance for your next session.' if extra > 0 and not entry.is_cancelled else ''
     return (f'Hello {entry.patient_name}, your bill {entry.invoice_number} from {practice} dated {entry.entry_date:%d %b %Y}: '
-            f'NPR {entry.rate:g}.{owing} Invoice: {url}')
+            f'NPR {entry.rate:g}.{owing}{remaining} Invoice: {url}')
 
 
 def whatsapp_link(entry, phone, url):
@@ -142,6 +144,20 @@ def build_pdf(entry, online_url=''):
         c.drawRightString(right - 3 * mm, ty, f'NPR {value:,.2f}')
         ty -= 7 * mm
 
+    extra = entry.carried_over
+    if extra > 0 and not entry.is_cancelled:
+        from .models import advance_balance
+        c.setFillColor(colors.HexColor('#e7f7ed'))
+        c.rect(width / 2 + 7 * mm, ty - 16 * mm, right - width / 2 - 7 * mm, 20 * mm, stroke=0, fill=1)
+        c.setFillColor(green)
+        c.setFont('Helvetica-Bold', 10)
+        c.drawString(width / 2 + 10 * mm, ty - 2 * mm, 'Extra kept as advance')
+        c.drawRightString(right - 3 * mm, ty - 2 * mm, f'NPR {extra:,.2f}')
+        c.setFont('Helvetica', 8.5)
+        c.setFillColor(ink)
+        c.drawString(width / 2 + 10 * mm, ty - 8 * mm, f'Cash handed over NPR {entry.cash_handed_over:,.2f}; the extra stays with us')
+        c.drawString(width / 2 + 10 * mm, ty - 12.5 * mm, f'for your next session. Advance balance now: NPR {advance_balance(entry.patient_id):,.2f}.')
+        ty -= 24 * mm
     payments = list(entry.payments.all())
     if payments:
         py = ty - 4 * mm

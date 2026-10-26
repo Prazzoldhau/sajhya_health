@@ -56,6 +56,17 @@ class BillingEntry(models.Model):
         return self.cancelled_at is not None
 
     @property
+    def carried_over(self):
+        """Extra cash the patient handed over on this bill that was kept as their advance (no change given back)."""
+        return sum((m.amount for m in self.advance_moves.all() if m.kind == 'deposit' and m.amount > 0), Decimal('0'))
+
+    @property
+    def cash_handed_over(self):
+        """Everything the patient handed over for this bill: what settled it plus the extra that was carried over."""
+        paid_in_money = sum((p.amount for p in self.payments.all() if p.payment_mode != ADVANCE), Decimal('0'))
+        return paid_in_money + self.carried_over
+
+    @property
     def amount_due(self):
         if self.is_cancelled:
             return Decimal('0')

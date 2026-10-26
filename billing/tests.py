@@ -746,3 +746,26 @@ class InvoiceTests(BillingBase):
         self.assertContains(self.client.get(reverse('billing:invoice', args=[entry.pk])), 'CANCELLED')
         entry.refresh_from_db()
         self.assertTrue(inv.build_pdf(entry).startswith(b'%PDF'))
+
+
+class InvoiceExtraTests(BillingBase):
+    def test_the_invoice_states_the_extra_kept_as_advance(self):
+        from . import invoice as inv
+        self.client.post(reverse('billing:patient-bill', args=[self.patient.pk]), {'entry_date': self.today.isoformat(), 'service': 'Session', 'rate': '500', 'payment_mode': 'cash', 'payment_status': 'paid', 'amount_given': '700'})
+        entry = BillingEntry.objects.get()
+        self.assertEqual((entry.rate, entry.amount_paid, entry.carried_over, entry.cash_handed_over), (500, 500, 200, 700))
+        page = self.client.get(reverse('billing:invoice', args=[entry.pk]))
+        self.assertContains(page, 'Extra kept as advance: NPR 200')
+        self.assertContains(page, 'You handed over NPR 700.00 for a NPR 500.00 bill')
+        self.assertEqual((page.context['carried'], page.context['advance_now']), (200, 200))
+        self.assertIn('Your extra NPR 200 is kept as advance', page.context['message'])
+        self.assertTrue(self.client.get(reverse('billing:invoice-pdf', args=[entry.pk])).content.startswith(b'%PDF'))
+        self.assertContains(self.client.get(reverse('billing:billing')), '+NPR 200')
+        self.assertContains(self.client.get(reverse('accounts:patient-detail', args=[self.patient.pk]) + '?tab=billing'), '+NPR 200')
+
+    def test_a_bill_with_no_extra_says_nothing_about_advance(self):
+        self.client.post(reverse('billing:patient-bill', args=[self.patient.pk]), {'entry_date': self.today.isoformat(), 'service': 'Session', 'rate': '500', 'payment_mode': 'cash', 'payment_status': 'paid'})
+        entry = BillingEntry.objects.get()
+        page = self.client.get(reverse('billing:invoice', args=[entry.pk]))
+        self.assertNotContains(page, 'Extra kept as advance')
+        self.assertNotIn('extra', page.context['message'])

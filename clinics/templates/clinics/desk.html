@@ -147,7 +147,7 @@
   {% for e in day_bills %}<tr{% if e.is_cancelled %} style="opacity:.55"{% endif %}><td>{{ e.invoice_number }}</td><td><b>{{ e.patient_name }}</b></td><td>{{ e.service }}</td>
     <td>{{ e.created_by_name|default:"—" }}{% if e.created_by_role %}<div class="hint">{{ e.created_by_role }}</div>{% endif %}</td>
     <td style="text-align:right"><b>NPR {{ e.rate }}</b></td>
-    <td>{% if e.is_cancelled %}<span class="tone">Cancelled</span>{% elif e.status_key == 'paid' %}<span class="tone good">Paid</span>{% else %}<span class="tone warn">{{ e.status_label }} · NPR {{ e.amount_due }} due</span>{% endif %}</td>
+    <td>{% if e.is_cancelled %}<span class="tone">Cancelled</span>{% elif e.status_key == 'paid' %}<span class="tone good">Paid</span>{% else %}<span class="tone warn">{{ e.status_label }} · NPR {{ e.amount_due }} due</span>{% endif %}{% if e.carried_over and not e.is_cancelled %}<div class="hint" style="color:#16834f">+NPR {{ e.carried_over }} kept as advance</div>{% endif %}</td>
     <td style="white-space:nowrap"><a class="secondary-btn" href="{% url 'clinics:desk-bill-pdf' e.pk %}" style="text-decoration:none;padding:6px 10px">PDF</a> <a class="secondary-btn" href="{{ e.whatsapp }}" target="_blank" rel="noopener" style="text-decoration:none;padding:6px 10px">WhatsApp</a></td></tr>
   {% empty %}<tr><td colspan="7" class="hint">Nothing billed on this day.</td></tr>{% endfor %}</tbody></table>
   {% if can_bill %}

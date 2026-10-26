@@ -16,6 +16,7 @@
   .inv-totals .due { font-weight: 800; font-size: 15px; border-top: 1px solid var(--line); margin-top: 4px; padding-top: 9px; }
   .inv-pays { padding: 14px 26px 6px; font-size: 12.5px; } .inv-pays .l { font-size: 10px; letter-spacing: .06em; color: var(--muted); font-weight: 800; text-transform: uppercase; margin-bottom: 4px; }
   .inv-pays div.row { display: flex; justify-content: space-between; padding: 3px 0; max-width: 420px; }
+  .inv-extra { margin: 14px 26px 0; padding: 11px 14px; border-radius: 9px; background: #e7f7ed; border: 1px solid #bfe3cd; color: #116b43; font-size: 13px; } .inv-extra div { margin-top: 3px; color: #18352b; font-size: 12.5px; }
   .inv-foot { padding: 18px 26px 22px; font-size: 12px; color: var(--muted); }
   .stamp { position: absolute; top: 45%; left: 50%; transform: translate(-50%, -50%) rotate(-18deg); font-size: 64px; font-weight: 800; color: rgba(184, 59, 59, .2); border: 6px solid rgba(184, 59, 59, .2); padding: 0 20px; border-radius: 10px; pointer-events: none; }
   .badge-s { display: inline-block; padding: 3px 10px; border-radius: 12px; font-size: 11px; font-weight: 800; background: #e7f7ed; color: #16834f; }
@@ -48,9 +49,11 @@
       <tbody><tr><td><b>{{ entry.service }}</b>{% if entry.notes %}<div style="font-size:12px;color:var(--muted);margin-top:3px">{{ entry.notes }}</div>{% endif %}</td><td>{{ entry.rate }}</td></tr></tbody></table>
     <div class="inv-totals">
       <div><span>Total</span><b>NPR {{ entry.rate }}</b></div>
-      <div><span>Received</span><span>NPR {{ entry.amount_paid }}</span></div>
+      {% if carried and not entry.is_cancelled %}<div><span>Cash handed over</span><span>NPR {{ cash_handed_over }}</span></div>{% endif %}
+      <div><span>Received for this bill</span><span>NPR {{ entry.amount_paid }}</span></div>
       <div class="due"><span>Balance due</span><span{% if entry.amount_due %} style="color:#b78317"{% endif %}>NPR {{ entry.amount_due }}</span></div>
     </div>
+    {% if carried and not entry.is_cancelled %}<div class="inv-extra"><b>Extra kept as advance: NPR {{ carried }}</b><div>You handed over NPR {{ cash_handed_over }} for a NPR {{ entry.rate }} bill. The extra NPR {{ carried }} stays with us for your next session{% if advance_now %} (advance balance now NPR {{ advance_now }}){% endif %}.</div></div>{% endif %}
     {% if payments %}<div class="inv-pays"><div class="l">Payments received</div>
       {% for p in payments %}<div class="row"><span>{{ p.paid_on|date:"j M Y" }} · {{ p.get_payment_mode_display }}</span><span>NPR {{ p.amount }}</span></div>{% endfor %}</div>{% endif %}
     <div class="inv-foot">Thank you. Please keep this invoice for your records.</div>
