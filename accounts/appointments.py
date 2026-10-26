@@ -41,6 +41,40 @@ def sync_next_appointment(patient):
     patient.save(update_fields=['next_appointment'])
 
 
+def appointment_message(appt, kind='booked'):
+    """The WhatsApp text for a patient: the appointment is booked (or moved), with day, time and who to contact."""
+    p = appt.professional
+    practice = p.practice_name or p.full_name
+    when = timezone.localtime(appt.start)
+    verb = 'has been rescheduled' if kind == 'rescheduled' else 'is booked'
+    reach = f' For any change, call {p.practice_phone or p.mobile}.' if (p.practice_phone or p.mobile) else ''
+    return (f'Hello {appt.patient.name}, your appointment at {practice} {verb} for {when:%A, %d %b %Y} at {fmt_time(appt.start)}.'
+            f' Please arrive 10 minutes early.{reach} Thank you.')
+
+
+def appointment_whatsapp(profile, appt, kind='booked'):
+    """wa.me link with the message ready; it opens the patient's own chat when their number is on file and visible to this user."""
+    from urllib.parse import quote
+
+    from billing.invoice import normalize_phone
+    phone = appt.patient.phone if can_see_contact(profile, appt.patient) else ''
+    number = normalize_phone(phone)
+    return f"https://wa.me/{number}?text={quote(appointment_message(appt, kind))}" if number else f"https://wa.me/?text={quote(appointment_message(appt, kind))}"
+
+
+def booked_prompt(request, profile):
+    """A banner offering the WhatsApp message right after an appointment was booked or moved (?booked=<id>&kind=...)."""
+    raw = request.GET.get('booked', '')
+    if not raw.isdigit():
+        return None
+    appt = profile.appointments.filter(pk=int(raw), kind=Appointment.APPOINTMENT, status=Appointment.SCHEDULED).select_related('patient', 'professional').first()
+    if appt is None or appt.patient is None:
+        return None
+    kind = 'rescheduled' if request.GET.get('kind') == 'rescheduled' else 'booked'
+    return {'name': appt.patient.name, 'kind': kind, 'url': appointment_whatsapp(profile, appt, kind), 'when': f'{timezone.localtime(appt.start):%a %d %b} at {fmt_time(appt.start)}',
+            'has_phone': bool(appt.patient.phone and can_see_contact(profile, appt.patient))}
+
+
 def _layout_lanes(items):
     """Side-by-side columns for overlapping appointments within one day."""
     items.sort(key=lambda e: e['start_min'])
@@ -95,7 +129,7 @@ def appointments(request):
         profile.appointments.filter(
             start__gte=aware(day_list[0], datetime.time.min),
             start__lt=aware(day_list[-1] + datetime.timedelta(days=1), datetime.time.min),
-        ).exclude(status=Appointment.CANCELLED).select_related('patient'))
+        ).exclude(status=Appointment.CANCELLED).select_related('patient', 'professional'))
 
     first_hour, last_hour = DEFAULT_FIRST_HOUR, DEFAULT_LAST_HOUR
     for ev in events:
@@ -123,6 +157,7 @@ def appointments(request):
                 'height': max(round((end_min - start_min) * PX_PER_MIN), 26),
                 'patient_url': reverse('accounts:patient-detail', args=[ev.patient_id]) if ev.patient else '',
                 'patient_code': ev.patient.patient_code if ev.patient else '',
+                'whatsapp': appointment_whatsapp(profile, ev, 'booked') if ev.kind == Appointment.APPOINTMENT and ev.patient and ev.status == Appointment.SCHEDULED else '',
                 'notes': ev.notes, 'raw_title': ev.title, 'session_type': ev.session_type,
                 'date': s.date().isoformat(), 'start_hm': s.strftime('%H:%M'), 'end_hm': e.strftime('%H:%M'),
             })
@@ -162,14 +197,15 @@ def appointments(request):
         'appointment_form': AppointmentForm(profile=profile, initial={'date': today, 'duration': profile.default_session_minutes}),
         'block_form': BlockForm(initial={'date': today}, auto_id='blk_%s'),
         'task_form': TaskForm(),
-        'open_new': request.GET.get('new') == '1', 'session_choices': Visit.SESSION_CHOICES,
+        'prompt': booked_prompt(request, profile), 'open_new': request.GET.get('new') == '1', 'session_choices': Visit.SESSION_CHOICES,
         'duration_default': profile.default_session_minutes,
     })
     return render(request, 'accounts/appointments.html', context)
 
 
-def _back(date, days):
-    return redirect(f"{reverse('accounts:appointments')}?date={date}&days={days}")
+def _back(date, days, booked=None, kind='booked'):
+    extra = f'&booked={booked}&kind={kind}' if booked else ''
+    return redirect(f"{reverse('accounts:appointments')}?date={date}&days={days}{extra}")
 
 
 @login_required
@@ -184,12 +220,12 @@ def appointment_create(request):
         return redirect('accounts:appointments')
     d = form.cleaned_data
     start = aware(d['date'], d['start_time'])
-    Appointment.objects.create(
+    appt = Appointment.objects.create(
         professional=profile, patient=d['patient'], start=start,
         end=start + datetime.timedelta(minutes=d['duration']), session_type=d['session_type'], notes=d['notes'])
     sync_next_appointment(d['patient'])
     messages.success(request, f"Appointment booked for {d['patient'].name}.")
-    return _back(d['date'], days)
+    return _back(d['date'], days, booked=appt.pk)
 
 
 @login_required
@@ -238,7 +274,7 @@ def appointment_edit(request, pk):
     if appt.patient:
         sync_next_appointment(appt.patient)
     messages.success(request, 'Appointment rescheduled.' if appt.kind == Appointment.APPOINTMENT else 'Calendar updated.')
-    return _back(d['date'], days)
+    return _back(d['date'], days, booked=appt.pk if appt.kind == Appointment.APPOINTMENT else None, kind='rescheduled')
 
 
 @login_required

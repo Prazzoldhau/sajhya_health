@@ -35,6 +35,7 @@
   @media (max-width: 900px) { .info-cards { grid-template-columns: repeat(2, 1fr); } .pd-head { flex-wrap: wrap; } }
 {% endblock %}
 {% block main %}
+{% include 'accounts/_whatsapp_prompt.html' %}
 <a class="back-link" href="{% url 'accounts:patients' %}">← Back to Patients</a>
 <section class="panel">
   <div class="pd-head">

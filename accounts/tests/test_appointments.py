@@ -281,3 +281,60 @@ class DashboardCardTests(TestCase):
         self.assertEqual([p.name for p in listing.context['page_obj']], ['Stale Patient'])
         self.assertContains(listing, 'due for a follow-up')
         self.assertEqual(len(self.client.get(reverse('accounts:patients'), {'status': 'active'}).context['page_obj']), 2)
+
+
+class AppointmentWhatsAppTests(TestCase):
+    def setUp(self):
+        self.user, self.profile = make_professional()
+        self.client.force_login(self.user)
+        self.patient = make_patient(self.profile)
+        self.tomorrow = timezone.localdate() + datetime.timedelta(days=1)
+
+    def book(self):
+        return self.client.post(reverse('accounts:appointment-create'), {
+            'patient': self.patient.pk, 'date': self.tomorrow.isoformat(), 'start_time': '15:00', 'duration': 30, 'session_type': 'treatment', 'notes': ''})
+
+    def test_booking_offers_a_whatsapp_message_to_the_patients_own_chat(self):
+        r = self.book()
+        appt = Appointment.objects.get()
+        self.assertIn(f'booked={appt.pk}', r['Location'])
+        page = self.client.get(r['Location'])
+        prompt = page.context['prompt']
+        self.assertEqual(prompt['kind'], 'booked')
+        self.assertTrue(prompt['url'].startswith('https://wa.me/9779841000000?text='), prompt['url'])  # the patient's number, with the country code
+        from urllib.parse import unquote
+        text = unquote(prompt['url'].split('text=', 1)[1])
+        self.assertIn('Sita Gurung', text)
+        self.assertIn('is booked for', text)
+        self.assertIn('3:00 PM', text)
+        self.assertContains(page, 'Send WhatsApp message')
+        self.assertContains(page, 'wa.me/9779841000000')  # also on the calendar entry, for the details window
+
+    def test_rescheduling_offers_a_rescheduled_message_and_other_cases_stay_quiet(self):
+        self.book()
+        appt = Appointment.objects.get()
+        r = self.client.post(reverse('accounts:appointment-edit', args=[appt.pk]), {'date': self.tomorrow.isoformat(), 'start_time': '16:30', 'end_time': '17:00', 'session_type': 'treatment', 'notes': ''})
+        page = self.client.get(r['Location'])
+        self.assertEqual(page.context['prompt']['kind'], 'rescheduled')
+        from urllib.parse import unquote
+        self.assertIn('has been rescheduled for', unquote(page.context['prompt']['url']))
+        self.assertIsNone(self.client.get(reverse('accounts:appointments')).context['prompt'])  # no banner on a normal visit
+        self.assertIsNone(self.client.get(reverse('accounts:appointments'), {'booked': 'x'}).context['prompt'])
+        appt.status = Appointment.CANCELLED
+        appt.save()
+        self.assertIsNone(self.client.get(reverse('accounts:appointments'), {'booked': appt.pk}).context['prompt'])  # cancelled: nothing to confirm
+
+    def test_next_visit_from_the_patient_page_offers_it_too_and_without_a_number_the_contact_is_chosen(self):
+        r = self.client.post(reverse('accounts:patient-next-visit', args=[self.patient.pk]), {'date': self.tomorrow.isoformat(), 'start_time': '09:00'})
+        self.assertIn('booked=', r['Location'])
+        page = self.client.get(r['Location'])
+        self.assertContains(page, 'Send WhatsApp message')
+        self.patient.phone = ''
+        self.patient.save()
+        page = self.client.get(r['Location'])
+        self.assertTrue(page.context['prompt']['url'].startswith('https://wa.me/?text='))
+        self.assertFalse(page.context['prompt']['has_phone'])
+        stranger, _ = make_professional('stranger')
+        other = self.client_class()
+        other.force_login(stranger)
+        self.assertIsNone(other.get(reverse('accounts:appointments'), {'booked': Appointment.objects.get().pk}).context['prompt'])  # someone else's booking

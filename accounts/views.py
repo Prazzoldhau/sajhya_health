@@ -347,6 +347,7 @@ def patient_add(request):
 
 @login_required
 def patient_detail(request, pk):
+    from .appointments import booked_prompt
     profile, patient = own_patient(request, pk)
     patient.touch()  # opening a patient puts them at the top of "Recent patients"
     tab = request.GET.get('tab', 'overview')
@@ -360,6 +361,7 @@ def patient_detail(request, pk):
         'visits': patient.visits.prefetch_related('treatments') if tab == 'visits' else None,
         'plans': patient.plans.prefetch_related('phases') if tab == 'plan' else None,
         'prescriptions': patient.prescriptions.prefetch_related('exercises__exercise__step_images', 'exercises__feedback_logs') if tab == 'exercises' else None,
+        'prompt': booked_prompt(request, profile),
         'bill_entries': patient.billing_entries.prefetch_related('advance_moves')[:50] if tab == 'billing' else None,
         'packages': patient.packages.prefetch_related('payments') if tab == 'billing' else None,
         'payment_form': PackagePaymentForm(),
@@ -440,10 +442,11 @@ def patient_next_visit(request, pk):
         form = NextVisitForm(request.POST)
         if form.is_valid():
             start = aware(form.cleaned_data['date'], form.cleaned_data['start_time'])
-            Appointment.objects.create(professional=profile, patient=patient, start=start,
-                                       end=start + datetime.timedelta(minutes=45), session_type=Visit.FOLLOW_UP)
+            appt = Appointment.objects.create(professional=profile, patient=patient, start=start,
+                                              end=start + datetime.timedelta(minutes=45), session_type=Visit.FOLLOW_UP)
             sync_next_appointment(patient)
             messages.success(request, 'Next visit booked - it is on your calendar.')
+            return redirect(f"{reverse('accounts:patient-detail', args=[patient.pk])}?booked={appt.pk}")
         else:
             messages.error(request, 'Pick a valid date and time.')
     return redirect('accounts:patient-detail', pk=patient.pk)

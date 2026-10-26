@@ -1,0 +1,6 @@
+{% if prompt %}
+<div class="no-print" style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;background:#e7f7ed;border:1px solid #bfe3cd;color:#116b43;border-radius:10px;padding:10px 14px;margin-bottom:12px">
+  <span><b>{% if prompt.kind == 'rescheduled' %}Rescheduled{% else %}Booked{% endif %}: {{ prompt.name }}, {{ prompt.when }}.</b> Let the patient know on WhatsApp{% if not prompt.has_phone %} <span style="color:#7a5a10">(no phone number on file: you will choose the contact)</span>{% endif %}.</span>
+  <a href="{{ prompt.url }}" target="_blank" rel="noopener" style="margin-left:auto;background:#25d366;color:#fff;text-decoration:none;font-weight:700;border-radius:8px;padding:8px 14px;display:inline-flex;align-items:center">Send WhatsApp message</a>
+</div>
+{% endif %}
