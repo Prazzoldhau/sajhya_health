@@ -73,7 +73,8 @@
           <span class="hint" id="pkChosen" style="display:block;margin-top:4px"></span>
         </span>
       </label>
-      <div class="two"><label>Duration {{ form.duration }}</label><label>Number of sessions {{ form.total_sessions }}</label></div>
+      <div class="two"><label>Duration {{ form.duration }}</label><label>{{ form.custom_days.label }} {{ form.custom_days }}</label></div>
+      <label>Number of sessions {{ form.total_sessions }}</label>
       <div class="two"><label>Package price (NPR) {{ form.total_amount }}</label><label>Amount paid now {{ form.amount_paid_now }}</label></div>
       <label>Start date {{ form.start_date }}</label>
       <label>Notes {{ form.notes }}</label>

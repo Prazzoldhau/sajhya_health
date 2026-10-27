@@ -191,8 +191,9 @@ class PatientPackageForm(forms.ModelForm):
 
     class Meta:
         model = PatientPackage
-        fields = ['patient', 'duration', 'total_sessions', 'total_amount', 'start_date', 'notes']
+        fields = ['patient', 'duration', 'custom_days', 'total_sessions', 'total_amount', 'start_date', 'notes']
         widgets = {
+            'custom_days': forms.NumberInput(attrs={'placeholder': 'e.g. 12', 'min': 1, 'max': 365}),
             'total_sessions': forms.NumberInput(attrs={'placeholder': 'e.g. 8', 'min': 1}),
             'total_amount': forms.NumberInput(attrs={'placeholder': 'Amount (NPR)', 'step': '0.01', 'min': 0}),
             'start_date': date_widget(),
@@ -202,6 +203,16 @@ class PatientPackageForm(forms.ModelForm):
     def __init__(self, *args, profile, **kwargs):
         super().__init__(*args, **kwargs)
         self.fields['patient'].queryset = Patient.objects.filter(professional=profile)
+        self.fields['duration'].choices = [c for c in PatientPackage.DURATION_CHOICES if c[0] != 'custom']  # 'other' is the days box
+        self.fields['duration'].required = False
+        self.fields['custom_days'].label = 'Or type the number of days'
+        self.fields['custom_days'].help_text = 'Used instead of the list when filled.'
+
+    def clean_custom_days(self):
+        days = self.cleaned_data.get('custom_days')
+        if days is not None and not 1 <= days <= 365:
+            raise forms.ValidationError('Enter between 1 and 365 days.')
+        return days
 
     def clean_total_sessions(self):
         value = self.cleaned_data.get('total_sessions')
@@ -220,6 +231,11 @@ class PatientPackageForm(forms.ModelForm):
         paid, total = data.get('amount_paid_now') or 0, data.get('total_amount')
         if total is not None and paid > total:
             self.add_error('amount_paid_now', 'Cannot be more than the package price.')
+        days = data.get('custom_days')
+        if days:  # typed days win over the list
+            data['duration'] = 'custom'
+        elif not data.get('duration') and 'custom_days' not in self.errors:
+            self.add_error('duration', 'Choose how long the package lasts, or type the number of days.')
         return data
 
 

@@ -245,14 +245,16 @@ class PatientPackage(models.Model):
     and a flat price. Sessions are counted against the package whenever a visit is recorded for the patient.
     Money is a separate paid-vs-due ledger (PackagePayment), since packages are often paid off in instalments."""
 
-    DURATION_CHOICES = [('1_week', '1 Week'), ('2_week', '2 Weeks'), ('3_week', '3 Weeks'), ('4_week', '4 Weeks')]
-    DURATION_DAYS = {'1_week': 7, '2_week': 14, '3_week': 21, '4_week': 28}
+    DURATION_CHOICES = [('5_day', '5 Days'), ('10_day', '10 Days'), ('15_day', '15 Days'), ('1_week', '1 Week'), ('2_week', '2 Weeks'), ('3_week', '3 Weeks'), ('4_week', '4 Weeks'),
+                        ('custom', 'Other (number of days)')]
+    DURATION_DAYS = {'5_day': 5, '10_day': 10, '15_day': 15, '1_week': 7, '2_week': 14, '3_week': 21, '4_week': 28}
     ACTIVE, COMPLETED, CANCELLED = 'active', 'completed', 'cancelled'
     STATUS_CHOICES = [(ACTIVE, 'Active'), (COMPLETED, 'Completed'), (CANCELLED, 'Cancelled')]
 
     patient = models.ForeignKey('accounts.Patient', on_delete=models.CASCADE, related_name='packages')
     professional = models.ForeignKey('accounts.ProfessionalProfile', on_delete=models.CASCADE, related_name='patient_packages')
     duration = models.CharField(max_length=10, choices=DURATION_CHOICES)
+    custom_days = models.PositiveSmallIntegerField(null=True, blank=True, help_text='The length in days when it is not one of the standard choices (for example 12).')
     total_sessions = models.PositiveIntegerField(help_text='How many sessions this package covers')
     total_amount = models.DecimalField(max_digits=10, decimal_places=2)
     amount_paid = models.DecimalField(max_digits=10, decimal_places=2, default=0)
@@ -269,8 +271,19 @@ class PatientPackage(models.Model):
         return f'{self.get_duration_display()} package - {self.patient.name} ({self.sessions_used}/{self.total_sessions})'
 
     @property
+    def length_days(self):
+        return self.custom_days if self.duration == 'custom' and self.custom_days else self.DURATION_DAYS.get(self.duration, 7)
+
+    def get_duration_display(self):
+        """'10 Days', '2 Weeks', or the typed number of days, for every screen and report."""
+        if self.duration == 'custom':
+            n = self.custom_days or 0
+            return f'{n} Day{"" if n == 1 else "s"}'
+        return dict(self.DURATION_CHOICES).get(self.duration, self.duration)
+
+    @property
     def end_date(self):
-        return self.start_date + timedelta(days=self.DURATION_DAYS[self.duration])
+        return self.start_date + timedelta(days=self.length_days)
 
     @property
     def sessions_remaining(self):

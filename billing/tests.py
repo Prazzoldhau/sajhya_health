@@ -186,7 +186,7 @@ class PatientAllowanceTests(TestCase):
 
 class PackageTests(BillingBase):
     def test_all_four_durations_exist_with_the_right_length(self):
-        self.assertEqual([label for _, label in PatientPackage.DURATION_CHOICES], ['1 Week', '2 Weeks', '3 Weeks', '4 Weeks'])
+        self.assertEqual([label for _, label in PatientPackage.DURATION_CHOICES if '_week' in _], ['1 Week', '2 Weeks', '3 Weeks', '4 Weeks'])  # plus 5, 10 and 15 days and a typed number of days
         for key, days in (('1_week', 7), ('2_week', 14), ('3_week', 21), ('4_week', 28)):
             self.package(duration=key)
             pkg = PatientPackage.objects.latest('id')
@@ -802,3 +802,34 @@ class InvoicePngTests(BillingBase):
         other.force_login(stranger)
         self.assertEqual(other.get(reverse('billing:invoice-png', args=[entry.pk])).status_code, 404)
         self.assertContains(self.client.get(reverse('billing:invoice', args=[entry.pk])), reverse('billing:invoice-png', args=[entry.pk]))
+
+
+class PackageDaysTests(BillingBase):
+    def start(self, **extra):
+        return self.client.post(reverse('billing:package-create'), {'patient': self.patient.pk, 'total_sessions': 10, 'total_amount': '5000', 'amount_paid_now': '0', 'start_date': self.today.isoformat(), **extra})
+
+    def test_ten_day_package_from_the_list_and_any_number_of_days_from_the_box(self):
+        self.start(duration='10_day')
+        ten = PatientPackage.objects.get()
+        self.assertEqual((ten.duration, ten.length_days, ten.get_duration_display(), ten.end_date), ('10_day', 10, '10 Days', self.today + datetime.timedelta(days=10)))
+        self.start(duration='1_week', custom_days='12')  # typed days win over the list
+        twelve = PatientPackage.objects.exclude(pk=ten.pk).get()
+        self.assertEqual((twelve.duration, twelve.custom_days, twelve.length_days, twelve.get_duration_display()), ('custom', 12, 12, '12 Days'))
+        self.assertEqual(twelve.end_date, self.today + datetime.timedelta(days=12))
+        self.start(duration='', custom_days='1')
+        self.assertEqual(PatientPackage.objects.exclude(pk__in=[ten.pk, twelve.pk]).get().get_duration_display(), '1 Day')
+        page = self.client.get(reverse('billing:packages'))
+        self.assertContains(page, '10 Days package')
+        self.assertContains(page, '12 Days package')
+        self.assertContains(page, 'Or type the number of days')
+        self.assertContains(page, '10 Days</option>')
+        self.assertNotContains(page, 'Other (number of days)')  # the box is the way to type it, not a list entry
+        self.assertContains(self.client.get(reverse('accounts:patient-detail', args=[self.patient.pk]) + '?tab=billing'), '12 Days package')
+
+    def test_neither_a_choice_nor_days_or_a_silly_number_is_refused(self):
+        self.start(duration='')
+        self.start(duration='1_week', custom_days='0')
+        self.start(duration='1_week', custom_days='9999')
+        self.assertEqual(PatientPackage.objects.count(), 0)
+        self.start(duration='1_week')  # the old way still works
+        self.assertEqual(PatientPackage.objects.get().length_days, 7)
