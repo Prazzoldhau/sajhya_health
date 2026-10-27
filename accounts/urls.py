@@ -3,7 +3,7 @@ from django.contrib.auth.decorators import login_required
 from django.urls import path
 from django.views.generic import TemplateView
 
-from . import appointments, plans, report_views, settings_views, treatments, views
+from . import appointments, notices, plans, report_views, settings_views, treatments, views
 from .forms import StyledAuthenticationForm
 from . import auth_views as password_views
 
@@ -22,6 +22,13 @@ urlpatterns = [
     path('review/', views.review_list, name='review-list'),
     path('review/<int:profile_id>/', views.review_detail, name='review-detail'),
     path('dashboard/', views.dashboard, name='dashboard'),
+    path('messages/', notices.messages_page, name='messages'),
+    path('messages/whatsapp-number/', notices.whatsapp_number_save, name='whatsapp-number'),
+    path('messages/send/', notices.notice_send, name='notice-send'),
+    path('messages/custom/add/', notices.custom_add, name='custom-add'),
+    path('messages/custom/<str:key>/delete/', notices.custom_delete, name='custom-delete'),
+    path('messages/<str:key>/save/', notices.message_save, name='message-save'),
+    path('messages/<str:key>/reset/', notices.message_reset, name='message-reset'),
     path('reports/', report_views.reports, name='reports'),
     path('settings/', settings_views.settings_page, name='settings'),
     path('profile-photo/', views.profile_picture, name='profile-picture'),

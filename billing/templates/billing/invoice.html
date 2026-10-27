@@ -38,7 +38,7 @@
   <article class="inv" id="invoice">
     {% if entry.is_cancelled %}<div class="stamp">CANCELLED</div>{% endif %}
     <div class="inv-head">
-      <div><h2>{{ practice.name }}</h2><div class="sub">{{ practice.address }}{% if practice.address and practice.phone %} · {% endif %}{{ practice.phone }}{% if practice.code %}<br>Facility code {{ practice.code }}{% endif %}</div></div>
+      <div><h2>{{ practice.name }}</h2><div class="sub">{{ practice.address }}{% if practice.address and practice.phone %} · {% endif %}{{ practice.phone }}{% if practice.whatsapp %}{% if practice.address or practice.phone %} · {% endif %}WhatsApp {{ practice.whatsapp }}{% endif %}{% if practice.code %}<br>Facility code {{ practice.code }}{% endif %}</div></div>
       <div class="right"><b>INVOICE</b><span class="sub">{{ entry.invoice_number }}</span></div>
     </div>
     <div class="inv-meta">

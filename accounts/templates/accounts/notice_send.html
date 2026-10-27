@@ -1,0 +1,36 @@
+{% extends 'accounts/pro_base.html' %}
+{% block title %}Send a notice | Sajhya Health{% endblock %}
+{% block extra_css %}
+  .ns-bar { display: flex; gap: 10px; flex-wrap: wrap; align-items: end; background: #fff; border: 1px solid var(--line); border-radius: 12px; padding: 14px 16px; margin-bottom: 14px; }
+  .ns-bar label { display: grid; gap: 3px; font-size: 11px; font-weight: 800; color: var(--muted); text-transform: uppercase; letter-spacing: .04em; }
+  .ns-bar select, .ns-bar input { height: 38px; border: 1px solid var(--line); border-radius: 8px; padding: 0 10px; background: #fff; min-width: 170px; }
+  .ns-row { display: grid; grid-template-columns: 210px minmax(0, 1fr) 150px; gap: 14px; padding: 12px 16px; border-bottom: 1px solid #eef3ef; align-items: start; }
+  .ns-row.sent { opacity: .55; } .ns-row .msg { white-space: pre-wrap; font-size: 12.5px; background: #f3faf0; border: 1px solid #dcecd2; border-radius: 8px; padding: 8px 10px; line-height: 1.5; }
+  .ns-row .wa { display: inline-flex; align-items: center; justify-content: center; height: 36px; border-radius: 8px; background: #25d366; color: #fff; font-weight: 700; text-decoration: none; width: 100%; }
+  @media (max-width: 800px) { .ns-row { grid-template-columns: 1fr; } }
+{% endblock %}
+
+{% block main %}
+<div style="display:flex;align-items:center;gap:12px;margin-bottom:12px"><a class="text-link" href="{% url 'accounts:messages' %}" style="text-decoration:none">← Messages</a><h1 style="margin:0;font-size:24px">Send a notice</h1></div>
+<form method="get" class="ns-bar">
+  <label>Message<select name="t" onchange="this.form.submit()">{% for k, label in templates %}<option value="{{ k }}" {% if k == key %}selected{% endif %}>{{ label }}</option>{% endfor %}</select></label>
+  <label>To<select name="audience" onchange="this.form.submit()">{% for k, label in audiences %}<option value="{{ k }}" {% if k == audience %}selected{% endif %}>{{ label }}</option>{% endfor %}</select></label>
+  {% if audience == 'appointments' %}<label>Day<input type="date" name="date" value="{{ day|date:'Y-m-d' }}" onchange="this.form.submit()"></label>{% endif %}
+  {% if audience == 'search' %}<label>Patient<input type="search" name="q" value="{{ q }}" placeholder="Name, phone or ID"></label><button class="secondary-btn" type="submit" style="height:38px">Search</button>{% endif %}
+  {% if audience == 'all' %}<label>Date used in the message<input type="date" name="date" value="{{ day|date:'Y-m-d' }}" onchange="this.form.submit()"></label>{% endif %}
+  <a class="secondary-btn" href="{% url 'accounts:messages' %}#{{ key }}" style="text-decoration:none;display:inline-flex;align-items:center;height:38px">Edit this message</a>
+</form>
+<p class="patient-id" style="margin:0 0 10px;display:block">{{ rows|length }} patient{{ rows|length|pluralize }}{% if rows %} · {{ with_phone }} with a phone number{% endif %}. Each button opens that patient's WhatsApp chat with their message ready; you press send. A number is not needed to open the message, but then you choose the contact.</p>
+<section class="panel">
+  {% for r in rows %}
+  <div class="ns-row" data-row>
+    <div><b>{{ r.patient.name }}</b><div class="patient-id">{{ r.patient.patient_code }}{% if r.when %} · {{ r.when }}{% endif %}</div><div class="patient-id">{% if r.phone %}{{ r.phone }}{% else %}<span style="color:#a97510">no number on file</span>{% endif %}</div></div>
+    <div class="msg">{{ r.text }}</div>
+    <div><a class="wa" href="{{ r.url }}" target="_blank" rel="noopener" data-wa>WhatsApp</a></div>
+  </div>
+  {% empty %}
+  <div style="padding:30px;text-align:center;color:var(--muted)">{% if audience == 'search' and not q %}Type a name, phone number or ID to find a patient.{% else %}No patients match. Try another group or day.{% endif %}</div>
+  {% endfor %}
+</section>
+<script>document.querySelectorAll('[data-wa]').forEach(function (a) { a.addEventListener('click', function () { a.closest('[data-row]').classList.add('sent'); a.textContent = 'Opened ✓'; }); });</script>
+{% endblock %}

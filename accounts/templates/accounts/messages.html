@@ -1,0 +1,102 @@
+{% extends 'accounts/pro_base.html' %}
+{% block title %}Messages | Sajhya Health{% endblock %}
+{% block extra_css %}
+  .ms-head { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; margin-bottom: 6px; } .ms-head h1 { margin: 0 10px 0 0; font-size: 24px; }
+  .ms-card { background: #fff; border: 1px solid var(--line); border-radius: 12px; padding: 16px 18px; margin-bottom: 14px; scroll-margin-top: 90px; }
+  .ms-card h3 { margin: 0 0 2px; font-size: 15px; } .ms-card .help { font-size: 12px; color: var(--muted); margin: 0 0 10px; }
+  .ms-grid { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 14px; }
+  .ms-card textarea { width: 100%; min-height: 150px; border: 1px solid var(--line); border-radius: 8px; padding: 10px; font: inherit; line-height: 1.5; resize: vertical; }
+  .ms-card input[type=text] { width: 100%; height: 38px; border: 1px solid var(--line); border-radius: 8px; padding: 0 10px; margin-bottom: 8px; }
+  .ms-preview { background: #e7f6dd; border: 1px solid #cfe6c2; border-radius: 10px 10px 10px 2px; padding: 10px 12px; font-size: 13px; line-height: 1.5; white-space: pre-wrap; min-height: 150px; }
+  .ms-preview-label { font-size: 10px; font-weight: 800; color: var(--muted); letter-spacing: .06em; text-transform: uppercase; margin-bottom: 4px; }
+  .chips { display: flex; gap: 5px; flex-wrap: wrap; margin-bottom: 8px; } .chips button { border: 1px solid #cfe6d8; background: #f1faf5; border-radius: 12px; padding: 3px 9px; font-size: 11px; font-weight: 700; color: var(--green-dark); }
+  .ms-actions { display: flex; gap: 8px; margin-top: 10px; align-items: center; flex-wrap: wrap; } .ms-actions form { margin: 0; }
+  .tagc { font-size: 10px; font-weight: 800; padding: 2px 8px; border-radius: 10px; background: #fff3d6; color: #a97510; margin-left: 6px; }
+  @media (max-width: 900px) { .ms-grid { grid-template-columns: 1fr; } }
+{% endblock %}
+
+{% block main %}
+<div class="ms-head"><h1>Messages</h1>
+  <a class="primary-btn" href="{% url 'accounts:notice-send' %}" style="text-decoration:none;display:inline-flex;align-items:center;margin-left:auto">✉ Send a notice</a></div>
+<p class="subtitle" style="margin:0 0 14px">Change the wording of every WhatsApp message the app prepares for your patients, set the number patients should contact, and write your own notices.</p>
+
+<section class="ms-card" id="number">
+  <h3>Business WhatsApp number</h3>
+  <p class="help">This number is printed in your messages (as <b>{contact}</b>), on invoices and on appointment confirmations, so patients know where to reach you. Example: +977 970-2235789.</p>
+  <form method="post" action="{% url 'accounts:whatsapp-number' %}" style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">{% csrf_token %}
+    <input type="text" name="whatsapp_number" value="{{ profile.whatsapp_number }}" placeholder="+977 970-2235789" style="max-width:260px;margin:0;height:40px;border:1px solid var(--line);border-radius:8px;padding:0 12px">
+    <button class="primary-btn" type="submit">Save number</button>
+    {% if profile.whatsapp_number %}<a class="secondary-btn" href="https://wa.me/{{ profile.whatsapp_number|cut:' '|cut:'-'|cut:'+'|cut:'('|cut:')' }}" target="_blank" rel="noopener" style="text-decoration:none;display:inline-flex;align-items:center">Test it</a>{% endif %}
+  </form>
+  <p class="help" style="margin:10px 0 0"><b>Good to know:</b> a website cannot choose which WhatsApp account sends a message. Messages are sent from the WhatsApp that is open on your phone or computer, so open your <b>business</b> WhatsApp there (WhatsApp Business app, or WhatsApp Web signed in to that number). This setting makes sure patients are told to reply to the business number. Sending automatically from the number, without you pressing send, needs WhatsApp's Business API (a paid Meta service).</p>
+</section>
+
+{% for m in built_in %}
+<section class="ms-card" id="{{ m.key }}">
+  <h3>{{ m.label }}{% if m.changed %}<span class="tagc">edited</span>{% endif %}</h3>
+  <p class="help">{{ m.help }}</p>
+  <div class="ms-grid">
+    <form method="post" action="{% url 'accounts:message-save' m.key %}">{% csrf_token %}
+      <div class="chips">{% for name, hint in placeholders %}<button type="button" data-ins="{{ name }}" title="{{ hint }}">{{ '{' }}{{ name }}{{ '}' }}</button>{% endfor %}</div>
+      <textarea name="body" data-preview="pv-{{ m.key }}" maxlength="1000">{{ m.body }}</textarea>
+      <div class="ms-actions"><button class="primary-btn" type="submit">Save</button></div>
+    </form>
+    <div><div class="ms-preview-label">Preview with an example patient</div><div class="ms-preview" id="pv-{{ m.key }}"></div>
+      {% if m.changed %}<div class="ms-actions"><form method="post" action="{% url 'accounts:message-reset' m.key %}" onsubmit="return confirm('Go back to the standard wording?')">{% csrf_token %}<button class="secondary-btn" type="submit">Reset to standard wording</button></form></div>{% endif %}</div>
+  </div>
+</section>
+{% endfor %}
+
+<section class="ms-card" id="custom">
+  <h3>Your own notices</h3>
+  <p class="help">For anything else you tell patients: a holiday closure, new timings, a camp, a payment reminder. Then use <b>Send a notice</b> to choose who gets it.</p>
+  {% for t in custom %}
+  <div style="border-top:1px solid var(--line);padding:12px 0" id="{{ t.key }}">
+    <div class="ms-grid">
+      <form method="post" action="{% url 'accounts:message-save' t.key %}">{% csrf_token %}
+        <input type="text" name="title" value="{{ t.title }}" maxlength="100">
+        <textarea name="body" data-preview="pv-{{ t.key }}" maxlength="1000" style="min-height:110px">{{ t.body }}</textarea>
+        <div class="ms-actions"><button class="primary-btn" type="submit">Save</button><a class="secondary-btn" href="{% url 'accounts:notice-send' %}?t={{ t.key }}" style="text-decoration:none">Send…</a></div>
+      </form>
+      <div><div class="ms-preview-label">Preview</div><div class="ms-preview" id="pv-{{ t.key }}" style="min-height:110px"></div>
+        <div class="ms-actions"><form method="post" action="{% url 'accounts:custom-delete' t.key %}" onsubmit="return confirm('Delete this notice?')">{% csrf_token %}<button class="secondary-btn" type="submit">Delete</button></form></div></div>
+    </div>
+  </div>
+  {% endfor %}
+  {% if can_add_custom %}
+  <form method="post" action="{% url 'accounts:custom-add' %}" style="border-top:1px solid var(--line);padding-top:12px;margin-top:6px">{% csrf_token %}
+    <div class="ms-preview-label">New notice</div>
+    <input type="text" name="title" placeholder="Name, e.g. Holiday closure" maxlength="100">
+    <div class="chips">{% for name, hint in placeholders %}<button type="button" data-ins="{{ name }}" title="{{ hint }}">{{ '{' }}{{ name }}{{ '}' }}</button>{% endfor %}</div>
+    <textarea name="body" maxlength="1000" style="min-height:110px" placeholder="Hello {patient}, {practice} will be closed on ... Contact us: {contact}"></textarea>
+    <div class="ms-actions"><button class="primary-btn" type="submit">Add notice</button></div>
+  </form>
+  {% endif %}
+</section>
+
+{{ sample_values|json_script:"ms-sample" }}
+<script>
+(function () {
+  var S = JSON.parse(document.getElementById('ms-sample').textContent);
+  function render(body) {
+    return body.split('\n').filter(function (line) {
+      var t = line.match(/\{(\w+)\}/g) || [];
+      return !(t.length && t.every(function (x) { var k = x.slice(1, -1); return k in S && !String(S[k]).trim(); }));
+    }).map(function (line) { return line.replace(/\{(\w+)\}/g, function (m, k) { return k in S ? S[k] : m; }); }).join('\n').replace(/\n{3,}/g, '\n\n').trim();
+  }
+  document.querySelectorAll('textarea[data-preview]').forEach(function (ta) {
+    var out = document.getElementById(ta.dataset.preview);
+    function upd() { out.textContent = render(ta.value); }
+    ta.addEventListener('input', upd); upd();
+  });
+  document.querySelectorAll('.chips [data-ins]').forEach(function (b) {
+    b.addEventListener('click', function () {
+      var ta = b.closest('form').querySelector('textarea'), tag = '{' + b.dataset.ins + '}';
+      var s = ta.selectionStart || 0, e = ta.selectionEnd || 0;
+      ta.value = ta.value.slice(0, s) + tag + ta.value.slice(e); ta.focus(); ta.selectionStart = ta.selectionEnd = s + tag.length;
+      ta.dispatchEvent(new Event('input'));
+    });
+  });
+})();
+</script>
+{% endblock %}

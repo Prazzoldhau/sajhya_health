@@ -317,7 +317,7 @@ class AppointmentWhatsAppTests(TestCase):
         page = self.client.get(r['Location'])
         self.assertEqual(page.context['prompt']['kind'], 'rescheduled')
         from urllib.parse import unquote
-        self.assertIn('has been rescheduled for', unquote(page.context['prompt']['url']))
+        self.assertIn('has been rescheduled to', unquote(page.context['prompt']['url']))
         self.assertIsNone(self.client.get(reverse('accounts:appointments')).context['prompt'])  # no banner on a normal visit
         self.assertIsNone(self.client.get(reverse('accounts:appointments'), {'booked': 'x'}).context['prompt'])
         appt.status = Appointment.CANCELLED

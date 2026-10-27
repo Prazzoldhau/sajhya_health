@@ -39,17 +39,20 @@ def normalize_phone(raw):
 
 def practice_of(entry):
     p = entry.professional
-    return {'name': p.practice_name or p.full_name, 'address': p.practice_address, 'phone': p.practice_phone or p.mobile,
+    return {'name': p.practice_name or p.full_name, 'address': p.practice_address, 'phone': p.practice_phone or p.mobile, 'whatsapp': p.whatsapp_number,
             'person': p.full_name, 'code': p.facility_code}
 
 
 def share_message(entry, url):
-    practice = practice_of(entry)['name']
-    owing = f' NPR {entry.amount_due:g} is still due.' if entry.amount_due > 0 and not entry.is_cancelled else ''
-    extra = entry.carried_over
-    remaining = f' Your extra NPR {extra:g} is kept as advance for your next session.' if extra > 0 and not entry.is_cancelled else ''
-    return (f'Hello {entry.patient_name}, your bill {entry.invoice_number} from {practice} dated {entry.entry_date:%d %b %Y}: '
-            f'NPR {entry.rate:g}.{owing}{remaining} Invoice: {url}')
+    """The text that goes with the invoice, in the professional's own wording (see Messages > Bill / invoice message)."""
+    from accounts import messaging
+    p = entry.professional
+    live = not entry.is_cancelled
+    values = {**messaging.practice_values(p), 'patient': entry.patient_name, 'invoice': entry.invoice_number, 'date': f'{entry.entry_date:%d %b %Y}',
+              'amount': f'{entry.rate:g}', 'link': url,
+              'due_line': f'NPR {entry.amount_due:g} is still due.' if entry.amount_due > 0 and live else '',
+              'extra_line': f'Your extra NPR {entry.carried_over:g} is kept as advance for your next session.' if live and entry.carried_over > 0 else ''}
+    return messaging.render(messaging.body_for(p, 'bill'), values)
 
 
 def whatsapp_chat(phone):
@@ -97,7 +100,7 @@ def build_pdf(entry, online_url=''):
     c.setFont('Helvetica-Bold', 18)
     c.drawString(left, height - 16 * mm, _latin(practice['name'], 'Physiotherapy practice'))
     c.setFont('Helvetica', 9.5)
-    c.drawString(left, height - 23 * mm, _latin(', '.join(x for x in (practice['address'], practice['phone']) if x), ''))
+    c.drawString(left, height - 23 * mm, _latin(', '.join(x for x in (practice['address'], practice['phone'], f"WhatsApp {practice['whatsapp']}" if practice['whatsapp'] else '') if x), ''))
     c.setFont('Helvetica-Bold', 22)
     c.drawRightString(right, height - 17 * mm, 'INVOICE')
     c.setFont('Helvetica', 9.5)
@@ -228,7 +231,7 @@ def build_png(entry):
     d = ImageDraw.Draw(img)
     d.rectangle([0, 0, W, 120], fill=green)
     d.text((pad, 28), _latin(practice['name'], 'Physiotherapy practice'), font=_font(True, 34), fill='white')
-    d.text((pad, 74), _latin(', '.join(x for x in (practice['address'], practice['phone']) if x), ''), font=_font(False, 20), fill='white')
+    d.text((pad, 74), _latin(', '.join(x for x in (practice['address'], practice['phone'], f"WhatsApp {practice['whatsapp']}" if practice['whatsapp'] else '') if x), ''), font=_font(False, 20), fill='white')
     d.text((W - pad, 30), 'INVOICE', font=_font(True, 36), fill='white', anchor='ra')
     d.text((W - pad, 78), entry.invoice_number, font=_font(False, 22), fill='white', anchor='ra')
     y = 160

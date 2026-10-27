@@ -295,6 +295,7 @@
       {% else %}
       <a class="nav {% if active == 'clinics' %}active{% endif %}" href="{% url 'clinics:hub' %}"><span class="nav-icon">✚</span><span class="nav-text">Clinic Connect</span>{% if clinic_invites %}<span class="nav-badge">{{ clinic_invites }}</span>{% endif %}</a>
       {% endif %}
+      <a class="nav {% if active == 'messages' %}active{% endif %}" href="{% url 'accounts:messages' %}"><span class="nav-icon">✉</span><span class="nav-text">Messages</span></a>
       <a class="nav {% if active == 'reports' %}active{% endif %}" href="{% url 'accounts:reports' %}"><span class="nav-icon">▥</span><span class="nav-text">Reports</span></a>
       <a class="nav {% if active == 'settings' %}active{% endif %}" href="{% url 'accounts:settings' %}"><span class="nav-icon">⚙</span><span class="nav-text">Settings</span></a>
       <div class="sidebar-bottom"><strong>Clinic workspace</strong><p>Manage appointments, assessments, treatment plans and patient progress from one place.</p></div>

@@ -41,25 +41,21 @@ def sync_next_appointment(patient):
     patient.save(update_fields=['next_appointment'])
 
 
+KIND_KEY = {'booked': 'appointment_booked', 'rescheduled': 'appointment_rescheduled', 'reminder': 'appointment_reminder', 'cancelled': 'appointment_cancelled'}
+
+
 def appointment_message(appt, kind='booked'):
-    """The WhatsApp text for a patient: the appointment is booked (or moved), with day, time and who to contact."""
-    p = appt.professional
-    practice = p.practice_name or p.full_name
-    when = timezone.localtime(appt.start)
-    verb = 'has been rescheduled' if kind == 'rescheduled' else 'is booked'
-    reach = f' For any change, call {p.practice_phone or p.mobile}.' if (p.practice_phone or p.mobile) else ''
-    return (f'Hello {appt.patient.name}, your appointment at {practice} {verb} for {when:%A, %d %b %Y} at {fmt_time(appt.start)}.'
-            f' Please arrive 10 minutes early.{reach} Thank you.')
+    """The WhatsApp text for a patient about this appointment, in the professional's own wording (see Messages)."""
+    from . import messaging
+    profile = appt.professional
+    return messaging.render(messaging.body_for(profile, KIND_KEY.get(kind, 'appointment_booked')), messaging.appointment_values(profile, appt))
 
 
 def appointment_whatsapp(profile, appt, kind='booked'):
     """wa.me link with the message ready; it opens the patient's own chat when their number is on file and visible to this user."""
-    from urllib.parse import quote
-
-    from billing.invoice import normalize_phone
+    from . import messaging
     phone = appt.patient.phone if can_see_contact(profile, appt.patient) else ''
-    number = normalize_phone(phone)
-    return f"https://wa.me/{number}?text={quote(appointment_message(appt, kind))}" if number else f"https://wa.me/?text={quote(appointment_message(appt, kind))}"
+    return messaging.whatsapp_url(phone, appointment_message(appt, kind))
 
 
 def booked_prompt(request, profile):
@@ -67,10 +63,11 @@ def booked_prompt(request, profile):
     raw = request.GET.get('booked', '')
     if not raw.isdigit():
         return None
-    appt = profile.appointments.filter(pk=int(raw), kind=Appointment.APPOINTMENT, status=Appointment.SCHEDULED).select_related('patient', 'professional').first()
+    kind = request.GET.get('kind') if request.GET.get('kind') in ('rescheduled', 'cancelled') else 'booked'
+    wanted = Appointment.CANCELLED if kind == 'cancelled' else Appointment.SCHEDULED
+    appt = profile.appointments.filter(pk=int(raw), kind=Appointment.APPOINTMENT, status=wanted).select_related('patient', 'professional').first()
     if appt is None or appt.patient is None:
         return None
-    kind = 'rescheduled' if request.GET.get('kind') == 'rescheduled' else 'booked'
     return {'name': appt.patient.name, 'kind': kind, 'url': appointment_whatsapp(profile, appt, kind), 'when': f'{timezone.localtime(appt.start):%a %d %b} at {fmt_time(appt.start)}',
             'has_phone': bool(appt.patient.phone and can_see_contact(profile, appt.patient))}
 
@@ -157,7 +154,7 @@ def appointments(request):
                 'height': max(round((end_min - start_min) * PX_PER_MIN), 26),
                 'patient_url': reverse('accounts:patient-detail', args=[ev.patient_id]) if ev.patient else '',
                 'patient_code': ev.patient.patient_code if ev.patient else '',
-                'whatsapp': appointment_whatsapp(profile, ev, 'booked') if ev.kind == Appointment.APPOINTMENT and ev.patient and ev.status == Appointment.SCHEDULED else '',
+                'wa': {k: appointment_whatsapp(profile, ev, k) for k in ('booked', 'reminder', 'rescheduled')} if ev.kind == Appointment.APPOINTMENT and ev.patient and ev.status == Appointment.SCHEDULED else {},
                 'notes': ev.notes, 'raw_title': ev.title, 'session_type': ev.session_type,
                 'date': s.date().isoformat(), 'start_hm': s.strftime('%H:%M'), 'end_hm': e.strftime('%H:%M'),
             })
@@ -301,6 +298,8 @@ def appointment_action(request, pk):
         messages.success(request, 'Removed from the calendar.')
     if patient:
         sync_next_appointment(patient)
+    if action == 'cancel' and appt.kind == Appointment.APPOINTMENT and patient:
+        return _back(local_date, request.POST.get('days', 3), booked=appt.pk, kind='cancelled')
     return _back(local_date, request.POST.get('days', 3))
 
 

@@ -145,6 +145,8 @@ class ProfessionalProfile(models.Model):
     practice_name = models.CharField(max_length=200, blank=True)
     practice_address = models.CharField(max_length=255, blank=True)
     practice_phone = models.CharField(max_length=20, blank=True)
+    whatsapp_number = models.CharField('Business WhatsApp number', max_length=20, blank=True,
+                                       help_text='Printed in messages and on invoices so patients know where to reach the practice.')
     facility_code = models.CharField('Facility / HMIS code', max_length=40, blank=True,
                                      help_text='Registration number or HMIS organisation-unit code of the practice; printed on reports.')
     default_session_minutes = models.PositiveSmallIntegerField(default=30, help_text='Pre-filled length when booking an appointment.')
@@ -343,6 +345,23 @@ class Appointment(models.Model):
 
     def __str__(self):
         return f'{self.patient or self.title} @ {self.start:%Y-%m-%d %H:%M}'
+
+
+class MessageTemplate(models.Model):
+    """This professional's own wording of a WhatsApp message (a built-in one they changed, or a notice they wrote). Placeholders like
+    {patient} and {date} are filled in per patient - see accounts/messaging.py."""
+    professional = models.ForeignKey(ProfessionalProfile, on_delete=models.CASCADE, related_name='message_templates')
+    key = models.CharField(max_length=60, help_text='A built-in message name, or custom-xxxxxxxx for a notice the professional wrote.')
+    title = models.CharField(max_length=100, blank=True)
+    body = models.TextField(max_length=1000)
+    is_custom = models.BooleanField(default=False)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        unique_together = [('professional', 'key')]
+
+    def __str__(self):
+        return f'{self.title or self.key} ({self.professional})'
 
 
 class Task(models.Model):
