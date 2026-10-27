@@ -132,7 +132,9 @@ def channel_links(phone, text, preferred='whatsapp'):
         else:
             url = f'sms:+{number}?body={quote(text)}' if number else f'sms:?body={quote(text)}'
         links.append({'key': key, 'label': label, 'url': url, 'copy': copy, 'preferred': key == preferred})
-    links.sort(key=lambda link: not link['preferred'])
+        if key == 'viber' and number:  # the other way Viber can do it: the text typed, then you choose the contact
+            links.append({'key': 'viber_text', 'label': 'Viber (text typed, choose contact)', 'url': f'viber://forward?text={quote(text)}', 'copy': '', 'preferred': False})
+    links.sort(key=lambda link: 0 if link['preferred'] else (0.5 if link['key'] == 'viber_text' and preferred == 'viber' else 1))  # the patient's app first, Viber's typed-text option right after it
     return links
 
 
