@@ -238,7 +238,7 @@ class AgeOrBirthDate(forms.Form):
 class PatientForm(AgeOrBirthDate, forms.ModelForm):
     class Meta:
         model = Patient
-        fields = ('photo', 'name', 'date_of_birth', 'gender', 'phone', 'email', 'address',
+        fields = ('photo', 'name', 'date_of_birth', 'gender', 'phone', 'messaging_app', 'email', 'address',
                   'occupation', 'referral_source', 'diagnosis', 'icd10_code', 'notes')
         widgets = {
             'date_of_birth': date_widget(),
@@ -263,6 +263,9 @@ class PatientForm(AgeOrBirthDate, forms.ModelForm):
             raise ValidationError('Check the date of birth: that would make the patient over 120 years old.')
         return born
 
+    def clean_messaging_app(self):
+        return self.cleaned_data.get('messaging_app') or self.instance.messaging_app or 'whatsapp'
+
     def clean_photo(self):
         photo = self.cleaned_data.get('photo')
         if isinstance(photo, UploadedFile):  # a fresh upload (not the file already stored)
@@ -279,6 +282,7 @@ class PatientForm(AgeOrBirthDate, forms.ModelForm):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self._old_photo = self.instance.photo.name if self.instance.pk and self.instance.photo else ''
+        self.fields['messaging_app'].required = False
         for name in ('name', 'gender', 'phone'):
             self.fields[name].required = True
         if self.instance.pk and self.instance.dob_is_estimate and self.instance.age is not None:

@@ -397,7 +397,7 @@ def patient_edit(request, pk):
     form = PatientEditForm(request.POST or None, request.FILES or None, instance=patient)
     show_contact = can_see_contact(profile, patient)
     if not show_contact:
-        for name in ('phone', 'email', 'address'):
+        for name in ('phone', 'messaging_app', 'email', 'address'):
             del form.fields[name]  # a clinic physio can neither read nor overwrite the patient's contact details
     if request.method == 'POST' and form.is_valid():
         form.save()  # (also removes a replaced picture)

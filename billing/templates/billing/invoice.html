@@ -69,7 +69,8 @@
     <div class="sep"></div>
     <a class="btn" href="{% url 'billing:invoice-pdf' entry.pk %}?download=1">⬇ Download PDF</a>
     <button type="button" class="btn" onclick="window.print()">🖨 Print / save as PDF</button>
-    <a class="btn" href="{{ whatsapp }}" target="_blank" rel="noopener">WhatsApp with a link to the PDF</a>
+    <div class="hint" style="margin:0">Send the message with the PDF link:</div>
+    {% for l in links %}<a class="btn{% if l.preferred %} main{% endif %}" href="{{ l.url }}" {% if l.key != 'sms' %}target="_blank" rel="noopener"{% endif %} {% if l.copy %}data-copy="{{ l.copy }}" title="Opens the chat and copies the message: paste it and send"{% endif %}>{% if l.preferred %}★ {% endif %}{{ l.label }}{% if l.key == 'viber' %} (opens chat, paste){% endif %}</a>{% endfor %}
     <button type="button" class="btn" id="shareBtn" hidden>↗ Share the PDF…</button>
     <button type="button" class="btn" id="copyBtn">⧉ Copy link</button>
     <div class="sep"></div>

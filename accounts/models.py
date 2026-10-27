@@ -145,6 +145,7 @@ class ProfessionalProfile(models.Model):
     practice_name = models.CharField(max_length=200, blank=True)
     practice_address = models.CharField(max_length=255, blank=True)
     practice_phone = models.CharField(max_length=20, blank=True)
+    viber_number = models.CharField('Business Viber number', max_length=20, blank=True, help_text='Printed in messages next to the WhatsApp number when the practice uses Viber too.')
     whatsapp_number = models.CharField('Business WhatsApp number', max_length=20, blank=True,
                                        help_text='Printed in messages and on invoices so patients know where to reach the practice.')
     facility_code = models.CharField('Facility / HMIS code', max_length=40, blank=True,
@@ -187,6 +188,9 @@ class Patient(models.Model):
     date_of_birth = models.DateField(null=True, blank=True)
     dob_is_estimate = models.BooleanField(default=False, help_text='The date of birth was worked out from an age the patient gave, so it is approximate.')
     gender = models.CharField(max_length=1, choices=GENDER_CHOICES, blank=True)
+    MESSAGING_CHOICES = [('whatsapp', 'WhatsApp'), ('viber', 'Viber'), ('sms', 'SMS (text message)')]
+    messaging_app = models.CharField('Messages go by', max_length=10, choices=MESSAGING_CHOICES, default='whatsapp',
+                                     help_text='The app this patient uses, so booking confirmations and notices open in it first.')
     email = models.EmailField(blank=True)
     address = models.TextField(blank=True)
     occupation = models.CharField(max_length=100, blank=True)

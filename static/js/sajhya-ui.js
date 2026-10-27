@@ -75,6 +75,12 @@
    * opts.onType     function() called when the user edits the text (e.g. to clear a hidden id)
    * returns { close }
    */
+  // A Viber link cannot carry a message, so the link carries it in data-copy and it is copied when the link is clicked (then paste in Viber).
+  document.addEventListener('click', function (e) {
+    var a = e.target.closest && e.target.closest('[data-copy]');
+    if (a && navigator.clipboard) navigator.clipboard.writeText(a.dataset.copy).catch(function () {});
+  });
+
   UI.picker = function (input, opts) {
     var minChars = opts.minChars == null ? 2 : opts.minChars;
     var box = null, timer = null, items = [], idx = -1;

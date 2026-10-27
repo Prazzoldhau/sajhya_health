@@ -78,11 +78,14 @@ def body_for(profile, key):
 
 def contact_text(profile):
     phone = profile.practice_phone or profile.mobile
-    if profile.whatsapp_number and phone and phone != profile.whatsapp_number:
-        return f'WhatsApp {profile.whatsapp_number} or call {phone}'
+    apps = []
     if profile.whatsapp_number:
-        return f'WhatsApp {profile.whatsapp_number}'
-    return phone
+        apps.append(f'WhatsApp {profile.whatsapp_number}')
+    if profile.viber_number:
+        apps.append(f'Viber {profile.viber_number}')
+    if apps and phone and phone not in (profile.whatsapp_number, profile.viber_number):
+        return ', '.join(apps) + f' or call {phone}'
+    return ', '.join(apps) if apps else phone
 
 
 def practice_values(profile):
@@ -108,6 +111,29 @@ def whatsapp_url(phone, text):
     from billing.invoice import normalize_phone
     number = normalize_phone(phone)
     return f"https://wa.me/{number}?text={quote(text)}" if number else f"https://wa.me/?text={quote(text)}"
+
+
+CHANNELS = [('whatsapp', 'WhatsApp'), ('viber', 'Viber'), ('sms', 'SMS')]
+
+
+def channel_links(phone, text, preferred='whatsapp'):
+    """The ways to send this text to one patient, the patient's own app first. WhatsApp and SMS open the chat with the text ready. Viber
+    cannot be given a text together with a chat, so its link opens the patient's chat (or the contact picker with no number) and the
+    text is put on the clipboard for you to paste: the link carries a `copy` text that the page copies when it is clicked."""
+    from billing.invoice import normalize_phone
+    number = normalize_phone(phone)
+    links = []
+    for key, label in CHANNELS:
+        copy = ''
+        if key == 'whatsapp':
+            url = whatsapp_url(phone, text)
+        elif key == 'viber':
+            url, copy = (f'viber://chat?number=%2B{number}', text) if number else (f'viber://forward?text={quote(text)}', '')
+        else:
+            url = f'sms:+{number}?body={quote(text)}' if number else f'sms:?body={quote(text)}'
+        links.append({'key': key, 'label': label, 'url': url, 'copy': copy, 'preferred': key == preferred})
+    links.sort(key=lambda link: not link['preferred'])
+    return links
 
 
 def clean_whatsapp_number(value):

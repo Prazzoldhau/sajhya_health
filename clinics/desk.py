@@ -114,6 +114,8 @@ def _billing_context(request, member):
     for e in day + owed:  # a ready-made WhatsApp message per bill
         url = request.build_absolute_uri(reverse('billing:invoice-public', args=[inv.invoice_token(e)]))
         e.whatsapp = inv.whatsapp_link(e, e.contact_number or e.patient.phone, url)
+        from accounts.messaging import channel_links
+        e.links = channel_links(e.contact_number or e.patient.phone, inv.share_message(e, url), e.patient.messaging_app)
     return {
         'selected': selected, 'today': today, 'prev_date': selected - datetime.timedelta(days=1), 'next_date': selected + datetime.timedelta(days=1),
         'day_bills': day, 'owed': owed, 'billed': sum((e.rate for e in day if not e.is_cancelled), 0), 'received': got,

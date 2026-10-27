@@ -307,7 +307,7 @@ class AppointmentWhatsAppTests(TestCase):
         self.assertIn('Sita Gurung', text)
         self.assertIn('is booked for', text)
         self.assertIn('3:00 PM', text)
-        self.assertContains(page, 'Send WhatsApp message')
+        self.assertContains(page, 'Send by WhatsApp')
         self.assertContains(page, 'wa.me/9779841000000')  # also on the calendar entry, for the details window
 
     def test_rescheduling_offers_a_rescheduled_message_and_other_cases_stay_quiet(self):
@@ -328,7 +328,7 @@ class AppointmentWhatsAppTests(TestCase):
         r = self.client.post(reverse('accounts:patient-next-visit', args=[self.patient.pk]), {'date': self.tomorrow.isoformat(), 'start_time': '09:00'})
         self.assertIn('booked=', r['Location'])
         page = self.client.get(r['Location'])
-        self.assertContains(page, 'Send WhatsApp message')
+        self.assertContains(page, 'Send by WhatsApp')
         self.patient.phone = ''
         self.patient.save()
         page = self.client.get(r['Location'])

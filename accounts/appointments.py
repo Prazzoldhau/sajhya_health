@@ -1,5 +1,6 @@
 import calendar
 import datetime
+import json
 
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
@@ -58,6 +59,13 @@ def appointment_whatsapp(profile, appt, kind='booked'):
     return messaging.whatsapp_url(phone, appointment_message(appt, kind))
 
 
+def appointment_links(profile, appt, kind='booked'):
+    """Every way to send this appointment message to the patient (their own app first)."""
+    from . import messaging
+    phone = appt.patient.phone if can_see_contact(profile, appt.patient) else ''
+    return messaging.channel_links(phone, appointment_message(appt, kind), appt.patient.messaging_app)
+
+
 def booked_prompt(request, profile):
     """A banner offering the WhatsApp message right after an appointment was booked or moved (?booked=<id>&kind=...)."""
     raw = request.GET.get('booked', '')
@@ -68,7 +76,7 @@ def booked_prompt(request, profile):
     appt = profile.appointments.filter(pk=int(raw), kind=Appointment.APPOINTMENT, status=wanted).select_related('patient', 'professional').first()
     if appt is None or appt.patient is None:
         return None
-    return {'name': appt.patient.name, 'kind': kind, 'url': appointment_whatsapp(profile, appt, kind), 'when': f'{timezone.localtime(appt.start):%a %d %b} at {fmt_time(appt.start)}',
+    return {'name': appt.patient.name, 'kind': kind, 'links': appointment_links(profile, appt, kind), 'url': appointment_links(profile, appt, kind)[0]['url'], 'when': f'{timezone.localtime(appt.start):%a %d %b} at {fmt_time(appt.start)}',
             'has_phone': bool(appt.patient.phone and can_see_contact(profile, appt.patient))}
 
 
@@ -155,10 +163,13 @@ def appointments(request):
                 'patient_url': reverse('accounts:patient-detail', args=[ev.patient_id]) if ev.patient else '',
                 'patient_code': ev.patient.patient_code if ev.patient else '',
                 'wa': {k: appointment_whatsapp(profile, ev, k) for k in ('booked', 'reminder', 'rescheduled')} if ev.kind == Appointment.APPOINTMENT and ev.patient and ev.status == Appointment.SCHEDULED else {},
+                'links': {k: appointment_links(profile, ev, k) for k in ('booked', 'reminder', 'rescheduled')} if ev.kind == Appointment.APPOINTMENT and ev.patient and ev.status == Appointment.SCHEDULED else {},
                 'notes': ev.notes, 'raw_title': ev.title, 'session_type': ev.session_type,
                 'date': s.date().isoformat(), 'start_hm': s.strftime('%H:%M'), 'end_hm': e.strftime('%H:%M'),
             })
         _layout_lanes(items)
+        for it in items:
+            it['links_json'] = json.dumps(it['links'])
         columns.append({
             'date': day, 'iso': day.isoformat(), 'is_today': day == today,
             'label': f"{day:%a}, {ordinal(day.day)} {day:%b}", 'events': items,

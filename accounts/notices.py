@@ -40,17 +40,19 @@ def messages_page(request):
 
 @login_required
 def whatsapp_number_save(request):
+    """The business WhatsApp and Viber numbers printed in messages and on invoices."""
     profile = workspace_profile(request)
     if profile is None or request.method != 'POST':
         return redirect('accounts:messages')
     try:
-        number = messaging.clean_whatsapp_number(request.POST.get('whatsapp_number'))
+        whatsapp = messaging.clean_whatsapp_number(request.POST.get('whatsapp_number'))
+        viber = messaging.clean_whatsapp_number(request.POST.get('viber_number'))
     except ValueError as exc:
-        messages.error(request, str(exc))
+        messages.error(request, str(exc).replace('WhatsApp number', 'number'))
         return _back('number')
-    profile.whatsapp_number = number
-    profile.save(update_fields=['whatsapp_number'])
-    messages.success(request, f'Business WhatsApp number saved: {number}.' if number else 'Business WhatsApp number removed.')
+    profile.whatsapp_number, profile.viber_number = whatsapp, viber
+    profile.save(update_fields=['whatsapp_number', 'viber_number'])
+    messages.success(request, 'Business numbers saved.' if whatsapp or viber else 'Business numbers removed.')
     return _back('number')
 
 
@@ -156,8 +158,8 @@ def notice_send(request):
     def add(patient, values, when_label=''):
         text = messaging.render(body, values)
         shown = can_see_contact(profile, patient) and patient.phone
-        rows.append({'patient': patient, 'phone': patient.phone if shown else '', 'text': text, 'when': when_label,
-                     'url': messaging.whatsapp_url(patient.phone if shown else '', text)})
+        links = messaging.channel_links(patient.phone if shown else '', text, patient.messaging_app)
+        rows.append({'patient': patient, 'phone': patient.phone if shown else '', 'text': text, 'when': when_label, 'links': links, 'url': links[0]['url']})
 
     if audience == 'appointments':
         start = timezone.make_aware(datetime.datetime.combine(day, datetime.time.min))

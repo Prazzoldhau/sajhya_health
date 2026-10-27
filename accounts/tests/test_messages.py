@@ -41,7 +41,7 @@ class MessagesPageTests(TestCase):
     def test_the_page_lists_every_message_and_the_business_number_can_be_set(self):
         page = self.client.get(reverse('accounts:messages'))
         self.assertEqual(page.status_code, 200)
-        for label in ('Appointment booked (confirmation)', 'Appointment reminder', 'Appointment cancelled', 'Follow-up check-in', 'Business WhatsApp number'):
+        for label in ('Appointment booked (confirmation)', 'Appointment reminder', 'Appointment cancelled', 'Follow-up check-in', 'Business WhatsApp and Viber numbers'):
             self.assertContains(page, label)
         self.client.post(reverse('accounts:whatsapp-number'), {'whatsapp_number': '+977 970-2235789'})
         self.profile.refresh_from_db()
@@ -146,3 +146,79 @@ class MessagesPageTests(TestCase):
         self.assertEqual(self.client.get(reverse('accounts:messages')).status_code, 302)
         self.client.logout()
         self.assertEqual(self.client.get(reverse('accounts:notice-send')).status_code, 302)
+
+
+class ViberTests(TestCase):
+    def setUp(self):
+        self.user, self.profile = make_professional()
+        self.client.force_login(self.user)
+        self.patient = make_patient(self.profile)
+        self.tomorrow = timezone.localdate() + datetime.timedelta(days=1)
+
+    def book(self):
+        start = aware(self.tomorrow, datetime.time(15, 0))
+        return Appointment.objects.create(professional=self.profile, patient=self.patient, start=start, end=start + datetime.timedelta(minutes=30))
+
+    def test_channel_links_put_the_patients_app_first_and_viber_copies_the_text(self):
+        links = messaging.channel_links('9841234567', 'Hello there', 'viber')
+        self.assertEqual([l['key'] for l in links], ['viber', 'whatsapp', 'sms'])
+        viber = links[0]
+        self.assertEqual((viber['url'], viber['copy'], viber['preferred']), ('viber://chat?number=%2B9779841234567', 'Hello there', True))
+        self.assertTrue(links[1]['url'].startswith('https://wa.me/9779841234567?text='))
+        self.assertTrue(links[2]['url'].startswith('sms:+9779841234567?body='))
+        blank = messaging.channel_links('', 'Hello there', 'whatsapp')  # no number: the app's contact picker
+        by_key = {l['key']: l for l in blank}
+        self.assertTrue(by_key['viber']['url'].startswith('viber://forward?text='))
+        self.assertEqual(by_key['viber']['copy'], '')
+        self.assertEqual(by_key['sms']['url'], 'sms:?body=Hello%20there')
+        self.assertEqual([l['key'] for l in messaging.channel_links('9841234567', 'x')], ['whatsapp', 'viber', 'sms'])
+
+    def test_the_patients_app_is_chosen_on_the_form_and_comes_first_on_the_booking_message(self):
+        self.client.post(reverse('accounts:patient-add'), {'name': 'Viber User', 'phone': '9800000777', 'gender': 'F', 'age': '30', 'messaging_app': 'viber'})
+        viber_patient = self.profile.patients.get(name='Viber User')
+        self.assertEqual(viber_patient.messaging_app, 'viber')
+        self.client.post(reverse('accounts:patient-add'), {'name': 'Default User', 'phone': '9800000778', 'gender': 'F', 'age': '30'})  # not chosen: WhatsApp
+        self.assertEqual(self.profile.patients.get(name='Default User').messaging_app, 'whatsapp')
+        self.client.post(reverse('accounts:patient-edit', args=[viber_patient.pk]), {'name': 'Viber User', 'phone': '9800000777', 'gender': 'F', 'age': '30', 'messaging_app': 'sms', 'status': 'active'})
+        viber_patient.refresh_from_db()
+        self.assertEqual(viber_patient.messaging_app, 'sms')
+        self.assertContains(self.client.get(reverse('accounts:patient-add')), 'name="messaging_app"')
+        # the booking banner leads with the patient's own app and still offers the others
+        self.patient.messaging_app = 'viber'
+        self.patient.save()
+        appt = self.book()
+        page = self.client.get(reverse('accounts:appointments'), {'booked': appt.pk})
+        links = page.context['prompt']['links']
+        self.assertEqual([l['key'] for l in links], ['viber', 'whatsapp', 'sms'])
+        self.assertContains(page, 'Send by Viber')
+        self.assertContains(page, 'data-copy=')
+        self.assertContains(page, 'viber://chat?number=%2B9779841000000')
+        event = [e for col in self.client.get(reverse('accounts:appointments'), {'date': self.tomorrow.isoformat(), 'days': 1}).context['columns'] for e in col['events']][0]
+        self.assertEqual([l['key'] for l in event['links']['booked']], ['viber', 'whatsapp', 'sms'])
+        self.assertEqual(set(event['links']), {'booked', 'reminder', 'rescheduled'})
+
+    def test_notices_offer_every_app_and_the_business_viber_number_appears_in_messages(self):
+        self.patient.messaging_app = 'viber'
+        self.patient.last_visit = timezone.localdate() - datetime.timedelta(days=40)
+        self.patient.save()
+        page = self.client.get(reverse('accounts:notice-send'), {'audience': 'followup'})
+        row = page.context['rows'][0]
+        self.assertEqual([l['key'] for l in row['links']], ['viber', 'whatsapp', 'sms'])
+        self.assertContains(page, 'data-copy=')
+        self.client.post(reverse('accounts:whatsapp-number'), {'whatsapp_number': '+977 970-2235789', 'viber_number': '+977 980-1111111'})
+        self.profile.refresh_from_db()
+        self.assertEqual((self.profile.whatsapp_number, self.profile.viber_number), ('+977 970-2235789', '+977 980-1111111'))
+        self.assertIn('WhatsApp +977 970-2235789, Viber +977 980-1111111', messaging.contact_text(self.profile))
+        self.client.post(reverse('accounts:whatsapp-number'), {'whatsapp_number': '+977 970-2235789', 'viber_number': 'x'})
+        self.profile.refresh_from_db()
+        self.assertEqual(self.profile.viber_number, '+977 980-1111111')  # a bad number changes nothing
+
+    def test_invoice_and_front_desk_offer_the_patients_app(self):
+        from billing.models import BillingEntry
+        self.patient.messaging_app = 'viber'
+        self.patient.save()
+        self.client.post(reverse('billing:patient-bill', args=[self.patient.pk]), {'entry_date': timezone.localdate().isoformat(), 'service': 'S', 'rate': '500', 'payment_mode': 'cash', 'payment_status': 'paid'})
+        entry = BillingEntry.objects.get()
+        page = self.client.get(reverse('billing:invoice', args=[entry.pk]))
+        self.assertEqual([l['key'] for l in page.context['links']], ['viber', 'whatsapp', 'sms'])
+        self.assertContains(page, 'Viber (opens chat, paste)')

@@ -16,6 +16,9 @@
   <h3 class="pf-section">Contact Information</h3>
   <div class="pf-row">
     <div class="pf-field"><label for="{{ form.phone.id_for_label }}">Phone Number <i>*</i></label>{{ form.phone }}{{ form.phone.errors }}</div>
+    <div class="pf-field"><label for="{{ form.messaging_app.id_for_label }}">Messages go by</label>{{ form.messaging_app }}{{ form.messaging_app.errors }}</div>
+  </div>
+  <div class="pf-row">
     <div class="pf-field"><label for="{{ form.email.id_for_label }}">Email</label>{{ form.email }}{{ form.email.errors }}</div>
   </div>
   <div class="pf-field"><label for="{{ form.address.id_for_label }}">Address</label>{{ form.address }}{{ form.address.errors }}</div>

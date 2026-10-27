@@ -1,6 +1,8 @@
 {% if prompt %}
 <div class="no-print" style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;background:#e7f7ed;border:1px solid #bfe3cd;color:#116b43;border-radius:10px;padding:10px 14px;margin-bottom:12px">
-  <span><b>{% if prompt.kind == 'rescheduled' %}Rescheduled{% elif prompt.kind == 'cancelled' %}Cancelled{% else %}Booked{% endif %}: {{ prompt.name }}, {{ prompt.when }}.</b> Let the patient know on WhatsApp{% if not prompt.has_phone %} <span style="color:#7a5a10">(no phone number on file: you will choose the contact)</span>{% endif %}.</span>
-  <a href="{{ prompt.url }}" target="_blank" rel="noopener" style="margin-left:auto;background:#25d366;color:#fff;text-decoration:none;font-weight:700;border-radius:8px;padding:8px 14px;display:inline-flex;align-items:center">Send WhatsApp message</a>
+  <span><b>{% if prompt.kind == 'rescheduled' %}Rescheduled{% elif prompt.kind == 'cancelled' %}Cancelled{% else %}Booked{% endif %}: {{ prompt.name }}, {{ prompt.when }}.</b> Let the patient know{% if not prompt.has_phone %} <span style="color:#7a5a10">(no phone number on file: you will choose the contact)</span>{% endif %}.</span>
+  <span style="margin-left:auto;display:inline-flex;gap:6px;flex-wrap:wrap;align-items:center">
+    {% for l in prompt.links %}<a href="{{ l.url }}" {% if l.key != 'sms' %}target="_blank" rel="noopener"{% endif %} {% if l.copy %}data-copy="{{ l.copy }}"{% endif %} style="{% if l.preferred %}background:{% if l.key == 'viber' %}#7360f2{% elif l.key == 'sms' %}#3d6fb0{% else %}#25d366{% endif %};color:#fff;{% else %}background:#fff;color:#116b43;border:1px solid #bfe3cd;{% endif %}text-decoration:none;font-weight:700;border-radius:8px;padding:8px 14px;display:inline-flex;align-items:center">{% if l.preferred %}Send by {% endif %}{{ l.label }}</a>{% endfor %}
+  </span>
 </div>
 {% endif %}

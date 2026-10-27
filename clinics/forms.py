@@ -207,9 +207,16 @@ class FrontDeskPatientForm(AgeOrBirthDate, forms.ModelForm):
     """What a receptionist or manager records when a patient walks in: identity and contact only, no clinical notes."""
     class Meta:
         model = Patient
-        fields = ('name', 'date_of_birth', 'gender', 'phone', 'email', 'address', 'occupation', 'referral_source')
+        fields = ('name', 'date_of_birth', 'gender', 'phone', 'messaging_app', 'email', 'address', 'occupation', 'referral_source')
         widgets = {'date_of_birth': forms.DateInput(attrs={'type': 'date'}), 'address': forms.Textarea(attrs={'rows': 2})}
-        labels = {'name': 'Full name', 'date_of_birth': 'Date of birth', 'phone': 'Phone number'}
+        labels = {'name': 'Full name', 'date_of_birth': 'Date of birth', 'phone': 'Phone number', 'messaging_app': 'Messages go by'}
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fields['messaging_app'].required = False
+
+    def clean_messaging_app(self):
+        return self.cleaned_data.get('messaging_app') or 'whatsapp'
 
     def clean_date_of_birth(self):
         from accounts.forms import PatientForm

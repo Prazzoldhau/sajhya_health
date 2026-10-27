@@ -14,6 +14,8 @@ from django.utils import timezone
 
 from accounts.access import actor_of, can_see_contact, first_error, own_patient, require_workspace, workspace_context, workspace_profile
 
+from accounts.messaging import channel_links
+
 from . import invoice as inv
 from .forms import AdvanceForm, BillCorrectionForm, BillingEntryForm, EntryPaymentForm, PackagePaymentForm, PatientBillForm, PatientPackageForm
 from .models import ADVANCE, BillingEntry, EntryPayment, PackagePayment, PatientAdvance, PatientPackage, advance_balance
@@ -492,7 +494,7 @@ def invoice(request, pk):
     context.update({
         'carried': entry.carried_over, 'cash_handed_over': entry.cash_handed_over, 'advance_now': advance_balance(entry.patient_id) if entry.patient_id else 0,
         'active': 'billing', 'entry': entry, 'practice': inv.practice_of(entry), 'payments': entry.payments.all(), 'public_url': public_url,
-        'whatsapp': inv.whatsapp_link(entry, phone, public_url), 'whatsapp_chat': inv.whatsapp_chat(phone), 'message': inv.share_message(entry, public_url), 'phone': phone, 'email': email,
+        'links': channel_links(phone, inv.share_message(entry, public_url), entry.patient.messaging_app if entry.patient_id else 'whatsapp'), 'whatsapp': inv.whatsapp_link(entry, phone, public_url), 'whatsapp_chat': inv.whatsapp_chat(phone), 'message': inv.share_message(entry, public_url), 'phone': phone, 'email': email,
         'back': back if back.startswith('/') and not back.startswith('//') else reverse('billing:billing') + f'?date={entry.entry_date.isoformat()}',
         'link_days': inv.LINK_DAYS,
     })

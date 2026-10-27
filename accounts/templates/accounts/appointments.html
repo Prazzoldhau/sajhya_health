@@ -152,7 +152,7 @@
           {% for e in col.events %}
           <div class="ev ev-{{ e.css }} {{ e.status }}" style="top:{{ e.top }}px;height:{{ e.height }}px;left:calc({{ e.left }}% + 2px);width:calc({{ e.width }}% - 4px)"
                data-id="{{ e.id }}" data-kind="{{ e.kind }}" data-status="{{ e.status }}" data-title="{{ e.title }}" data-time="{{ e.time_label }}"
-               data-wa-booked="{{ e.wa.booked }}" data-wa-reminder="{{ e.wa.reminder }}" data-wa-rescheduled="{{ e.wa.rescheduled }}" data-type="{{ e.type_label }}" data-date="{{ e.date }}" data-start="{{ e.start_hm }}" data-end="{{ e.end_hm }}" data-session="{{ e.session_type }}" data-raw-title="{{ e.raw_title }}" data-patient-url="{{ e.patient_url }}" data-code="{{ e.patient_code }}" data-notes="{{ e.notes }}">
+               data-links='{{ e.links_json }}' data-type="{{ e.type_label }}" data-date="{{ e.date }}" data-start="{{ e.start_hm }}" data-end="{{ e.end_hm }}" data-session="{{ e.session_type }}" data-raw-title="{{ e.raw_title }}" data-patient-url="{{ e.patient_url }}" data-code="{{ e.patient_code }}" data-notes="{{ e.notes }}">
             <b>{{ e.title }}</b>{{ e.time_label }}{% if e.height > 52 %}<div class="tag">{{ e.type_label }}</div>{% endif %}
           </div>
           {% endfor %}
@@ -214,7 +214,7 @@
       <button class="primary-btn" name="action" value="attend" id="dAttend">Mark attended</button>
       <span id="dWaWrap" style="display:inline-flex;gap:4px;align-items:center">
         <select id="dWaKind" aria-label="Which message" style="height:36px;border:1px solid #cfe6d8;border-radius:8px;padding:0 6px"><option value="booked">Confirmation</option><option value="reminder">Reminder</option><option value="rescheduled">Rescheduled</option></select>
-        <a class="secondary-btn" id="dWhatsapp" href="#" target="_blank" rel="noopener" style="text-decoration:none;display:inline-flex;align-items:center;color:#128c4a" title="Opens WhatsApp with the message ready. Change the wording under Messages.">WhatsApp</a>
+        <span id="dChannels" style="display:inline-flex;gap:4px"></span>
       </span>
       <button type="button" class="secondary-btn" id="dEdit">Reschedule / edit</button>
       <button class="secondary-btn" name="action" value="cancel" id="dCancel">Cancel appointment</button>
@@ -295,8 +295,19 @@
       $('actionForm').action = $('actionForm').dataset.url.replace('/0/', '/' + d.id + '/');
       $('dOpen').style.display = isAppt ? '' : 'none';
       $('dOpen').href = d.patientUrl || '#';
-      $('dWaWrap').style.display = d.waBooked ? 'inline-flex' : 'none';
-      function setWa() { var k = $('dWaKind').value; $('dWhatsapp').href = (k === 'reminder' ? d.waReminder : k === 'rescheduled' ? d.waRescheduled : d.waBooked) || '#'; }
+      var links = {}; try { links = JSON.parse(d.links || '{}'); } catch (err) {}
+      $('dWaWrap').style.display = links.booked ? 'inline-flex' : 'none';
+      function setWa() {
+        var box = $('dChannels'); box.innerHTML = '';
+        (links[$('dWaKind').value] || []).forEach(function (l) {
+          var a = document.createElement('a'); a.className = 'secondary-btn'; a.textContent = l.label; a.href = l.url;
+          if (l.key !== 'sms') { a.target = '_blank'; a.rel = 'noopener'; }
+          if (l.copy) a.dataset.copy = l.copy;
+          a.style.cssText = 'text-decoration:none;display:inline-flex;align-items:center;' + (l.preferred ? 'background:#e7f7ed;border-color:#7dc99d;color:#116b43;font-weight:800' : '');
+          a.title = l.key === 'viber' ? 'Opens the chat and copies the message: paste it in Viber' : 'Opens ' + l.label + ' with the message ready';
+          box.appendChild(a);
+        });
+      }
       $('dWaKind').onchange = setWa; setWa();
       $('dEdit').style.display = !isAppt || d.status === 'scheduled' ? '' : 'none';
       $('dEdit').onclick = function () {
