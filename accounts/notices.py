@@ -51,7 +51,8 @@ def whatsapp_number_save(request):
         messages.error(request, str(exc).replace('WhatsApp number', 'number'))
         return _back('number')
     profile.whatsapp_number, profile.viber_number = whatsapp, viber
-    profile.save(update_fields=['whatsapp_number', 'viber_number'])
+    profile.whatsapp_web = request.POST.get('whatsapp_web') == 'on'
+    profile.save(update_fields=['whatsapp_number', 'viber_number', 'whatsapp_web'])
     messages.success(request, 'Business numbers saved.' if whatsapp or viber else 'Business numbers removed.')
     return _back('number')
 
@@ -158,7 +159,7 @@ def notice_send(request):
     def add(patient, values, when_label=''):
         text = messaging.render(body, values)
         shown = can_see_contact(profile, patient) and patient.phone
-        links = messaging.channel_links(patient.phone if shown else '', text, patient.messaging_app)
+        links = messaging.channel_links(patient.phone if shown else '', text, patient.messaging_app, profile.whatsapp_web)
         rows.append({'patient': patient, 'phone': patient.phone if shown else '', 'text': text, 'when': when_label, 'links': links, 'url': links[0]['url']})
 
     if audience == 'appointments':

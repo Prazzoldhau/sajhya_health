@@ -56,14 +56,14 @@ def appointment_whatsapp(profile, appt, kind='booked'):
     """wa.me link with the message ready; it opens the patient's own chat when their number is on file and visible to this user."""
     from . import messaging
     phone = appt.patient.phone if can_see_contact(profile, appt.patient) else ''
-    return messaging.whatsapp_url(phone, appointment_message(appt, kind))
+    return messaging.whatsapp_url(phone, appointment_message(appt, kind), profile.whatsapp_web)
 
 
 def appointment_links(profile, appt, kind='booked'):
     """Every way to send this appointment message to the patient (their own app first)."""
     from . import messaging
     phone = appt.patient.phone if can_see_contact(profile, appt.patient) else ''
-    return messaging.channel_links(phone, appointment_message(appt, kind), appt.patient.messaging_app)
+    return messaging.channel_links(phone, appointment_message(appt, kind), appt.patient.messaging_app, profile.whatsapp_web)
 
 
 def booked_prompt(request, profile):

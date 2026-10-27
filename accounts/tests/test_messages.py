@@ -222,3 +222,30 @@ class ViberTests(TestCase):
         page = self.client.get(reverse('billing:invoice', args=[entry.pk]))
         self.assertEqual([l['key'] for l in page.context['links']], ['viber', 'whatsapp', 'sms'])
         self.assertContains(page, 'Viber (opens chat, paste)')
+
+
+class WhatsAppWebTests(TestCase):
+    def test_whatsapp_links_can_go_to_whatsapp_web(self):
+        self.assertTrue(messaging.whatsapp_url('9841234567', 'Hi').startswith('https://wa.me/9779841234567?text='))
+        self.assertTrue(messaging.whatsapp_url('9841234567', 'Hi', web=True).startswith('https://web.whatsapp.com/send?phone=9779841234567&text='))
+        self.assertTrue(messaging.whatsapp_url('', 'Hi', web=True).startswith('https://web.whatsapp.com/send?text='))
+        links = messaging.channel_links('9841234567', 'Hi', 'whatsapp', web=True)
+        self.assertTrue(links[0]['url'].startswith('https://web.whatsapp.com/send?phone='))
+
+    def test_the_setting_changes_every_whatsapp_button(self):
+        user, profile = make_professional()
+        self.client.force_login(user)
+        patient = make_patient(profile)
+        patient.last_visit = timezone.localdate() - datetime.timedelta(days=40)
+        patient.save()
+        first = self.client.get(reverse('accounts:notice-send'), {'audience': 'followup'}).context['rows'][0]['links'][0]['url']
+        self.assertTrue(first.startswith('https://wa.me/'))
+        self.client.post(reverse('accounts:whatsapp-number'), {'whatsapp_number': '+977 970-2235789', 'whatsapp_web': 'on'})
+        profile.refresh_from_db()
+        self.assertTrue(profile.whatsapp_web)
+        after = self.client.get(reverse('accounts:notice-send'), {'audience': 'followup'}).context['rows'][0]['links'][0]['url']
+        self.assertTrue(after.startswith('https://web.whatsapp.com/send?phone=9779841000000'), after)
+        self.assertContains(self.client.get(reverse('accounts:messages')), 'To send from a different WhatsApp number')
+        self.client.post(reverse('accounts:whatsapp-number'), {'whatsapp_number': '+977 970-2235789'})  # unticked
+        profile.refresh_from_db()
+        self.assertFalse(profile.whatsapp_web)

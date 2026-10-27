@@ -55,16 +55,18 @@ def share_message(entry, url):
     return messaging.render(messaging.body_for(p, 'bill'), values)
 
 
-def whatsapp_chat(phone):
+def whatsapp_chat(phone, web=False):
     """The bare WhatsApp chat with this number (no message), for sending the invoice as a picture."""
     number = normalize_phone(phone)
+    if web:
+        return f'https://web.whatsapp.com/send?phone={number}' if number else 'https://web.whatsapp.com/'
     return f'https://wa.me/{number}' if number else 'https://web.whatsapp.com/'
 
 
 def whatsapp_link(entry, phone, url):
-    """wa.me opens WhatsApp with the message ready; with no usable number it opens the contact picker instead."""
-    number = normalize_phone(phone)
-    return f"https://wa.me/{number}?text={quote(share_message(entry, url))}" if number else f"https://wa.me/?text={quote(share_message(entry, url))}"
+    """Opens WhatsApp with the message ready; with no usable number it opens the contact picker instead."""
+    from accounts.messaging import whatsapp_url
+    return whatsapp_url(phone, share_message(entry, url), entry.professional.whatsapp_web)
 
 
 # ---------------------------------------------------------------- the PDF

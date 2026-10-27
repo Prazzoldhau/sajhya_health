@@ -145,6 +145,8 @@ class ProfessionalProfile(models.Model):
     practice_name = models.CharField(max_length=200, blank=True)
     practice_address = models.CharField(max_length=255, blank=True)
     practice_phone = models.CharField(max_length=20, blank=True)
+    whatsapp_web = models.BooleanField('Open WhatsApp in WhatsApp Web', default=False,
+                                       help_text='WhatsApp links open in the browser (web.whatsapp.com), where the business number is signed in, instead of the WhatsApp app on this computer.')
     viber_number = models.CharField('Business Viber number', max_length=20, blank=True, help_text='Printed in messages next to the WhatsApp number when the practice uses Viber too.')
     whatsapp_number = models.CharField('Business WhatsApp number', max_length=20, blank=True,
                                        help_text='Printed in messages and on invoices so patients know where to reach the practice.')
