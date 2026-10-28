@@ -818,3 +818,28 @@ class FrontDeskRegisteredByAndBillingTests(Base):
         self.assertEqual(self.client.get(reverse('clinics:desk'), {'tab': 'billing'}).status_code, 200)
         self.client.post(reverse('clinics:desk-bill-create'), {**bill, 'patient_id': 999999})
         self.assertEqual(BillingEntry.objects.count(), 1)  # a patient that is not the clinic's cannot be billed
+
+
+class ClinicLoginBillsFrontDeskPatientTests(Base):
+    CREDS = StaffLoginTests.CREDS
+    add_staff = StaffLoginTests.add_staff
+    setup_desk = FrontDeskRegisteredByAndBillingTests.setup_desk
+    register = FrontDeskRegisteredByAndBillingTests.register
+
+    """The clinic's own login bills (and packages) a patient reception registered: it was refused with 'Select a valid choice'."""
+    def test_clinic_login_can_bill_and_start_a_package_for_a_patient_the_front_desk_registered(self):
+        from billing.models import PatientPackage
+        self.setup_desk()
+        self.as_user('ram-desk')
+        self.register()
+        patient = Patient.objects.get(name='Walk In')
+        self.as_user('himal-clinic')
+        today = timezone.localdate().isoformat()
+        r = self.client.post(reverse('billing:entry-create'), {'entry_date': today, 'patient': patient.pk, 'patient_name': 'Walk In', 'age': '32', 'sex': 'F', 'contact_number': '9841000111',
+                                                              'service': 'Physiotherapy', 'rate': '500', 'payment_mode': 'cash', 'payment_status': 'paid', 'amount_given': '1000'})
+        self.assertEqual(r.status_code, 302)
+        entry = BillingEntry.objects.get()
+        self.assertEqual((entry.patient, entry.status_key, entry.carried_over), (patient, 'paid', 500))
+        self.client.post(reverse('billing:package-create'), {'patient': patient.pk, 'duration': '10_day', 'total_sessions': 10, 'total_amount': '5000', 'amount_paid_now': '0', 'start_date': today})
+        self.assertEqual(PatientPackage.objects.get().patient, patient)
+        self.assertEqual(self.client.get(reverse('accounts:reports'), {'from': today, 'to': today}).status_code, 200)

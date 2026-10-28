@@ -85,7 +85,7 @@ class BillingEntryForm(PaymentStatusMixin, forms.ModelForm):
 
     def __init__(self, *args, profile, **kwargs):
         super().__init__(*args, **kwargs)
-        self.fields['patient'].queryset = Patient.objects.filter(professional=profile)
+        self.fields['patient'].queryset = profile.workspace_patients()  # a clinic login also bills the patients its front desk registered
         self.fields['patient'].required = False
 
     def clean_patient_name(self):
@@ -202,7 +202,7 @@ class PatientPackageForm(forms.ModelForm):
 
     def __init__(self, *args, profile, **kwargs):
         super().__init__(*args, **kwargs)
-        self.fields['patient'].queryset = Patient.objects.filter(professional=profile)
+        self.fields['patient'].queryset = profile.workspace_patients()  # a clinic login also bills the patients its front desk registered
         self.fields['duration'].choices = [c for c in PatientPackage.DURATION_CHOICES if c[0] != 'custom']  # 'other' is the days box
         self.fields['duration'].required = False
         self.fields['custom_days'].label = 'Or type the number of days'

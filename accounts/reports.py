@@ -97,8 +97,8 @@ def build_report(profile, start, end):
     from profiles.models import AidEntry, LabEntry, MedicineEntry
 
     lo, hi = _bounds(start, end)
-    patients = Patient.objects.filter(professional=profile)
-    visits = Visit.objects.filter(patient__professional=profile, date__gte=start, date__lte=end)
+    patients = profile.workspace_patients()
+    visits = Visit.objects.filter(patient__in=patients, date__gte=start, date__lte=end)
     appointments = Appointment.objects.filter(professional=profile, kind=Appointment.APPOINTMENT, start__gte=lo, start__lt=hi)
     entries = BillingEntry.objects.filter(professional=profile, cancelled_at__isnull=True, entry_date__gte=start, entry_date__lte=end)
     payments = PackagePayment.objects.filter(package__professional=profile, created_at__gte=lo, created_at__lt=hi)
@@ -244,9 +244,9 @@ def build_report(profile, start, end):
         ['Prescriptions created', prescriptions.count()], ['Exercises prescribed', items.count()],
         ['Exercises ticked done', done], ['Completion rate', _pct(done, items.count())],
     ]))
-    aids = AidEntry.objects.filter(patient__professional=profile, issued_on__gte=start, issued_on__lte=end)
-    labs = LabEntry.objects.filter(patient__professional=profile, ordered_on__gte=start, ordered_on__lte=end)
-    meds = MedicineEntry.objects.filter(patient__professional=profile, start_date__gte=start, start_date__lte=end)
+    aids = AidEntry.objects.filter(patient__in=patients, issued_on__gte=start, issued_on__lte=end)
+    labs = LabEntry.objects.filter(patient__in=patients, ordered_on__gte=start, ordered_on__lte=end)
+    meds = MedicineEntry.objects.filter(patient__in=patients, start_date__gte=start, start_date__lte=end)
     sections.append(_section('Other clinical activity', ['Measure', 'Count'], [
         ['Aids issued', aids.count()], ['Lab tests ordered', labs.count()], ['Medicines started', meds.count()],
     ]))
