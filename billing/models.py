@@ -3,7 +3,7 @@ from datetime import timedelta
 from decimal import Decimal
 
 from django.conf import settings
-from django.db import models
+from django.db import models, transaction
 from django.utils import timezone
 
 PAYMENT_MODE_CHOICES = [('cash', 'Cash'), ('card', 'Card'), ('online', 'Online'), ('other', 'Other')]
@@ -86,13 +86,19 @@ class BillingEntry(models.Model):
 
     def record_payment(self, amount, payment_mode='cash', notes='', paid_on=None, user=None):
         """Log money received against this bill, capped at what is still owed. Returns the EntryPayment, or None if nothing was recorded."""
-        if amount is None or amount <= 0 or self.amount_due <= 0 or self.is_cancelled:
+        if amount is None or amount <= 0:
             return None
-        amount = min(Decimal(amount), self.amount_due)
-        payment = EntryPayment.objects.create(entry=self, amount=amount, payment_mode=payment_mode, notes=notes,
-                                              paid_on=paid_on or timezone.localdate(), recorded_by=user)
-        self.amount_paid += amount
-        self.save(update_fields=['amount_paid', 'updated_at'])
+        with transaction.atomic():
+            # two people receiving money for the same bill at once must not both count the same balance: lock the row and use its latest figures
+            fresh = BillingEntry.objects.select_for_update().get(pk=self.pk)
+            self.rate, self.amount_paid, self.cancelled_at = fresh.rate, fresh.amount_paid, fresh.cancelled_at
+            if self.amount_due <= 0 or self.is_cancelled:
+                return None
+            amount = min(Decimal(amount), self.amount_due)
+            payment = EntryPayment.objects.create(entry=self, amount=amount, payment_mode=payment_mode, notes=notes,
+                                                  paid_on=paid_on or timezone.localdate(), recorded_by=user)
+            self.amount_paid += amount
+            self.save(update_fields=['amount_paid', 'updated_at'])
         return payment
 
 
@@ -100,14 +106,16 @@ class BillingEntry(models.Model):
         """Settle this bill (as far as it goes) out of the patient's advance balance. Returns the amount used (0 if none)."""
         if self.patient_id is None or self.is_cancelled or self.amount_due <= 0:
             return Decimal('0')
-        amount = min(advance_balance(self.patient_id), self.amount_due, Decimal(limit) if limit is not None else self.amount_due)
-        if amount <= 0:
-            return Decimal('0')
-        payment = self.record_payment(amount, ADVANCE, notes='From advance', user=user)
-        if payment is None:
-            return Decimal('0')
-        PatientAdvance.objects.create(patient_id=self.patient_id, professional=self.professional, kind=PatientAdvance.USED, amount=-payment.amount,
-                                      entry=self, paid_on=payment.paid_on, recorded_by=user)
+        with transaction.atomic():
+            lock_patient(self.patient_id)  # the balance is read and spent under one lock: two bills cannot spend the same advance twice
+            amount = min(advance_balance(self.patient_id), self.amount_due, Decimal(limit) if limit is not None else self.amount_due)
+            if amount <= 0:
+                return Decimal('0')
+            payment = self.record_payment(amount, ADVANCE, notes='From advance', user=user)
+            if payment is None:
+                return Decimal('0')
+            PatientAdvance.objects.create(patient_id=self.patient_id, professional=self.professional, kind=PatientAdvance.USED, amount=-payment.amount,
+                                          entry=self, paid_on=payment.paid_on, recorded_by=user)
         return payment.amount
 
     def carry_over(self, amount, payment_mode='cash', user=None, paid_on=None):
@@ -194,6 +202,12 @@ class PatientAdvance(models.Model):
 
     def __str__(self):
         return f'{self.patient} {self.get_kind_display()} {self.amount}'
+
+
+def lock_patient(patient_id):
+    """Take a database lock on the patient's row, so money moves for one patient (advance used, refunded, taken) happen one at a time."""
+    from accounts.models import Patient
+    return Patient.objects.select_for_update().get(pk=patient_id)
 
 
 def advance_balance(patient_id):
@@ -334,12 +348,17 @@ class PatientPackage(models.Model):
 
     def record_payment(self, amount, payment_mode='cash', notes=''):
         """Log one payment, capped at what is still owed. Returns the PackagePayment, or None if nothing was recorded."""
-        if amount is None or amount <= 0 or self.is_fully_paid:
+        if amount is None or amount <= 0:
             return None
-        amount = min(Decimal(amount), self.amount_due)
-        payment = PackagePayment.objects.create(package=self, amount=amount, payment_mode=payment_mode, notes=notes)
-        self.amount_paid += amount
-        self.save()
+        with transaction.atomic():
+            fresh = PatientPackage.objects.select_for_update().get(pk=self.pk)  # same rule as bills: use the latest balance, one payment at a time
+            self.amount_paid, self.total_amount = fresh.amount_paid, fresh.total_amount
+            if self.is_fully_paid:
+                return None
+            amount = min(Decimal(amount), self.amount_due)
+            payment = PackagePayment.objects.create(package=self, amount=amount, payment_mode=payment_mode, notes=notes)
+            self.amount_paid += amount
+            self.save()
         return payment
 
 

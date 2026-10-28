@@ -3,6 +3,7 @@ from decimal import Decimal
 
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
+from django.db import transaction
 from django.db.models import F, Q, Sum
 from django.core.exceptions import ValidationError
 from django.core.mail import EmailMessage
@@ -18,7 +19,7 @@ from accounts.messaging import channel_links
 
 from . import invoice as inv
 from .forms import AdvanceForm, BillCorrectionForm, BillingEntryForm, EntryPaymentForm, PackagePaymentForm, PatientBillForm, PatientPackageForm
-from .models import ADVANCE, BillingEntry, EntryPayment, PackagePayment, PatientAdvance, PatientPackage, advance_balance
+from .models import ADVANCE, BillingEntry, EntryPayment, PackagePayment, PatientAdvance, PatientPackage, advance_balance, lock_patient
 
 
 def revenue_for(profile, date):
@@ -265,11 +266,13 @@ def advance_refund(request, patient_id):
         messages.error(request, first_error(form))
         return back
     amount = form.cleaned_data['amount']
-    if amount > advance_balance(patient.pk):
-        messages.error(request, f'Only NPR {advance_balance(patient.pk):g} is held for {patient.name}.')
-        return back
-    PatientAdvance.objects.create(patient=patient, professional=profile, kind=PatientAdvance.REFUND, amount=-amount, payment_mode=form.cleaned_data['payment_mode'],
-                                  notes=form.cleaned_data['notes'], recorded_by=request.user)
+    with transaction.atomic():
+        lock_patient(patient.pk)  # check the balance and pay it back under one lock, so a double click cannot refund it twice
+        if amount > advance_balance(patient.pk):
+            messages.error(request, f'Only NPR {advance_balance(patient.pk):g} is held for {patient.name}.')
+            return back
+        PatientAdvance.objects.create(patient=patient, professional=profile, kind=PatientAdvance.REFUND, amount=-amount, payment_mode=form.cleaned_data['payment_mode'],
+                                      notes=form.cleaned_data['notes'], recorded_by=request.user)
     messages.success(request, f'NPR {amount:g} refunded to {patient.name}. Balance: NPR {advance_balance(patient.pk):g}.')
     return back
 

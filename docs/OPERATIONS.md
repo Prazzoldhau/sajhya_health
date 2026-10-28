@@ -136,3 +136,7 @@ descriptions. It only loads a picture path if the file really exists under `stat
 sure the folder is deployed first (it is about 750 MB; consider rsync / an object store / Git LFS rather than a plain `git push`). Run it on a
 **fresh** database; on a database that held an older library add `--prune` once to remove the old entries. Videos are not files here: the YouTube
 and hosted (Supabase) links are stored as URLs and played from there.
+
+## Money integrity check
+
+`python manage.py check_money` compares every bill, package and advance with the payments behind it and lists any that disagree (it changes nothing; exit status 1 if something is wrong). Run it after restoring a backup or editing money rows in the admin, or on a schedule. Money moves are done under database locks (`select_for_update`), so two people receiving the same bill, or spending the same advance, at once cannot both count it.

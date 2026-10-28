@@ -833,3 +833,63 @@ class PackageDaysTests(BillingBase):
         self.assertEqual(PatientPackage.objects.count(), 0)
         self.start(duration='1_week')  # the old way still works
         self.assertEqual(PatientPackage.objects.get().length_days, 7)
+
+
+class MoneySafetyTests(BillingBase):
+    def bill(self, rate='500', **extra):
+        self.client.post(reverse('billing:patient-bill', args=[self.patient.pk]), {'entry_date': self.today.isoformat(), 'service': 'S', 'rate': rate, 'payment_mode': 'cash', 'payment_status': 'due', **extra})
+        return BillingEntry.objects.latest('id')
+
+    def test_two_people_receiving_the_same_bill_cannot_both_count_the_balance(self):
+        entry = self.bill()
+        first, second = BillingEntry.objects.get(pk=entry.pk), BillingEntry.objects.get(pk=entry.pk)  # two screens open on the same unpaid bill
+        self.assertIsNotNone(first.record_payment(500, 'cash'))
+        self.assertIsNone(second.record_payment(500, 'cash'))  # the second one sees it is already paid
+        entry.refresh_from_db()
+        self.assertEqual((entry.amount_paid, entry.payments.count()), (500, 1))
+        part = self.bill()
+        a, b = BillingEntry.objects.get(pk=part.pk), BillingEntry.objects.get(pk=part.pk)
+        a.record_payment(300, 'cash')
+        paid = b.record_payment(300, 'cash')  # only 200 was still owed
+        self.assertEqual(paid.amount, 200)
+        part.refresh_from_db()
+        self.assertEqual((part.amount_paid, part.status_key), (500, 'paid'))
+
+    def test_the_same_advance_cannot_be_spent_twice(self):
+        self.client.post(reverse('billing:advance-add', args=[self.patient.pk]), {'amount': '500', 'payment_mode': 'cash'})
+        one, two = self.bill(), self.bill()
+        a, b = BillingEntry.objects.get(pk=one.pk), BillingEntry.objects.get(pk=two.pk)
+        self.assertEqual(a.use_advance(), 500)
+        self.assertEqual(b.use_advance(), 0)  # nothing left
+        self.assertEqual(advance_balance(self.patient.pk), 0)
+
+    def test_a_double_refund_is_refused(self):
+        self.client.post(reverse('billing:advance-add', args=[self.patient.pk]), {'amount': '500', 'payment_mode': 'cash'})
+        for _ in range(2):
+            self.client.post(reverse('billing:advance-refund', args=[self.patient.pk]), {'amount': '500', 'payment_mode': 'cash'})
+        self.assertEqual(advance_balance(self.patient.pk), 0)  # not -500
+
+    def test_package_payments_use_the_latest_balance_too(self):
+        self.client.post(reverse('billing:package-create'), {'patient': self.patient.pk, 'duration': '10_day', 'total_sessions': 5, 'total_amount': '1000', 'amount_paid_now': '0', 'start_date': self.today.isoformat()})
+        package = PatientPackage.objects.get()
+        a, b = PatientPackage.objects.get(pk=package.pk), PatientPackage.objects.get(pk=package.pk)
+        a.record_payment(800)
+        self.assertEqual(b.record_payment(800).amount, 200)
+        package.refresh_from_db()
+        self.assertEqual(package.amount_paid, 1000)
+
+    def test_check_money_finds_drift_and_is_quiet_when_all_is_well(self):
+        from io import StringIO
+
+        from django.core.management import call_command
+        from django.core.management.base import CommandError
+        entry = self.bill()
+        entry.record_payment(200, 'cash')
+        self.client.post(reverse('billing:advance-add', args=[self.patient.pk]), {'amount': '300', 'payment_mode': 'cash'})
+        out = StringIO()
+        call_command('check_money', stdout=out)
+        self.assertIn('Money checks out', out.getvalue())
+        BillingEntry.objects.filter(pk=entry.pk).update(amount_paid=450)  # a figure edited by hand, away from its payments
+        with self.assertRaises(CommandError):
+            call_command('check_money', stdout=out, stderr=StringIO())
+        self.assertIn(entry.invoice_number, out.getvalue())

@@ -75,6 +75,16 @@
    * opts.onType     function() called when the user edits the text (e.g. to clear a hidden id)
    * returns { close }
    */
+  // A second click (or Enter) on a form that is already being sent is ignored, so a nervous double click cannot book, bill or take a payment twice.
+  if (!window.__sajhyaSubmitGuard) document.addEventListener('submit', function (e) {
+    var f = e.target;
+    if (e.defaultPrevented || !f || !f.method || f.method.toLowerCase() !== 'post') return;
+    if (f.dataset.sending) { e.preventDefault(); return; }
+    f.dataset.sending = '1';
+    setTimeout(function () { delete f.dataset.sending; }, 6000);  // long enough for the page to change, short enough to retry after a network failure
+  });
+  window.__sajhyaSubmitGuard = true;
+
   // A Viber link cannot carry a message, so the link carries it in data-copy and it is copied when the link is clicked (then paste in Viber).
   document.addEventListener('click', function (e) {
     var a = e.target.closest && e.target.closest('[data-copy]');
