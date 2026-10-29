@@ -74,6 +74,7 @@
     <span class="no">{{ forloop.counter }}</span>
     <div><b>{{ e.patient.name }}</b> <span class="hint">{{ e.patient.patient_code }}</span><div class="hint">Joined {{ e.joined_at|time:"H:i" }}{% if can_contact and e.patient.phone %} · {{ e.patient.phone }}{% endif %}</div></div>
     <span class="tone {% if e.status == 'called' %}good{% elif e.status == 'waiting' %}warn{% endif %}">{{ e.get_status_display }}</span>
+    {% if member.role == 'assistant' and e.status != 'completed' %}<a class="primary-btn" href="?tab=session&patient={{ e.patient_id }}" style="text-decoration:none;padding:7px 12px">Record treatment</a>{% endif %}
     {% if can_manage_queue and e.status == 'waiting' or can_manage_queue and e.status == 'called' %}
     <div class="acts">
       {% if e.status == 'waiting' %}<form method="post" action="{% url 'clinics:desk-queue-action' e.pk %}">{% csrf_token %}<button class="primary-btn" name="action" value="call">Call in</button></form>{% endif %}
@@ -102,6 +103,84 @@
     {% for f in form %}<label>{{ f.label }}{{ f }}{{ f.errors }}</label>{% endfor %}
     <button class="primary-btn" type="submit" style="width:fit-content">Register patient</button>
   </form>
+
+{% elif tab == 'session' %}
+  <p class="hint" style="margin-top:0">Record what was done with a patient: the treatment given and the exercises you supervised. The physiotherapist sees it on the patient's record with your name.</p>
+  {% if usable %}
+  <form method="post" action="{% url 'clinics:desk-session-create' %}" class="form" id="sessionForm" style="max-width:760px">{% csrf_token %}
+    <label>Patient<span class="search"><input type="text" id="sessSearch" placeholder="Search the clinic's patients..." autocomplete="off"></span></label>
+    <input type="hidden" name="patient_id" id="sessPatient"><span class="hint" id="sessChosen"></span>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px"><label>Date<input type="date" name="date" value="{{ today|date:'Y-m-d' }}" max="{{ today|date:'Y-m-d' }}"></label>
+      <label>Session type<select name="session_type">{% for v, l in session_types %}<option value="{{ v }}" {% if v == 'treatment' %}selected{% endif %}>{{ l }}</option>{% endfor %}</select></label></div>
+
+    <div class="tx-box" data-tx="treatments" data-kind="clinical">
+      <div class="tx-title">Treatment given <span class="hint">electrotherapy, heat / cold, traction, manual therapy...</span></div>
+      <div class="tx-chips"><button type="button" class="chip" data-quick="TENS (pain relief)|15-20 min">＋ TENS</button><button type="button" class="chip" data-quick="IFC / Interferential current|15-20 min">＋ IFC</button><button type="button" class="chip" data-quick="Therapeutic ultrasound|5-8 min">＋ Ultrasound</button><button type="button" class="chip" data-quick="Hot pack|15 min">＋ Hot pack</button><button type="button" class="chip" data-quick="Cold pack / cryotherapy|10-15 min">＋ Cold pack</button><button type="button" class="chip" data-quick="Cervical traction|10-15 min">＋ Traction</button></div>
+      <span style="position:relative;display:block"><input type="search" class="tx-search" placeholder="Search treatments (TENS, ultrasound, SWD...) or type your own and press Enter" autocomplete="off"></span>
+      <div class="tx-list"></div><input type="hidden" name="treatments" value="[]">
+    </div>
+    <div class="tx-box" data-tx="exercises" data-kind="exercise">
+      <div class="tx-title">Exercises supervised <span class="hint">search the exercise library; add the dose</span></div>
+      <span style="position:relative;display:block"><input type="search" class="tx-search" placeholder="Search exercises (bridging, wall slides, heel slides...) or type your own and press Enter" autocomplete="off"></span>
+      <div class="tx-list"></div><input type="hidden" name="exercises" value="[]">
+    </div>
+    <label>Notes (optional)<textarea name="notes" rows="2" maxlength="2000" placeholder="How the patient tolerated it, anything the physiotherapist should know"></textarea></label>
+    <label style="display:flex;gap:8px;align-items:center;font-weight:600"><input type="checkbox" name="finish_queue" value="1" checked style="width:auto;height:auto"> Mark the patient as done in today's queue</label>
+    <button class="primary-btn" type="submit" style="width:fit-content">Save</button>
+  </form>
+  {% else %}<div class="paused">The clinic's plan is not active, so recording is paused. Please ask the clinic owner.</div>{% endif %}
+
+  <h3 style="font-size:13px;margin:22px 0 6px">Recorded by you today</h3>
+  <table><thead><tr><th>PATIENT</th><th>TREATMENT GIVEN</th><th>EXERCISES SUPERVISED</th></tr></thead><tbody>
+  {% for v in my_sessions %}<tr><td><b>{{ v.patient.name }}</b><div class="hint">{{ v.patient.patient_code }}</div></td>
+    <td>{% for t in v.treatments.all %}{% if t.kind == 'clinical' %}<div>{{ t.name }}{% if t.dosage %} <span class="hint">{{ t.dosage }}</span>{% endif %}</div>{% endif %}{% endfor %}</td>
+    <td>{% for t in v.treatments.all %}{% if t.kind == 'exercise' %}<div>{{ t.name }}{% if t.dosage %} <span class="hint">{{ t.dosage }}</span>{% endif %}</div>{% endif %}{% endfor %}</td></tr>
+  {% empty %}<tr><td colspan="3" class="hint">Nothing recorded yet today.</td></tr>{% endfor %}</tbody></table>
+  <style>
+    .tx-box { border: 1px solid var(--line); border-radius: 10px; padding: 10px 12px; background: #f6faf7; display: grid; gap: 8px; }
+    .tx-title { font-size: 12px; font-weight: 800; color: var(--green-dark); } .tx-chips { display: flex; gap: 6px; flex-wrap: wrap; }
+    .tx-chips .chip { border: 1px solid #cfe6d8; background: #fff; border-radius: 14px; padding: 4px 10px; font-size: 11px; font-weight: 700; color: var(--green-dark); }
+    .tx-row { display: grid; grid-template-columns: 1fr 150px auto; gap: 6px; align-items: center; background: #fff; border: 1px solid var(--line); border-radius: 8px; padding: 6px 8px; }
+    .tx-row .nm { font-weight: 700; font-size: 12.5px; } .tx-row input { height: 32px; border: 1px solid var(--line); border-radius: 6px; padding: 0 8px; width: 100%; }
+    .tx-row button { border: 0; background: transparent; color: #9aa8a0; font-size: 16px; } .tx-search { width: 100%; height: 38px; border: 1px solid var(--line); border-radius: 8px; padding: 0 10px; background: #fff; }
+  </style>
+  {{ preset|json_script:"sess-preset" }}
+  <script>
+  (function () {
+    if (!window.SajhyaUI) return;
+    var form = document.getElementById('sessionForm'); if (!form) return;
+    SajhyaUI.patientPicker(document.getElementById('sessSearch'), document.getElementById('sessPatient'), { url: "{% url 'clinics:desk-patient-search' %}", hint: document.getElementById('sessChosen'), preset: JSON.parse(document.getElementById('sess-preset').textContent) });
+    form.querySelectorAll('[data-tx]').forEach(function (box) {
+      var kind = box.dataset.kind, list = box.querySelector('.tx-list'), json = box.querySelector('input[type=hidden]'), input = box.querySelector('.tx-search'), rows = [];
+      function draw() {
+        list.innerHTML = '';
+        rows.forEach(function (r, i) {
+          var row = document.createElement('div'); row.className = 'tx-row';
+          var nm = document.createElement('div'); nm.className = 'nm'; nm.textContent = r.name;
+          var dose = document.createElement('input'); dose.placeholder = kind === 'exercise' ? 'Sets x reps / time' : 'Dose / time'; dose.value = r.dosage || '';
+          dose.addEventListener('input', function () { r.dosage = dose.value; json.value = JSON.stringify(rows); });
+          dose.addEventListener('keydown', function (e) { if (e.key === 'Enter') e.preventDefault(); });
+          var del = document.createElement('button'); del.type = 'button'; del.textContent = '×'; del.setAttribute('aria-label', 'Remove');
+          del.addEventListener('click', function () { rows.splice(i, 1); draw(); });
+          row.appendChild(nm); row.appendChild(dose); row.appendChild(del); list.appendChild(row);
+        });
+        json.value = JSON.stringify(rows);
+      }
+      function add(name, dosage) {
+        name = (name || '').trim(); if (!name) return;
+        if (!rows.some(function (r) { return r.name.toLowerCase() === name.toLowerCase(); })) rows.push({ kind: kind, name: name, dosage: dosage || '' });
+        input.value = ''; draw();
+      }
+      SajhyaUI.picker(input, {
+        url: "{% url 'clinics:desk-treatment-search' %}", params: function () { return { kind: kind }; }, minChars: 1, emptyText: 'No match - press Enter to add what you typed',
+        render: function (r) { return '<b>' + SajhyaUI.esc(r.name) + '</b> <span style="color:#7c9186">' + SajhyaUI.esc(r.group) + (r.dose ? ' · ' + SajhyaUI.esc(r.dose) : '') + '</span>'; },
+        onPick: function (r) { add(r.name, r.dose); },
+      });
+      input.addEventListener('keydown', function (e) { if (e.key === 'Enter') { e.preventDefault(); if (input.value.trim()) add(input.value, ''); } });
+      box.querySelectorAll('[data-quick]').forEach(function (b) { b.addEventListener('click', function () { var p = b.dataset.quick.split('|'); add(p[0], p[1]); }); });
+    });
+  })();
+  </script>
 
 {% elif tab == 'billing' %}
   <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:14px">

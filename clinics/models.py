@@ -190,7 +190,7 @@ class ClinicMember(models.Model):
     PERMISSIONS = {
         MANAGER: {'overview', 'patients', 'contact', 'register', 'queue', 'queue_manage', 'billing', 'team'},
         RECEPTIONIST: {'patients', 'contact', 'register', 'queue', 'queue_manage', 'billing'},
-        ASSISTANT: {'patients', 'queue', 'queue_manage'},
+        ASSISTANT: {'patients', 'queue', 'queue_manage', 'record_session'},
         OTHER: {'queue'},
     }
 

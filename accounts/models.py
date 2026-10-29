@@ -285,6 +285,7 @@ class Visit(models.Model):
     patient = models.ForeignKey(Patient, on_delete=models.CASCADE, related_name='visits')
     date = models.DateField(default=timezone.localdate)
     therapist = models.CharField(max_length=200)
+    recorded_by_role = models.CharField(max_length=40, blank=True, help_text='Set when someone other than the physiotherapist recorded the session (for example a therapy assistant).')
     session_type = models.CharField(max_length=20, choices=SESSION_CHOICES, default=TREATMENT)
     progress = models.CharField(max_length=20, choices=PROGRESS_CHOICES, blank=True)
     notes = models.TextField(blank=True)

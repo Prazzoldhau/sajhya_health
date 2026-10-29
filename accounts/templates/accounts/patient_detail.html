@@ -82,7 +82,7 @@
       <thead><tr><th>DATE</th><th>THERAPIST</th><th>SESSION TYPE</th><th>TREATMENT GIVEN</th><th>PROGRESS</th></tr></thead>
       <tbody>
       {% for v in recent_visits %}
-        <tr><td>{{ v.date|date:"Y-m-d" }}</td><td><b>{{ v.therapist }}</b></td><td>{{ v.get_session_type_display }}</td><td style="white-space:normal;max-width:260px">{% for t in v.treatments.all %}{{ t.name }}{% if not forloop.last %}, {% endif %}{% empty %}-{% endfor %}</td><td>{% if v.progress %}<span class="status {{ v.progress }}">{{ v.get_progress_display }}</span>{% else %}-{% endif %}</td></tr>
+        <tr><td>{{ v.date|date:"Y-m-d" }}</td><td><b>{{ v.therapist }}</b>{% if v.recorded_by_role %}<div class="patient-id">{{ v.recorded_by_role }}</div>{% endif %}</td><td>{{ v.get_session_type_display }}</td><td style="white-space:normal;max-width:260px">{% for t in v.treatments.all %}{{ t.name }}{% if not forloop.last %}, {% endif %}{% empty %}-{% endfor %}</td><td>{% if v.progress %}<span class="status {{ v.progress }}">{{ v.get_progress_display }}</span>{% else %}-{% endif %}</td></tr>
       {% empty %}
         <tr><td colspan="5" class="empty" style="padding:22px;text-align:center;color:var(--muted)">No sessions recorded yet.</td></tr>
       {% endfor %}
@@ -164,7 +164,7 @@
       <thead><tr><th>DATE</th><th>THERAPIST</th><th>SESSION TYPE</th><th>TREATMENT GIVEN</th><th>PROGRESS</th><th>NOTES</th></tr></thead>
       <tbody>
       {% for v in visits %}
-        <tr><td>{{ v.date|date:"Y-m-d" }}</td><td><b>{{ v.therapist }}</b></td><td>{{ v.get_session_type_display }}</td><td style="white-space:normal;max-width:280px">{% for t in v.treatments.all %}<div><b>{{ t.name }}</b>{% if t.dosage %} <span class="patient-id">{{ t.dosage }}</span>{% endif %}</div>{% empty %}-{% endfor %}</td><td>{% if v.progress %}<span class="status {{ v.progress }}">{{ v.get_progress_display }}</span>{% else %}-{% endif %}</td><td style="white-space:normal;max-width:300px">{{ v.notes|default:"-" }}</td></tr>
+        <tr><td>{{ v.date|date:"Y-m-d" }}</td><td><b>{{ v.therapist }}</b>{% if v.recorded_by_role %}<div class="patient-id">{{ v.recorded_by_role }}</div>{% endif %}</td><td>{{ v.get_session_type_display }}</td><td style="white-space:normal;max-width:280px">{% for t in v.treatments.all %}<div><b>{{ t.name }}</b>{% if t.dosage %} <span class="patient-id">{{ t.dosage }}</span>{% endif %}</div>{% empty %}-{% endfor %}</td><td>{% if v.progress %}<span class="status {{ v.progress }}">{{ v.get_progress_display }}</span>{% else %}-{% endif %}</td><td style="white-space:normal;max-width:300px">{{ v.notes|default:"-" }}</td></tr>
       {% empty %}
         <tr><td colspan="6" style="padding:22px;text-align:center;color:var(--muted)">No sessions recorded yet.</td></tr>
       {% endfor %}

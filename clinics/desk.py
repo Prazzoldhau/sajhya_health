@@ -13,7 +13,7 @@ from django.utils import timezone
 from django.views.decorators.http import require_GET, require_POST
 
 from accounts.access import first_error
-from accounts.models import Patient
+from accounts.models import Patient, Visit
 from billing import catalog, exports
 from billing import invoice as inv
 from billing.forms import EntryPaymentForm, PatientBillForm
@@ -23,7 +23,7 @@ from .forms import FrontDeskPatientForm
 from .models import ClinicMember, QueueEntry
 
 TABS = [('overview', 'Overview', 'overview'), ('queue', 'Queue', 'queue'), ('patients', 'Patients', 'patients'),
-        ('register', 'Register patient', 'register'), ('billing', 'Billing', 'billing'), ('team', 'Team', 'team')]
+        ('register', 'Register patient', 'register'), ('session', 'Record treatment', 'record_session'), ('billing', 'Billing', 'billing'), ('team', 'Team', 'team')]
 
 
 def desk_member(request):
@@ -90,6 +90,8 @@ def desk(request, member):
         context['form'] = FrontDeskPatientForm()
     elif tab == 'billing':
         context.update(_billing_context(request, member))
+    elif tab == 'session':
+        context.update(_session_context(request, member))
     elif tab == 'team':
         context['members'] = clinic.members.filter(status=ClinicMember.ACTIVE).select_related('physio')
     return render(request, 'clinics/desk.html', context)
@@ -123,6 +125,63 @@ def _billing_context(request, member):
         'due_total': sum((e.amount_due for e in owed), 0), 'bill_form': PatientBillForm(initial={'entry_date': selected}), 'pay_form': EntryPaymentForm(), 'service_catalog': catalog.catalog_for(billing_owner(clinic)),
         'can_bill': member.clinic.is_usable,
     }
+
+
+def _session_context(request, member):
+    """The assistant's page for recording what was done: the patient, the treatment given, the exercises supervised."""
+    clinic = member.clinic
+    today = timezone.localdate()
+    preset = clinic.patients.filter(pk=request.GET.get('patient') or 0).first()
+    mine = (Visit.objects.filter(patient__clinic=clinic, date=today, therapist=member.name, recorded_by_role=member.get_role_display())
+            .select_related('patient').prefetch_related('treatments').order_by('-id'))
+    return {'today': today, 'preset': {'id': preset.pk, 'name': preset.name, 'code': preset.patient_code} if preset else None, 'my_sessions': list(mine[:30]),
+            'session_types': Visit.SESSION_CHOICES}
+
+
+@desk_view('record_session')
+@require_GET
+def treatment_search(request, member):
+    """Type-ahead for the treatment page: the clinical / electrotherapy list, or the exercise library (?kind=exercise)."""
+    from accounts.treatments import search_options
+    return JsonResponse({'results': search_options(request.GET.get('q', ''), request.GET.get('kind', ''))})
+
+
+@desk_view('record_session')
+@require_POST
+def session_create(request, member):
+    """The therapy assistant records a session: what treatment was given and which exercises were supervised. It becomes a session on the
+    patient's record (shown to the physiotherapist with the assistant's name and role) and can finish the patient in today's queue."""
+    from accounts.services import record_visit
+    from accounts.treatments import parse_treatments
+    clinic = member.clinic
+    back = redirect(f"{reverse('clinics:desk')}?tab=session")
+    patient = clinic.patients.exclude(status=Patient.DISCHARGED).filter(pk=request.POST.get('patient_id') or 0).first()
+    if patient is None:
+        messages.error(request, 'Search and pick one of the clinic\'s patients.')
+        return back
+    given = [{**t, 'kind': 'clinical'} for t in parse_treatments(request.POST.get('treatments'))]
+    supervised = [{**t, 'kind': 'exercise'} for t in parse_treatments(request.POST.get('exercises'))]
+    if not given and not supervised:
+        messages.error(request, 'Add the treatment that was given and/or the exercises that were supervised.')
+        return redirect(f"{reverse('clinics:desk')}?tab=session&patient={patient.pk}")
+    try:
+        day = datetime.date.fromisoformat(request.POST.get('date', ''))
+    except ValueError:
+        day = timezone.localdate()
+    if day > timezone.localdate() or day < timezone.localdate() - datetime.timedelta(days=30):
+        messages.error(request, 'The date must be today or a day in the last 30 days.')
+        return redirect(f"{reverse('clinics:desk')}?tab=session&patient={patient.pk}")
+    kind = request.POST.get('session_type')
+    kind = kind if kind in dict(Visit.SESSION_CHOICES) else Visit.TREATMENT
+    notes = (request.POST.get('notes') or '').strip()[:2000]
+    _, used = record_visit(patient, member.name, day, kind, '', notes, given + supervised, recorded_by_role=member.get_role_display())
+    if request.POST.get('finish_queue'):
+        start, end = _today()
+        QueueEntry.objects.filter(clinic=clinic, patient=patient, joined_at__gte=start, joined_at__lt=end,
+                                  status__in=[QueueEntry.WAITING, QueueEntry.CALLED]).update(status=QueueEntry.COMPLETED, finished_at=timezone.now())
+    messages.success(request, f'Recorded for {patient.name}: {len(given)} treatment{"s" if len(given) != 1 else ""} and {len(supervised)} supervised exercise{"s" if len(supervised) != 1 else ""}.'
+                     + (' One package session used.' if used else ''))
+    return back
 
 
 @desk_view('billing')

@@ -55,12 +55,19 @@ def treatment_search(request):
     """Type-ahead for the session form: clinical / electrotherapy options first, then the exercise library."""
     if workspace_profile(request) is None:
         return JsonResponse({'results': []})
-    q = request.GET.get('q', '').strip().lower()
+    return JsonResponse({'results': search_options(request.GET.get('q', ''), request.GET.get('kind', ''))})
+
+
+def search_options(query, kind=''):
+    """Clinical / electrotherapy options and exercise-library matches for a search text. kind 'clinical' or 'exercise' limits it to one list."""
+    q = (query or '').strip().lower()
     if not q:
-        return JsonResponse({'results': []})
-    results = [{'kind': 'clinical', 'name': name, 'dose': dose, 'group': group} for group, name, dose in OPTIONS if q in name.lower() or q in group.lower()][:10]
-    if len(q) >= 2:
+        return []
+    results = []
+    if kind != 'exercise':
+        results += [{'kind': 'clinical', 'name': name, 'dose': dose, 'group': group} for group, name, dose in OPTIONS if q in name.lower() or q in group.lower()][:10]
+    if kind != 'clinical' and len(q) >= 2:
         from exercises.models import ExerciseMain
-        for e in ExerciseMain.objects.filter(exercise_name__icontains=q).order_by('exercise_name')[:8]:
+        for e in ExerciseMain.objects.filter(exercise_name__icontains=q).order_by('exercise_name')[:10]:
             results.append({'kind': 'exercise', 'name': e.exercise_name, 'dose': e.dose_label, 'group': 'Exercise'})
-    return JsonResponse({'results': results})
+    return results

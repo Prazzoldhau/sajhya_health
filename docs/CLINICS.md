@@ -120,7 +120,7 @@ physiotherapist workspace and never see clinical records (diagnosis, notes, trea
 |---|---|---|---|---|---|
 | Manager | yes | yes | yes | yes | add, call, done, cancel; plus team list |
 | Receptionist | - | yes | yes | yes | add, call, done, cancel |
-| Therapy assistant | - | yes | no | no | call, done (cannot add or cancel) |
+| Therapy assistant | - | yes | no | no | call, done (cannot add or cancel); **records the treatment given and the exercises supervised** (Record treatment tab) |
 | Other staff | - | - | - | - | view only |
 
 Patients a staff member registers belong to the clinic (they count toward the monthly cap) and to the owning physiotherapist's team.

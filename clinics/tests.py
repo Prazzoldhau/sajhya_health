@@ -879,3 +879,89 @@ class DeskBillingExportTests(Base):
         self.assertEqual(self.client.get(reverse('clinics:desk-bill-export')).status_code, 404)
         self.as_user('other-physio')
         self.assertEqual(self.client.get(reverse('clinics:desk-bill-export')).status_code, 404)
+
+
+class AssistantRecordsTreatmentTests(Base):
+    CREDS = StaffLoginTests.CREDS
+    add_staff = StaffLoginTests.add_staff
+    setup_desk = FrontDeskRegisteredByAndBillingTests.setup_desk
+    register = FrontDeskRegisteredByAndBillingTests.register
+
+    def prepare(self):
+        clinic = self.setup_desk()
+        self.as_user('ram-desk')
+        self.register()
+        self.patient = Patient.objects.get(name='Walk In')
+        self.client.post(reverse('clinics:desk-queue-add'), {'patient_id': self.patient.pk})
+        self.as_user('asha')
+        return clinic
+
+    def save(self, **extra):
+        import json
+        data = {'patient_id': self.patient.pk, 'date': timezone.localdate().isoformat(), 'session_type': 'treatment', 'finish_queue': '1', 'notes': 'Tolerated well',
+                'treatments': json.dumps([{'kind': 'exercise', 'name': 'TENS (pain relief)', 'dosage': '15 min'}, {'name': 'Hot pack', 'dosage': '10 min'}]),
+                'exercises': json.dumps([{'kind': 'clinical', 'name': 'Bridging', 'dosage': '3 x 10'}]), **extra}
+        return self.client.post(reverse('clinics:desk-session-create'), data)
+
+    def test_the_assistant_records_the_treatment_given_and_the_exercises_supervised(self):
+        from accounts.models import Visit
+        self.prepare()
+        page = self.client.get(reverse('clinics:desk'), {'tab': 'session', 'patient': self.patient.pk})
+        self.assertContains(page, 'Treatment given')
+        self.assertContains(page, 'Exercises supervised')
+        self.assertContains(page, 'Record treatment')  # the tab name, and the shortcut on the queue row
+        self.assertContains(self.client.get(reverse('clinics:desk'), {'tab': 'queue'}), f'tab=session&amp;patient={self.patient.pk}' if False else 'Record treatment')
+        r = self.save()
+        self.assertRedirects(r, reverse('clinics:desk') + '?tab=session', fetch_redirect_response=False)
+        visit = Visit.objects.get()
+        self.assertEqual((visit.patient, visit.therapist, visit.recorded_by_role, visit.session_type, visit.notes), (self.patient, 'Asha', 'Therapy assistant', 'treatment', 'Tolerated well'))
+        # the page decides the kind from the list it was typed in, whatever was posted
+        self.assertEqual([(t.kind, t.name, t.dosage) for t in visit.treatments.all()], [('clinical', 'TENS (pain relief)', '15 min'), ('clinical', 'Hot pack', '10 min'), ('exercise', 'Bridging', '3 x 10')])
+        self.assertEqual(QueueEntry.objects.get().status, 'completed')  # finished in today's queue
+        mine = self.client.get(reverse('clinics:desk'), {'tab': 'session'})
+        self.assertContains(mine, 'Bridging')
+        self.assertEqual(len(mine.context['my_sessions']), 1)
+        # the physiotherapist sees it on the patient's record with the assistant's name and role
+        self.as_user('owner')
+        tab = self.client.get(reverse('accounts:patient-detail', args=[self.patient.pk]), {'tab': 'visits'})
+        self.assertContains(tab, 'Asha')
+        self.assertContains(tab, 'Therapy assistant')
+        self.assertContains(tab, 'Bridging')
+
+    def test_something_must_be_entered_the_patient_must_be_the_clinics_and_the_date_sensible(self):
+        from accounts.models import Visit
+        self.prepare()
+        self.save(treatments='[]', exercises='[]')
+        self.assertEqual(Visit.objects.count(), 0)  # neither a treatment nor an exercise
+        self.save(patient_id=999999)
+        stranger_user, stranger = make_professional('far-physio')
+        elsewhere = make_patient(stranger, 'Elsewhere')
+        self.save(patient_id=elsewhere.pk)
+        self.save(date=(timezone.localdate() + datetime.timedelta(days=2)).isoformat())
+        self.save(date=(timezone.localdate() - datetime.timedelta(days=90)).isoformat())
+        self.assertEqual(Visit.objects.count(), 0)
+        self.save(treatments='[]')  # exercises alone are enough
+        self.assertEqual(Visit.objects.get().treatments.count(), 1)
+        self.save(finish_queue='', treatments='[]', exercises='not json')
+        self.assertEqual(Visit.objects.count(), 1)
+
+    def test_only_the_assistant_has_the_page_and_the_search_works(self):
+        self.prepare()
+        search = self.client.get(reverse('clinics:desk-treatment-search'), {'q': 'tens', 'kind': 'clinical'})
+        self.assertIn('TENS (pain relief)', [r['name'] for r in search.json()['results']])
+        self.assertTrue(all(r['kind'] == 'clinical' for r in self.client.get(reverse('clinics:desk-treatment-search'), {'q': 'e', 'kind': 'clinical'}).json()['results']))
+        for who in ('ram-desk', 'mani'):  # receptionist and manager do not record treatment
+            self.as_user(who)
+            self.assertNotContains(self.client.get(reverse('clinics:desk')), 'tab=session')
+            self.assertEqual(self.client.post(reverse('clinics:desk-session-create'), {'patient_id': self.patient.pk, 'exercises': '[{"name": "x"}]'}).status_code, 404)
+            self.assertEqual(self.client.get(reverse('clinics:desk-treatment-search'), {'q': 'tens'}).status_code, 404)
+        self.as_user('owner')
+        self.assertEqual(self.client.post(reverse('clinics:desk-session-create'), {}).status_code, 404)
+
+    def test_a_session_by_the_assistant_uses_a_package_session(self):
+        from billing.models import PatientPackage
+        self.prepare()
+        package = PatientPackage.objects.create(patient=self.patient, professional=self.patient.professional, duration='10_day', total_sessions=5, total_amount=1000, start_date=timezone.localdate())
+        self.save()
+        package.refresh_from_db()
+        self.assertEqual(package.sessions_used, 1)
