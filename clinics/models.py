@@ -187,6 +187,8 @@ class ClinicMember(models.Model):
                                 help_text='Staff only: the sign-in the owner gave this person.')
     department = models.ForeignKey('accounts.Department', null=True, blank=True, on_delete=models.SET_NULL, related_name='logins',
                                    help_text='Department login only: the department whose schedule this sign-in shows.')
+    departments = models.ManyToManyField('accounts.Department', blank=True, related_name='team',
+                                         help_text='The departments this person works in. Someone with none set can be booked into any department.')
     specialty = models.CharField(max_length=80, blank=True, help_text='Doctor / therapist only, e.g. Ortho.')
     name = models.CharField(max_length=150, blank=True, help_text='Staff only; physios use their profile name.')
     phone = models.CharField(max_length=20, blank=True)
@@ -205,6 +207,13 @@ class ClinicMember(models.Model):
     @property
     def display_name(self):
         return self.physio.full_name if self.physio_id else self.name
+
+    def works_in(self, department):
+        """Can this person be booked into the department? Yes when no department is chosen, none are set for them, or it is one of theirs."""
+        if department is None:
+            return True
+        ids = [d.pk for d in self.departments.all()]
+        return not ids or department.pk in ids
 
     @property
     def label(self):

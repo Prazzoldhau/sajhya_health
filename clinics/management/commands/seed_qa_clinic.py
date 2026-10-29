@@ -17,6 +17,7 @@ from django.db import transaction
 from django.utils import timezone
 
 from accounts.models import Account, Appointment, Department, Patient, Profession, ProfessionalProfile
+from billing import catalog
 from clinics.login import set_clinic_login, set_staff_login
 from clinics.models import Clinic, ClinicMember, ClinicSubscription, QueueEntry
 
@@ -61,6 +62,10 @@ class Command(BaseCommand):
             workspace = clinic.workspace
             departments = {name: Department.objects.get_or_create(professional=workspace, name=name)[0] for *_, name in THERAPISTS}
             members = self.therapists(clinic)
+            for name, member in members.items():  # each therapist works in their own department
+                member.departments.set([departments[name]])
+            for department in departments.values():  # and each department has its own services to bill from (starting prices, editable)
+                catalog.seed_suggested(workspace, department)
             self.receptionist(clinic)
             patients = self.patients(clinic, workspace)
             self.appointments(workspace, patients, departments, members)

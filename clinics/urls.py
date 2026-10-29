@@ -32,6 +32,7 @@ urlpatterns = [
     path('<int:pk>/team/invite/', views.member_invite, name='invite'),
     path('<int:pk>/team/staff/', views.staff_add, name='staff-add'),
     path('<int:pk>/team/<int:member_id>/login/', views.staff_login, name='staff-login'),
+    path('<int:pk>/team/<int:member_id>/departments/', views.member_departments, name='member-departments'),
     path('<int:pk>/team/<int:member_id>/remove/', views.member_remove, name='member-remove'),
     path('<int:pk>/queue/add/', views.queue_add, name='queue-add'),
     path('<int:pk>/patients/search/', views.patient_search, name='patient-search'),

@@ -76,7 +76,7 @@
   <form method="post" action="{% url 'accounts:logout' %}">{% csrf_token %}<button class="out" type="submit">Log out</button></form>
 </header>
 <div class="shell">
-<nav><div class="label">Front desk</div>{% for key, label in tabs %}<a href="?tab={{ key }}" class="{% if key == tab %}on{% endif %}"><i>{% if key == 'overview' %}⌂{% elif key == 'schedule' %}▦{% elif key == 'queue' %}☰{% elif key == 'patients' %}♙{% elif key == 'register' %}＋{% elif key == 'session' %}✚{% elif key == 'billing' %}▣{% else %}◈{% endif %}</i>{{ label }}</a>{% endfor %}</nav>
+<nav><div class="label">Front desk</div>{% for key, label in tabs %}<a href="{% if key == 'billing' %}{{ billing_url }}{% else %}?tab={{ key }}{% endif %}" class="{% if key == tab %}on{% endif %}"><i>{% if key == 'overview' %}⌂{% elif key == 'schedule' %}▦{% elif key == 'queue' %}☰{% elif key == 'patients' %}♙{% elif key == 'register' %}＋{% elif key == 'session' %}✚{% elif key == 'billing' %}▣{% else %}◈{% endif %}</i>{{ label }}</a>{% endfor %}</nav>
 <div class="content">
 {% for m in messages %}<div class="msg {{ m.tags }}">{{ m }}</div>{% endfor %}
 <main>
@@ -88,8 +88,8 @@
     <a class="kpi" href="?tab=queue" style="text-decoration:none;color:inherit"><div class="k">Waiting in queue</div><div class="v">{{ queue_counts.waiting }}</div><div class="hint">{{ queue_counts.called }} in session · {{ queue_counts.completed }} done</div></a>
     <div class="kpi"><div class="k">Registered today</div><div class="v">{{ registered_today }}</div><div class="hint">{{ patient_total }} patients in all</div></div>
     {% if billed_today != None %}
-    <a class="kpi" href="?tab=billing" style="text-decoration:none;color:inherit"><div class="k">Billed today</div><div class="v">{{ billed_today|floatformat:"0" }}</div><div class="hint">received {{ received_today|floatformat:"0" }}</div></a>
-    <a class="kpi" href="?tab=billing" style="text-decoration:none;color:inherit"><div class="k">Still to collect</div><div class="v">{{ due_total|floatformat:"0" }}</div><div class="hint">across all unpaid bills</div></a>
+    <a class="kpi" href="{{ billing_url }}" style="text-decoration:none;color:inherit"><div class="k">Billed today</div><div class="v">{{ billed_today|floatformat:"0" }}</div><div class="hint">received {{ received_today|floatformat:"0" }}</div></a>
+    <a class="kpi" href="{{ billing_url }}" style="text-decoration:none;color:inherit"><div class="k">Still to collect</div><div class="v">{{ due_total|floatformat:"0" }}</div><div class="hint">across all unpaid bills</div></a>
     {% endif %}
     <div class="kpi"><div class="k">Team members</div><div class="v">{{ team_count }}</div></div>
   </div>
@@ -97,7 +97,7 @@
     {% if can_book %}<a class="primary-btn" href="?tab=schedule&book=1" style="text-decoration:none">＋ Book an appointment</a>{% endif %}
     {% if can_register %}<a class="secondary-btn" href="?tab=register" style="text-decoration:none">＋ Register a patient</a>{% endif %}
     {% if can_manage_queue %}<a class="secondary-btn" href="?tab=queue" style="text-decoration:none">＋ Add to queue</a>{% endif %}
-    {% if billed_today != None %}<a class="secondary-btn" href="?tab=billing" style="text-decoration:none">＋ New bill</a>{% endif %}
+    {% if billed_today != None %}<a class="secondary-btn" href="{{ billing_url }}{% if billing_url != '?tab=billing' %}?new=1{% endif %}" style="text-decoration:none">＋ New bill</a>{% endif %}
   </div>
   <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(340px,1fr));gap:16px">
     <section><h3 style="font-size:13px;margin:0 0 8px">Coming up today</h3>
@@ -199,7 +199,7 @@
           <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px"><label>Date<input type="date" name="date" value="{{ a.start|date:'Y-m-d' }}" required></label><label>Start<input type="time" name="start_time" value="{{ a.start|time:'H:i' }}" required></label><label>End<input type="time" name="end_time" value="{{ a.end|time:'H:i' }}" required></label></div>
           <input type="hidden" name="session_type" value="{{ a.session_type }}"><input type="hidden" name="notes" value="{{ a.notes }}">
           <label>Department<select name="department"><option value="">No department</option>{% for d in book_departments %}<option value="{{ d.pk }}" {% if d.pk == a.department_id %}selected{% endif %}>{{ d.name }}</option>{% endfor %}</select></label>
-          <label>Book with<select name="practitioner"><option value="">Anyone / not set</option>{% for pk, name in book_team %}<option value="{{ pk }}" {% if pk == a.practitioner_id %}selected{% endif %}>{{ name }}</option>{% endfor %}</select></label>
+          <label>Book with<select name="practitioner"><option value="">Anyone / not set</option>{% for pk, name, depts in book_team %}<option value="{{ pk }}" data-depts="{{ depts }}" {% if pk == a.practitioner_id %}selected{% endif %}>{{ name }}</option>{% endfor %}</select></label>
           <button class="primary-btn" type="submit" style="width:fit-content">Save changes</button>
         </form>
         <form method="post" action="{% url 'clinics:desk-appt-cancel' a.pk %}" onsubmit="return confirm('Cancel this appointment?')" style="margin-top:6px">{% csrf_token %}<button class="secondary-btn" type="submit">Cancel appointment</button></form>
@@ -222,7 +222,7 @@
       <div class="grid3">
         <label>Type<select name="session_type">{% for v, l in session_types %}<option value="{{ v }}" {% if v == 'treatment' %}selected{% endif %}>{{ l }}</option>{% endfor %}</select></label>
         <label>Department<select name="department"><option value="">No department</option>{% for d in book_departments %}<option value="{{ d.pk }}" {% if dept == d.pk|stringformat:'s' %}selected{% endif %}>{{ d.name }}</option>{% endfor %}</select></label>
-        <label>Book with<select name="practitioner"><option value="">Anyone / not set</option>{% for pk, name in book_team %}<option value="{{ pk }}">{{ name }}</option>{% endfor %}</select></label>
+        <label>Book with<select name="practitioner"><option value="">Anyone / not set</option>{% for pk, name, depts in book_team %}<option value="{{ pk }}" data-depts="{{ depts }}">{{ name }}</option>{% endfor %}</select></label>
       </div>
       <label>Notes (optional)<textarea name="notes" rows="2"></textarea></label>
       <button class="primary-btn" type="submit" style="width:fit-content">Book appointment</button>
@@ -241,7 +241,7 @@
         <input type="hidden" name="session_type" id="ed_session"><input type="hidden" name="notes" id="ed_notes">
         <div class="grid3" style="grid-template-columns:1fr 1fr">
           <label>Department<select name="department" id="ed_dept"><option value="">No department</option>{% for d in book_departments %}<option value="{{ d.pk }}">{{ d.name }}</option>{% endfor %}</select></label>
-          <label>Book with<select name="practitioner" id="ed_who"><option value="">Anyone / not set</option>{% for pk, name in book_team %}<option value="{{ pk }}">{{ name }}</option>{% endfor %}</select></label>
+          <label>Book with<select name="practitioner" id="ed_who"><option value="">Anyone / not set</option>{% for pk, name, depts in book_team %}<option value="{{ pk }}" data-depts="{{ depts }}">{{ name }}</option>{% endfor %}</select></label>
         </div>
         <button class="primary-btn" type="submit" style="width:fit-content">Save changes</button>
       </form>
@@ -261,6 +261,20 @@
     });
     document.addEventListener('keydown', function (e) { if (e.key === 'Escape') document.querySelectorAll('.modal.open').forEach(function (m) { m.classList.remove('open'); }); });
     document.addEventListener('click', function (e) { var a = e.target.closest('[data-copy]'); if (a && navigator.clipboard) navigator.clipboard.writeText(a.dataset.copy); });
+    // choosing a department narrows "Book with" to the people who work in it (people with no department set appear everywhere)
+    function narrowWho(deptSelect) {
+      var form = deptSelect.form, who = form && form.elements['practitioner'];
+      if (!who) return;
+      var d = deptSelect.value;
+      Array.prototype.forEach.call(who.options, function (o) {
+        if (!o.value) return;
+        var ds = o.dataset.depts, ok = !d || !ds || ds.split(',').indexOf(d) > -1;
+        o.hidden = !ok; o.disabled = !ok;
+      });
+      if (who.selectedOptions[0] && who.selectedOptions[0].disabled) who.value = '';
+    }
+    document.addEventListener('change', function (e) { if (e.target.name === 'department' && e.target.tagName === 'SELECT') narrowWho(e.target); });
+    document.querySelectorAll('select[name=department]').forEach(narrowWho);
     if (location.search.indexOf('book=1') > -1) open('bookModal');
     var GRID = {{ grid_start_min|default:0 }}, PX = {{ px_per_min|default:1.5 }};
     document.querySelectorAll('.day-col').forEach(function (col) {
@@ -294,7 +308,7 @@
           $('editForm').action = $('editForm').dataset.url.replace('/0/', '/' + d.id + '/');
           $('cancelForm').action = $('cancelForm').dataset.url.replace('/0/', '/' + d.id + '/');
           $('ed_date').value = d.date; $('ed_start').value = d.start; $('ed_end').value = d.end; $('ed_session').value = d.session; $('ed_notes').value = d.notes || '';
-          $('ed_dept').value = d.departmentId || ''; $('ed_who').value = d.practitionerId || '';
+          $('ed_dept').value = d.departmentId || ''; $('ed_who').value = d.practitionerId || ''; narrowWho($('ed_dept'));
         }
         open('apptModal');
       });

@@ -78,7 +78,7 @@ class BillingEntryForm(PaymentStatusMixin, forms.ModelForm):
             'patient_name': forms.TextInput(attrs={'placeholder': 'Full name', 'autocomplete': 'off'}),
             'age': forms.NumberInput(attrs={'placeholder': 'Age', 'min': 0, 'max': 130}),
             'contact_number': forms.TextInput(attrs={'placeholder': 'Optional'}),
-            'service': forms.TextInput(attrs={'placeholder': 'e.g. Physiotherapy'}),
+            'service': forms.TextInput(attrs={'placeholder': 'e.g. Speech therapy session'}),
             'rate': forms.NumberInput(attrs={'placeholder': 'Amount (NPR)', 'step': '0.01', 'min': 0}),
             'notes': forms.Textarea(attrs={'rows': 2, 'placeholder': 'Optional notes'}),
         }
@@ -102,7 +102,7 @@ class PatientBillForm(PaymentStatusMixin, forms.ModelForm):
         fields = ['entry_date', 'service', 'rate', 'payment_mode', 'notes']
         widgets = {
             'entry_date': date_widget(),
-            'service': forms.TextInput(attrs={'placeholder': 'e.g. Physiotherapy'}),
+            'service': forms.TextInput(attrs={'placeholder': 'e.g. Speech therapy session'}),
             'rate': forms.NumberInput(attrs={'placeholder': 'Amount (NPR)', 'step': '0.01', 'min': 0}),
             'notes': forms.Textarea(attrs={'rows': 2, 'placeholder': 'Optional notes'}),
         }
@@ -120,7 +120,7 @@ class BillCorrectionForm(forms.ModelForm):
         fields = ['entry_date', 'service', 'rate', 'payment_mode', 'notes']
         widgets = {
             'entry_date': date_widget(),
-            'service': forms.TextInput(attrs={'placeholder': 'e.g. Physiotherapy'}),
+            'service': forms.TextInput(attrs={'placeholder': 'e.g. Speech therapy session'}),
             'rate': forms.NumberInput(attrs={'placeholder': 'Amount (NPR)', 'step': '0.01', 'min': 0}),
             'notes': forms.Textarea(attrs={'rows': 2, 'placeholder': 'Optional notes'}),
         }

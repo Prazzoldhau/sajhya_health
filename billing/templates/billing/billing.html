@@ -1,4 +1,4 @@
-{% extends 'accounts/pro_base.html' %}
+{% extends base_template|default:'accounts/pro_base.html' %}
 {% block title %}Billing | Sajhya Health{% endblock %}
 {% block extra_css %}
   .bill-head { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-bottom: 14px; }
@@ -50,7 +50,7 @@
   <div class="table-wrap"><table>
     <thead><tr><th>PATIENT</th><th>INVOICE</th><th>DATE</th><th style="text-align:right">BILLED</th><th style="text-align:right">PAID</th><th style="text-align:right">DUE</th><th class="no-print"></th></tr></thead>
     <tbody>{% for e in owed %}<tr>
-      <td>{% if e.patient %}<a href="{% url 'accounts:patient-detail' e.patient.pk %}?tab=billing" style="color:inherit;text-decoration:none">{{ e.patient_name }}</a>{% else %}{{ e.patient_name }}{% endif %}{% if e.contact_number %}<div class="patient-id">{{ e.contact_number }}</div>{% endif %}</td>
+      <td>{% if e.patient %}{% if staff_mode %}{{ e.patient_name }}{% else %}<a href="{% url 'accounts:patient-detail' e.patient.pk %}?tab=billing" style="color:inherit;text-decoration:none">{{ e.patient_name }}</a>{% endif %}{% else %}{{ e.patient_name }}{% endif %}{% if e.contact_number %}<div class="patient-id">{{ e.contact_number }}</div>{% endif %}</td>
       <td>{{ e.invoice_number }}</td><td>{{ e.entry_date|date:"M j" }}</td>
       <td style="text-align:right">NPR {{ e.rate }}</td><td style="text-align:right">NPR {{ e.amount_paid }}</td><td style="text-align:right"><b style="color:#b78317">NPR {{ e.amount_due }}</b></td>
       <td class="no-print"><button type="button" class="table-action" data-pay data-url="{% url 'billing:entry-payment' e.pk %}" data-name="{{ e.patient_name }}" data-due="{{ e.amount_due }}" data-invoice="{{ e.invoice_number }}">Receive payment</button></td>
@@ -69,7 +69,7 @@
       {% for e in entries %}
         <tr{% if e.is_cancelled %} style="opacity:.55"{% endif %}>
           <td>{{ e.invoice_number }}{% if search %}<div class="patient-id">{{ e.entry_date|date:"M j, Y" }}</div>{% endif %}</td>
-          <td><div class="patient-cell"><span class="patient-avatar">{{ e.patient_name|slice:":2"|upper }}</span><div>{% if e.patient %}<a href="{% url 'accounts:patient-detail' e.patient.pk %}?tab=billing" style="color:inherit;text-decoration:none">{{ e.patient_name }}</a>{% else %}{{ e.patient_name }}{% endif %}<div class="patient-id">{% if e.age %}{{ e.age }} yrs{% endif %}{% if e.sex %} · {{ e.get_sex_display }}{% endif %}{% if e.contact_number %} · {{ e.contact_number }}{% endif %}</div></div></div></td>
+          <td><div class="patient-cell"><span class="patient-avatar">{{ e.patient_name|slice:":2"|upper }}</span><div>{% if e.patient %}{% if staff_mode %}{{ e.patient_name }}{% else %}<a href="{% url 'accounts:patient-detail' e.patient.pk %}?tab=billing" style="color:inherit;text-decoration:none">{{ e.patient_name }}</a>{% endif %}{% else %}{{ e.patient_name }}{% endif %}<div class="patient-id">{% if e.age %}{{ e.age }} yrs{% endif %}{% if e.sex %} · {{ e.get_sex_display }}{% endif %}{% if e.contact_number %} · {{ e.contact_number }}{% endif %}</div></div></div></td>
           <td>{{ e.service }}{% if e.notes %}<div class="patient-id">{{ e.notes }}</div>{% endif %}{% if e.created_by_name %}<div class="patient-id">Billed by {{ e.created_by_name }}{% if e.created_by_role %} ({{ e.created_by_role }}){% endif %}</div>{% endif %}</td>
           <td>{{ e.get_payment_mode_display }}</td>
           <td style="text-align:right"><b{% if e.is_cancelled %} style="text-decoration:line-through"{% endif %}>NPR {{ e.rate }}</b></td>
@@ -153,7 +153,7 @@
   // optional link to a registered patient: search, then pre-fill the details
   var input = $('billSearch');
   SajhyaUI.picker(input, {
-    url: "{% url 'accounts:appointment-patient-search' %}", emptyText: 'No matching patients',
+    url: "{{ patient_search_url }}", emptyText: 'No matching patients',
     render: function (p) { return '<b>' + SajhyaUI.esc(p.name) + '</b> <span style="color:#7c9186">' + SajhyaUI.esc(p.code) + '</span>'; },
     onPick: function (p) {
       f('patient').value = p.id; f('patient_name').value = p.name; f('contact_number').value = p.phone || '';
@@ -166,7 +166,7 @@
   // search a patient: pick from the list to see only that patient's bills (typing and pressing Enter searches names, phones and invoices)
   var find = $('billFind');
   SajhyaUI.picker(find, {
-    url: "{% url 'accounts:appointment-patient-search' %}", emptyText: 'No matching patients',
+    url: "{{ patient_search_url }}", emptyText: 'No matching patients',
     render: function (p) { return '<b>' + SajhyaUI.esc(p.name) + '</b> <span style="color:#7c9186">' + SajhyaUI.esc(p.code) + '</span>'; },
     onPick: function (p) { location.href = "{% url 'billing:billing' %}?patient=" + p.id; },
   });

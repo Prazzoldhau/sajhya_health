@@ -1,4 +1,4 @@
-{% extends 'accounts/pro_base.html' %}
+{% extends base_template|default:'accounts/pro_base.html' %}
 {% block title %}Packages | Sajhya Health{% endblock %}
 {% block extra_css %}
   .pk-head { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; margin-bottom: 14px; }
@@ -38,7 +38,7 @@
 {% for pk in packages %}
 <article class="pk">
   <div class="pk-top">
-    <span class="who"><a href="{% url 'accounts:patient-detail' pk.patient.pk %}?tab=billing">{{ pk.patient.name }}</a> <span class="patient-id" style="display:inline">{{ pk.patient.patient_code }}</span></span>
+    <span class="who">{% if staff_mode %}{{ pk.patient.name }}{% else %}<a href="{% url 'accounts:patient-detail' pk.patient.pk %}?tab=billing">{{ pk.patient.name }}</a>{% endif %} <span class="patient-id" style="display:inline">{{ pk.patient.patient_code }}</span></span>
     <b>{{ pk.get_duration_display }} package</b>
     <span class="patient-id" style="display:inline">{{ pk.start_date|date:"M j" }} – {{ pk.end_date|date:"M j, Y" }}</span>
     <span class="st {{ pk.effective_status }}">{{ pk.effective_status_display }}</span>
@@ -110,7 +110,7 @@
 
   // patient search for the new-package form (shared picker: blocks submit until a patient is chosen)
   SajhyaUI.patientPicker($('pkSearch'), $('id_patient'), {
-    url: "{% url 'accounts:appointment-patient-search' %}", hint: $('pkChosen'), preset: JSON.parse($('preset-data').textContent),
+    url: "{{ patient_search_url }}", hint: $('pkChosen'), preset: JSON.parse($('preset-data').textContent),
   });
   {% if open_new %}SajhyaUI.openModal('pkModal');{% endif %}
 })();

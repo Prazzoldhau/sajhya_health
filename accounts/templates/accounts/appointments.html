@@ -196,7 +196,7 @@
       <div class="two"><label>Date {{ appointment_form.date }}</label><label>Start time {{ appointment_form.start_time }}</label></div>
       <div class="two"><label>Duration {{ appointment_form.duration }}</label><label>Type {{ appointment_form.session_type }}</label></div>
       <label>Department {{ appointment_form.department }}{% if not departments %}<span class="hint">None set up yet. <a href="{% url 'accounts:departments' %}">Add departments</a> to book Physical Therapy, Occupational Therapy and so on.</span>{% endif %}</label>
-      {% if practitioners %}<label>Book with {{ appointment_form.practitioner }}</label>{% endif %}
+      {% if practitioners %}<label>Book with <select name="practitioner" id="id_practitioner"><option value="">Anyone / not set</option>{% for p in practitioners %}<option value="{{ p.id }}" data-depts="{{ p.depts }}">{{ p.name }}</option>{% endfor %}</select></label>{% endif %}
       <label>Notes {{ appointment_form.notes }}</label>
       <div class="pf-actions" style="padding:10px 0 0"><button type="button" class="secondary-btn" data-close>Cancel</button><button type="submit" class="primary-btn">Book appointment</button></div>
     </form>
@@ -250,7 +250,7 @@
       <div class="two"><label>End time <input type="time" name="end_time" id="e_end" required></label>
         <label id="e_type_wrap">Type <select name="session_type" id="e_type">{% for value, label in session_choices %}<option value="{{ value }}">{{ label }}</option>{% endfor %}</select></label></div>
       <label id="e_dept_wrap">Department <select name="department" id="e_dept"><option value="">No department</option>{% for d in departments %}<option value="{{ d.id }}">{{ d.name }}</option>{% endfor %}</select></label>
-      {% if practitioners %}<label id="e_who_wrap">Book with <select name="practitioner" id="e_who"><option value="">Anyone / not set</option>{% for p in practitioners %}<option value="{{ p.id }}">{{ p.name }}</option>{% endfor %}</select></label>{% endif %}
+      {% if practitioners %}<label id="e_who_wrap">Book with <select name="practitioner" id="e_who"><option value="">Anyone / not set</option>{% for p in practitioners %}<option value="{{ p.id }}" data-depts="{{ p.depts }}">{{ p.name }}</option>{% endfor %}</select></label>{% endif %}
       <label id="e_label_wrap">Label <input type="text" name="title" id="e_label" maxlength="150"></label>
       <label id="e_notes_wrap">Notes <textarea name="notes" id="e_notes" rows="2"></textarea></label>
       <div class="pf-actions" style="padding:10px 0 0"><button type="button" class="secondary-btn" data-close>Cancel</button><button type="submit" class="primary-btn">Save changes</button></div>
@@ -276,6 +276,20 @@
   var PX = {{ px_per_min }}, GRID_START = {{ grid_start_min }};
   function $(id) { return document.getElementById(id); }
   var openModal = SajhyaUI.openModal;
+  // choosing a department narrows "Book with" to the people who work in it (people with no department set appear everywhere)
+    function narrowWho(deptSelect) {
+      var form = deptSelect.form, who = form && form.elements['practitioner'];
+      if (!who) return;
+      var d = deptSelect.value;
+      Array.prototype.forEach.call(who.options, function (o) {
+        if (!o.value) return;
+        var ds = o.dataset.depts, ok = !d || !ds || ds.split(',').indexOf(d) > -1;
+        o.hidden = !ok; o.disabled = !ok;
+      });
+      if (who.selectedOptions[0] && who.selectedOptions[0].disabled) who.value = '';
+    }
+    document.addEventListener('change', function (e) { if (e.target.name === 'department' && e.target.tagName === 'SELECT') narrowWho(e.target); });
+    document.querySelectorAll('select[name=department]').forEach(narrowWho);
   function typing(e) { return /INPUT|TEXTAREA|SELECT/.test((e.target.tagName || '')); }
 
   function pad(n) { return (n < 10 ? '0' : '') + n; }
@@ -336,7 +350,7 @@
         $('e_date').value = d.date; $('e_start').value = d.start; $('e_end').value = d.end;
         $('e_type').value = d.session; $('e_label').value = d.rawTitle; $('e_notes').value = d.notes || '';
         $('e_dept').value = d.departmentId || '';
-        if ($('e_who')) { $('e_who').value = d.practitionerId || ''; $('e_who_wrap').hidden = !isAppt; }
+        if ($('e_who')) { $('e_who').value = d.practitionerId || ''; $('e_who_wrap').hidden = !isAppt; narrowWho($('e_dept')); }
         $('e_type_wrap').hidden = $('e_notes_wrap').hidden = $('e_dept_wrap').hidden = !isAppt;
         $('e_label_wrap').hidden = isAppt;
         openModal('editModal');

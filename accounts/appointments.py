@@ -222,7 +222,7 @@ def appointments(request):
         'range_label': f"{day_list[0]:%d %b}" + (f" - {day_list[-1]:%d %b %Y}" if days > 1 else f" {day_list[0]:%Y}"),
         'weeks': weeks, 'month_label': f'{month_first:%B %Y}', 'prev_month': prev_month, 'next_month': next_month,
         'departments': [{'id': d.pk, 'name': d.name, 'tint': tints[d.pk]} for d in departments], 'dept': chosen,
-        'practitioners': [{'id': m.pk, 'name': m.choice_label} for m in team_of(profile)],
+        'practitioners': practitioner_options(profile),
         'tasks': tasks, 'open_count': sum(not t.done for t in tasks), 'done_count': sum(t.done for t in tasks),
         'panel': request.GET.get('panel', 'calendar'),
         'appointment_form': AppointmentForm(profile=profile, initial={'date': today, 'duration': profile.default_session_minutes}),
@@ -243,6 +243,11 @@ def team_of(profile):
     return clinic.members.filter(status=ClinicMember.ACTIVE, role__in=ClinicMember.BOOKABLE_ROLES).select_related('physio')
 
 
+def practitioner_options(profile):
+    """The clinic team an appointment can be booked with, each with the departments they work in (empty = any), for the booking forms."""
+    return [{'id': m.pk, 'name': m.choice_label, 'depts': ','.join(str(d.pk) for d in m.departments.all())} for m in team_of(profile).prefetch_related('departments')]
+
+
 def apply_edit(profile, appt, d):
     """Move an appointment (or block) and change its details from a validated RescheduleForm; the department and the person it is with
     must belong to this practice, otherwise they are cleared."""
@@ -252,11 +257,16 @@ def apply_edit(profile, appt, d):
         appt.notes = d['notes']
         appt.department = profile.departments.filter(pk=int(d['department'])).first() if d['department'].isdigit() else None
         appt.practitioner = team_of(profile).filter(pk=int(d['practitioner'])).first() if d['practitioner'].isdigit() else None
+        dropped = None
+        if appt.practitioner is not None and not appt.practitioner.works_in(appt.department):
+            dropped, appt.practitioner = appt.practitioner.display_name, None  # they do not work in that department
     else:
         appt.title = d['title']
+        dropped = None
     appt.save()
     if appt.patient:
         sync_next_appointment(appt.patient)
+    return dropped
 
 
 def _back(date, days, booked=None, kind='booked'):
@@ -320,7 +330,9 @@ def appointment_edit(request, pk):
         messages.error(request, first_error(form))
         return _back(timezone.localtime(appt.start).date(), days)
     d = form.cleaned_data
-    apply_edit(profile, appt, d)
+    dropped = apply_edit(profile, appt, d)
+    if dropped:
+        messages.warning(request, f'{dropped} does not work in that department, so the appointment is not booked with anyone yet.')
     messages.success(request, 'Appointment rescheduled.' if appt.kind == Appointment.APPOINTMENT else 'Calendar updated.')
     return _back(d['date'], days, booked=appt.pk if appt.kind == Appointment.APPOINTMENT else None, kind='rescheduled')
 

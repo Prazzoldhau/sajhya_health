@@ -174,6 +174,8 @@ class ServiceItem(models.Model):
     professional = models.ForeignKey('accounts.ProfessionalProfile', on_delete=models.CASCADE, related_name='service_items')
     name = models.CharField(max_length=100)
     price = models.DecimalField(max_digits=10, decimal_places=2)
+    department = models.ForeignKey('accounts.Department', null=True, blank=True, on_delete=models.SET_NULL, related_name='service_items',
+                                   help_text='The department this service belongs to (Speech Therapy...). Leave empty for a service every department offers.')
     is_addon = models.BooleanField(default=False, help_text='An extra on top of a main service (shown with a +).')
     active = models.BooleanField(default=True, help_text='Untick to stop offering it without losing it.')
     order = models.PositiveSmallIntegerField(default=0)

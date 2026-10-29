@@ -14,19 +14,55 @@ SUGGESTED = [('Basic Physiotherapy', 400, False), ('Consultation', 200, False), 
              ('Taping', 200, True), ('Cupping', 100, True), ('CPM', 200, True)]
 
 
+# Starting points for the other departments of a clinic; every practice edits the names and prices to its own.
+SUGGESTED_BY_KIND = {
+    'physio': SUGGESTED,
+    'ot': [('OT Assessment', 500, False), ('Occupational Therapy Session', 600, False), ('Sensory Integration Session', 700, False), ('Hand Therapy Session', 600, False),
+           ('Splinting', 300, True), ('Home Programme Plan', 200, True)],
+    'speech': [('Speech Assessment', 600, False), ('Speech Therapy Session', 600, False), ('Language Therapy Session', 600, False), ('Voice Therapy Session', 600, False),
+               ('Swallowing Therapy Session', 700, False), ('Parent Counselling', 300, True)],
+    'behaviour': [('Behaviour Assessment', 700, False), ('Behaviour Therapy Session', 800, False), ('Parent Training', 500, False), ('Social Skills Group', 400, False),
+                  ('Home Visit', 500, True)],
+    'audiology': [('Hearing Test (Audiometry)', 500, False), ('Tympanometry', 400, False), ('Hearing Aid Trial', 300, False), ('Hearing Aid Fitting', 800, False),
+                  ('Ear Mould Impression', 500, True)],
+}
+
+
+def kind_of(department_name):
+    """Which suggested list suits a department, by its name; None for a name we do not recognise."""
+    name = (department_name or '').lower()
+    for key, words in (('physio', ('physio', 'physical')), ('ot', ('occupational',)), ('speech', ('speech', 'language')), ('behaviour', ('behav',)),
+                       ('audiology', ('audio', 'hearing'))):
+        if any(w in name for w in words):
+            return key
+    return None
+
+
 def catalog_for(profile):
-    """The active price list as plain dicts (for the bill forms' service picker)."""
-    return [{'id': s.pk, 'name': s.name, 'price': str(s.price), 'addon': s.is_addon}
-            for s in ServiceItem.objects.filter(professional=profile, active=True)]
+    """The active price list as plain dicts (for the bill forms' service picker). dept is the department's id, or '' for a service every department offers."""
+    return [{'id': s.pk, 'name': s.name, 'price': str(s.price), 'addon': s.is_addon, 'dept': s.department_id or '', 'dept_name': s.department.name if s.department_id else ''}
+            for s in ServiceItem.objects.filter(professional=profile, active=True).select_related('department')]
 
 
-def seed_suggested(profile):
-    """Add the standard list to a practice that has none yet. Returns how many were added."""
-    if ServiceItem.objects.filter(professional=profile).exists():
-        return 0
-    for order, (name, price, addon) in enumerate(SUGGESTED):
-        ServiceItem.objects.create(professional=profile, name=name, price=Decimal(price), is_addon=addon, order=order)
-    return len(SUGGESTED)
+def seed_suggested(profile, department=None):
+    """Add the standard list to a practice that has none yet (no department), or a department's suggested services (skipping names already on the list).
+    Returns how many were added."""
+    if department is None:
+        if ServiceItem.objects.filter(professional=profile).exists():
+            return 0
+        for order, (name, price, addon) in enumerate(SUGGESTED):
+            ServiceItem.objects.create(professional=profile, name=name, price=Decimal(price), is_addon=addon, order=order)
+        return len(SUGGESTED)
+    suggested = SUGGESTED_BY_KIND.get(kind_of(department.name), [])
+    have = {n.lower() for n in ServiceItem.objects.filter(professional=profile).values_list('name', flat=True)}
+    order = ServiceItem.objects.filter(professional=profile).count()
+    added = 0
+    for name, price, addon in suggested:
+        if name.lower() in have:
+            continue
+        ServiceItem.objects.create(professional=profile, department=department, name=name, price=Decimal(price), is_addon=addon, order=order + added)
+        added += 1
+    return added
 
 
 def parse_lines(raw):

@@ -1112,3 +1112,61 @@ class PriceListTests(BillingBase):
         other.post(reverse('billing:service-save', args=[item.pk]), {'name': 'Hacked', 'price': '1', 'kind': 'main', 'active': 'on'})
         item.refresh_from_db()
         self.assertEqual((item.name, item.price), ('Needling', 300))
+
+
+class DepartmentServicesTests(BillingBase):
+    """The price list is not only physiotherapy: a department can have its own services, offered when billing for it."""
+    def setUp(self):
+        super().setUp()
+        from accounts.models import Department
+        self.speech = Department.objects.create(professional=self.profile, name='Speech Therapy')
+        self.ot = Department.objects.create(professional=self.profile, name='Occupational Therapy')
+        self.hearing = Department.objects.create(professional=self.profile, name='Audiology')
+        self.custom = Department.objects.create(professional=self.profile, name='Neuro Rehabilitation')
+
+    def test_each_department_can_start_from_its_own_suggested_services(self):
+        from . import catalog
+        from .models import ServiceItem
+        self.assertEqual([catalog.kind_of(n) for n in ('Physical Therapy', 'Occupational Therapy', 'Speech Therapy', 'Behaviour Therapy', 'Audiology (Hearing)', 'Neuro Rehabilitation')],
+                         ['physio', 'ot', 'speech', 'behaviour', 'audiology', None])
+        self.client.post(reverse('billing:services-seed'), {'department': self.speech.pk})
+        names = set(ServiceItem.objects.filter(department=self.speech).values_list('name', flat=True))
+        self.assertIn('Speech Therapy Session', names)
+        self.assertIn('Speech Assessment', names)
+        self.client.post(reverse('billing:services-seed'), {'department': self.hearing.pk})
+        self.assertIn('Hearing Test (Audiometry)', ServiceItem.objects.filter(department=self.hearing).values_list('name', flat=True))
+        before = ServiceItem.objects.count()
+        self.client.post(reverse('billing:services-seed'), {'department': self.speech.pk})  # again: nothing duplicated
+        self.assertEqual(ServiceItem.objects.count(), before)
+        self.client.post(reverse('billing:services-seed'), {'department': self.custom.pk})  # no suggestions for an unknown kind
+        self.assertEqual(ServiceItem.objects.count(), before)
+        self.client.post(reverse('billing:services-seed'), {'department': 999999})  # not one of this practice's departments: the plain list, which only starts an empty price list
+        self.assertEqual(ServiceItem.objects.count(), before)
+
+    def test_a_service_can_be_given_a_department_and_the_picker_receives_it(self):
+        from .models import ServiceItem
+        self.client.post(reverse('billing:service-save', args=[0]), {'name': 'Hearing screening', 'price': '350', 'kind': 'main', 'department': self.hearing.pk})
+        item = ServiceItem.objects.get(name='Hearing screening')
+        self.assertEqual(item.department, self.hearing)
+        self.client.post(reverse('billing:service-save', args=[item.pk]), {'name': 'Hearing screening', 'price': '350', 'kind': 'main', 'department': '', 'active': 'on'})
+        item.refresh_from_db()
+        self.assertIsNone(item.department)  # every department
+        self.client.post(reverse('billing:service-save', args=[item.pk]), {'name': 'Hearing screening', 'price': '350', 'kind': 'main', 'department': self.ot.pk, 'active': 'on'})
+        catalog = self.client.get(reverse('billing:billing')).context['service_catalog']
+        row = [c for c in catalog if c['name'] == 'Hearing screening'][0]
+        self.assertEqual((row['dept'], row['dept_name']), (self.ot.pk, 'Occupational Therapy'))
+        stranger, other = make_professional('stranger')
+        from accounts.models import Department
+        foreign = Department.objects.create(professional=other, name='Foreign')
+        self.client.post(reverse('billing:service-save', args=[item.pk]), {'name': 'Hearing screening', 'price': '350', 'kind': 'main', 'department': foreign.pk, 'active': 'on'})
+        item.refresh_from_db()
+        self.assertIsNone(item.department)  # never attached to another practice's department
+
+    def test_the_price_list_page_and_bill_forms_are_not_physiotherapy_only(self):
+        self.client.post(reverse('billing:services-seed'), {'department': self.speech.pk})
+        page = self.client.get(reverse('billing:services'))
+        self.assertContains(page, 'Speech Therapy')
+        self.assertContains(page, 'Every department')
+        self.assertContains(page, 'Speech Therapy services')  # the suggestion button
+        self.assertNotContains(page, 'placeholder="e.g. Physiotherapy"')
+        self.assertContains(self.client.get(reverse('billing:billing')), 'data-svc-dept')  # the department filter in the bill form's picker

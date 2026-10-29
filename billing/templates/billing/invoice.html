@@ -1,4 +1,4 @@
-{% extends 'accounts/pro_base.html' %}
+{% extends base_template|default:'accounts/pro_base.html' %}
 {% load static %}
 {% block title %}Invoice {{ entry.invoice_number }} | Sajhya Health{% endblock %}
 {% block extra_css %}

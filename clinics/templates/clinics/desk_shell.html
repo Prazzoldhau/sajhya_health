@@ -1,0 +1,11 @@
+{% extends 'accounts/pro_base.html' %}
+{% comment %}The workspace layout for front-desk staff on pages shared with the professional workspace (billing): the front-desk menu instead of the clinical one.{% endcomment %}
+{% block tagline %}Front desk{% endblock %}
+{% block brand_url %}{% url 'clinics:desk' %}{% endblock %}
+{% block global_search %}{% endblock %}
+{% block profile_links %}<a href="{% url 'accounts:password-change' %}">Change password</a>{% endblock %}
+{% block sidebar %}
+<div class="nav-label">Front desk</div>
+{% for key, label in desk_tabs %}<a class="nav {% if key == active or key == 'schedule' and active == 'appointments' %}active{% endif %}" href="{% if key == 'billing' %}{% url 'billing:billing' %}{% else %}{% url 'clinics:desk' %}?tab={{ key }}{% endif %}"><span class="nav-icon">{% if key == 'overview' %}⌂{% elif key == 'schedule' %}▦{% elif key == 'queue' %}☰{% elif key == 'patients' %}♙{% elif key == 'register' %}＋{% elif key == 'session' %}✚{% elif key == 'billing' %}▣{% else %}◈{% endif %}</span><span class="nav-text">{{ label }}</span></a>{% endfor %}
+<div class="sidebar-bottom"><strong>{{ desk_member.clinic.name }}</strong><p>Signed in as {{ display_name }} ({{ role }}).</p></div>
+{% endblock %}

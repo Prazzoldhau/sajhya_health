@@ -13,7 +13,8 @@ from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
 from django.utils import timezone
 
-from accounts.access import actor_of, can_see_contact, first_error, own_patient, require_workspace, workspace_context, workspace_profile
+from accounts.access import actor_of, can_see_contact, first_error
+from .access import billing_context, billing_manager, billing_patient, billing_profile, billing_require, staff_member
 
 from accounts.messaging import channel_links
 
@@ -41,6 +42,13 @@ def _selected_date(request):
         return timezone.localdate()
 
 
+def _patient_page(request, patient):
+    """Where to go after billing one patient: their Billing tab, or (front-desk staff cannot open patient records) their bills in the billing book."""
+    if staff_member(request):
+        return f"{reverse('billing:billing')}?patient={patient.pk}"
+    return f"{reverse('accounts:patient-detail', args=[patient.pk])}?tab=billing"
+
+
 def _back(date):
     return redirect(f"{reverse('billing:billing')}?date={date.isoformat()}")
 
@@ -51,7 +59,7 @@ def _back(date):
 
 @login_required
 def billing(request):
-    profile = workspace_profile(request)
+    profile = billing_profile(request)
     if profile is None:
         return redirect('accounts:welcome')
     today = timezone.localdate()
@@ -98,7 +106,7 @@ def billing(request):
         entries = found
         owed = [e for e in owed if e in found]
 
-    context = workspace_context(request.user, profile)
+    context = billing_context(request, profile)
     context.update({
         'active': 'billing', 'billing_tab': 'book', 'search': search, 'form': form, 'entries': entries, 'selected': selected, 'today': today,
         'prev_date': selected - datetime.timedelta(days=1), 'next_date': selected + datetime.timedelta(days=1),
@@ -112,7 +120,7 @@ def billing(request):
 @login_required
 def entry_save(request, pk=None):
     """Create a billing entry, or edit one when pk is given."""
-    profile = require_workspace(request)
+    profile = billing_require(request)
     entry = get_object_or_404(BillingEntry, pk=pk, professional=profile) if pk else None
     if request.method != 'POST':
         return redirect('billing:billing')
@@ -145,8 +153,8 @@ def entry_save(request, pk=None):
 @login_required
 def patient_bill(request, patient_id):
     """Add a bill for one patient from that patient's Billing tab, then return to the tab."""
-    profile, patient = own_patient(request, patient_id)
-    back = redirect(f"{reverse('accounts:patient-detail', args=[patient.pk])}?tab=billing")
+    profile, patient = billing_patient(request, patient_id)
+    back = redirect(_patient_page(request, patient))
     if request.method != 'POST':
         return back
     form = PatientBillForm(request.POST)
@@ -176,13 +184,13 @@ def _advance_back(request, patient):
     nxt = request.POST.get('next', '')
     if nxt.startswith('/') and not nxt.startswith('//'):
         return redirect(nxt)
-    return redirect(f"{reverse('accounts:patient-detail', args=[patient.pk])}?tab=billing")
+    return redirect(_patient_page(request, patient))
 
 
 @login_required
 def advances(request):
     """Advances held: who has paid ahead, how much is left, and the full movement history of one patient."""
-    profile = workspace_profile(request)
+    profile = billing_profile(request)
     if profile is None:
         return redirect('accounts:welcome')
     moves = list(PatientAdvance.objects.filter(professional=profile).select_related('patient', 'entry').order_by('paid_on', 'created_at', 'id'))
@@ -224,7 +232,7 @@ def advances(request):
             ledger.append({'move': m, 'running': running})
         ledger.reverse()  # newest first
     held = sum((p['balance'] for p in people.values()), Decimal('0'))
-    context = workspace_context(request.user, profile)
+    context = billing_context(request, profile)
     context.update({
         'active': 'billing', 'billing_tab': 'advances', 'rows': rows, 'chosen': chosen, 'ledger': ledger, 'q': request.GET.get('q', '').strip(), 'show': show,
         'advance_held_total': held, 'held': held, 'holders': sum(1 for p in people.values() if p['balance'] > 0), 'month_taken': month[PatientAdvance.DEPOSIT],
@@ -237,7 +245,7 @@ def advances(request):
 @login_required
 def advance_add(request, patient_id):
     """Take money from a patient in advance, to be used against their next bills."""
-    profile, patient = own_patient(request, patient_id)
+    profile, patient = billing_patient(request, patient_id)
     back = _advance_back(request, patient)
     if request.method != 'POST':
         return back
@@ -260,7 +268,7 @@ def advance_add(request, patient_id):
 @login_required
 def advance_refund(request, patient_id):
     """Pay back part or all of what a patient has left in advance."""
-    profile, patient = own_patient(request, patient_id)
+    profile, patient = billing_patient(request, patient_id)
     back = _advance_back(request, patient)
     if request.method != 'POST':
         return back
@@ -283,7 +291,7 @@ def advance_refund(request, patient_id):
 @login_required
 def entry_payment(request, pk):
     """Receive money against a bill that was left on credit (in full or in part), then return to the page it came from."""
-    profile = require_workspace(request)
+    profile = billing_require(request)
     entry = get_object_or_404(BillingEntry, pk=pk, professional=profile)
     nxt = request.POST.get('next', '')
     back = redirect(nxt if nxt.startswith('/') and not nxt.startswith('//') else reverse('billing:billing'))
@@ -316,7 +324,7 @@ def entry_payment(request, pk):
 @login_required
 def entry_correct(request, pk):
     """Fix a bill's amount, date, service or how it was paid (cash / credit / part paid). The patient's details are not part of it."""
-    profile = require_workspace(request)
+    profile = billing_require(request)
     entry = get_object_or_404(BillingEntry, pk=pk, professional=profile)
     nxt = request.POST.get('next', '')
     back = redirect(nxt if nxt.startswith('/') and not nxt.startswith('//') else f"{reverse('billing:billing')}?date={entry.entry_date.isoformat()}")
@@ -338,7 +346,7 @@ def entry_correct(request, pk):
 @login_required
 def entry_cancel(request, pk):
     """Cancel a bill (a mistake, or the patient never came): it stays on record, struck through, and counts for nothing."""
-    profile = require_workspace(request)
+    profile = billing_require(request)
     entry = get_object_or_404(BillingEntry, pk=pk, professional=profile)
     nxt = request.POST.get('next', '')
     back = redirect(nxt if nxt.startswith('/') and not nxt.startswith('//') else f"{reverse('billing:billing')}?date={entry.entry_date.isoformat()}")
@@ -356,7 +364,7 @@ def entry_cancel(request, pk):
 
 @login_required
 def entry_restore(request, pk):
-    profile = require_workspace(request)
+    profile = billing_require(request)
     entry = get_object_or_404(BillingEntry, pk=pk, professional=profile)
     nxt = request.POST.get('next', '')
     back = redirect(nxt if nxt.startswith('/') and not nxt.startswith('//') else f"{reverse('billing:billing')}?date={entry.entry_date.isoformat()}")
@@ -369,7 +377,8 @@ def entry_restore(request, pk):
 
 @login_required
 def entry_delete(request, pk):
-    profile = require_workspace(request)
+    billing_manager(request)
+    profile = billing_require(request)
     entry = get_object_or_404(BillingEntry, pk=pk, professional=profile)
     if request.method == 'POST':
         date = entry.entry_date
@@ -388,7 +397,7 @@ PACKAGE_FILTERS = ['active', 'due', 'completed', 'expired', 'cancelled']
 
 @login_required
 def packages(request):
-    profile = workspace_profile(request)
+    profile = billing_profile(request)
     if profile is None:
         return redirect('accounts:welcome')
     all_packages = list(PatientPackage.objects.filter(professional=profile).select_related('patient').prefetch_related('payments'))
@@ -405,7 +414,7 @@ def packages(request):
         preset = profile.workspace_patients().filter(pk=request.GET['patient']).first()
 
     live = [p for p in all_packages if p.effective_status == 'active']
-    context = workspace_context(request.user, profile)
+    context = billing_context(request, profile)
     context.update({
         'advance_held_total': PatientAdvance.objects.filter(professional=profile).aggregate(t=Sum('amount'))['t'] or 0,
         'active': 'billing', 'billing_tab': 'packages', 'packages': shown, 'show': flt, 'filters': PACKAGE_FILTERS,
@@ -422,13 +431,13 @@ def packages(request):
 
 def _packages_back(request, patient=None):
     if request.POST.get('next') == 'patient' and patient is not None:
-        return redirect(f"{reverse('accounts:patient-detail', args=[patient.pk])}?tab=billing")
+        return redirect(_patient_page(request, patient))
     return redirect('billing:packages')
 
 
 @login_required
 def package_create(request):
-    profile = require_workspace(request)
+    profile = billing_require(request)
     if request.method != 'POST':
         return redirect('billing:packages')
     form = PatientPackageForm(request.POST, profile=profile)
@@ -447,7 +456,7 @@ def package_create(request):
 
 @login_required
 def package_payment(request, pk):
-    profile = require_workspace(request)
+    profile = billing_require(request)
     package = get_object_or_404(PatientPackage, pk=pk, professional=profile)
     if request.method == 'POST':
         form = PackagePaymentForm(request.POST)
@@ -463,7 +472,7 @@ def package_payment(request, pk):
 
 @login_required
 def package_cancel(request, pk):
-    profile = require_workspace(request)
+    profile = billing_require(request)
     package = get_object_or_404(PatientPackage, pk=pk, professional=profile)
     if request.method == 'POST':
         package.status = PatientPackage.CANCELLED
@@ -487,7 +496,7 @@ def _pdf_response(entry, online_url='', download=False):
 @login_required
 def invoice(request, pk):
     """The printable invoice with the ways to send it: download, print / save as PDF, WhatsApp, share, e-mail, copy link."""
-    profile = workspace_profile(request)
+    profile = billing_profile(request)
     if profile is None:
         return redirect('accounts:welcome')
     entry = get_object_or_404(BillingEntry.objects.select_related('patient'), pk=pk, professional=profile)
@@ -495,7 +504,7 @@ def invoice(request, pk):
     phone = entry.contact_number or (entry.patient.phone if entry.patient_id and can_see_contact(profile, entry.patient) else '')
     email = entry.patient.email if entry.patient_id and can_see_contact(profile, entry.patient) else ''
     back = request.GET.get('next', '')
-    context = workspace_context(request.user, profile)
+    context = billing_context(request, profile)
     from .models import advance_balance
     context.update({
         'lines': entry.line_items, 'carried': entry.carried_over, 'cash_handed_over': entry.cash_handed_over, 'advance_now': advance_balance(entry.patient_id) if entry.patient_id else 0,
@@ -510,7 +519,7 @@ def invoice(request, pk):
 @login_required
 def invoice_png(request, pk):
     """The invoice as a picture drawn on the server: what the page falls back to when the browser cannot draw it."""
-    profile = workspace_profile(request)
+    profile = billing_profile(request)
     if profile is None:
         raise Http404
     entry = get_object_or_404(BillingEntry, pk=pk, professional=profile)
@@ -522,7 +531,7 @@ def invoice_png(request, pk):
 
 @login_required
 def invoice_pdf(request, pk):
-    profile = workspace_profile(request)
+    profile = billing_profile(request)
     if profile is None:
         raise Http404
     entry = get_object_or_404(BillingEntry, pk=pk, professional=profile)
@@ -539,7 +548,7 @@ def invoice_public(request, token):
 
 @login_required
 def invoice_email(request, pk):
-    profile = workspace_profile(request)
+    profile = billing_profile(request)
     if profile is None:
         raise Http404
     entry = get_object_or_404(BillingEntry, pk=pk, professional=profile)
@@ -573,7 +582,7 @@ def invoice_email(request, pk):
 @login_required
 def sheet(request):
     """All bills as a spreadsheet-style table (filter, sort, totals) with the Excel / CSV download one click away."""
-    profile = workspace_profile(request)
+    profile = billing_profile(request)
     if profile is None:
         return redirect('accounts:welcome')
     f = exports.Filters.from_query(request.GET)
@@ -581,7 +590,7 @@ def sheet(request):
     rows = exports.sheet_rows(scope, f, limit=exports.MAX_SHEET_ROWS + 1)
     truncated = len(rows) > exports.MAX_SHEET_ROWS
     rows = rows[:exports.MAX_SHEET_ROWS]
-    context = workspace_context(request.user, profile)
+    context = billing_context(request, profile)
     context.update({'active': 'billing', 'billing_tab': 'sheet', 'f': f, 'qs': f.querystring(), 'rows': rows, 'totals': exports.totals(rows), 'truncated': truncated,
                     'shown': len(rows), 'statuses': exports.STATUSES, 'modes': exports.MODES, 'columns': [(h, key) for h, _, key in exports.BILL_COLUMNS],
                     'numeric': exports.NUMERIC,
@@ -598,7 +607,7 @@ def _download(content, filename, content_type):
 
 @login_required
 def export_xlsx(request):
-    profile = workspace_profile(request)
+    profile = billing_profile(request)
     if profile is None:
         raise Http404
     f = exports.Filters.from_query(request.GET)
@@ -608,7 +617,7 @@ def export_xlsx(request):
 
 @login_required
 def export_csv(request):
-    profile = workspace_profile(request)
+    profile = billing_profile(request)
     if profile is None:
         raise Http404
     f = exports.Filters.from_query(request.GET)
@@ -621,11 +630,14 @@ def export_csv(request):
 
 @login_required
 def services(request):
-    profile = workspace_profile(request)
+    billing_manager(request)
+    profile = billing_profile(request)
     if profile is None:
         return redirect('accounts:welcome')
-    context = workspace_context(request.user, profile)
-    context.update({'active': 'billing', 'billing_tab': 'services', 'items': ServiceItem.objects.filter(professional=profile),
+    context = billing_context(request, profile)
+    departments = list(profile.departments.all())
+    context.update({'active': 'billing', 'billing_tab': 'services', 'items': ServiceItem.objects.filter(professional=profile).select_related('department'),
+                    'departments': [{'obj': d, 'kind': catalog.kind_of(d.name)} for d in departments],
                     'advance_held_total': PatientAdvance.objects.filter(professional=profile).aggregate(t=Sum('amount'))['t'] or 0})
     return render(request, 'billing/services.html', context)
 
@@ -633,7 +645,8 @@ def services(request):
 @login_required
 def service_save(request, pk):
     """Add a service (pk 0) or change one: name, price, service / add-on, in use."""
-    profile = workspace_profile(request)
+    billing_manager(request)
+    profile = billing_profile(request)
     if profile is None or request.method != 'POST':
         return redirect('billing:services')
     item = get_object_or_404(ServiceItem, pk=pk, professional=profile) if pk else None
@@ -657,6 +670,7 @@ def service_save(request, pk):
     else:
         item.active = request.POST.get('active') == 'on'
     item.name, item.price, item.is_addon = name, price.quantize(Decimal('0.01')), request.POST.get('kind') == 'addon'
+    item.department = profile.departments.filter(pk=int(request.POST['department'])).first() if request.POST.get('department', '').isdigit() else None
     item.save()
     messages.success(request, f'{item.name} saved at NPR {item.price:g}.')
     return redirect('billing:services')
@@ -664,7 +678,8 @@ def service_save(request, pk):
 
 @login_required
 def service_delete(request, pk):
-    profile = workspace_profile(request)
+    billing_manager(request)
+    profile = billing_profile(request)
     if profile is None or request.method != 'POST':
         return redirect('billing:services')
     ServiceItem.objects.filter(pk=pk, professional=profile).delete()
@@ -674,9 +689,14 @@ def service_delete(request, pk):
 
 @login_required
 def services_seed(request):
-    profile = workspace_profile(request)
+    billing_manager(request)
+    profile = billing_profile(request)
     if profile is None or request.method != 'POST':
         return redirect('billing:services')
-    added = catalog.seed_suggested(profile)
-    messages.success(request, f'{added} services added. Change the prices to yours.' if added else 'Your price list already has services.')
+    department = profile.departments.filter(pk=int(request.POST['department'])).first() if request.POST.get('department', '').isdigit() else None
+    added = catalog.seed_suggested(profile, department)
+    if added:
+        messages.success(request, f'{added} services added' + (f' for {department.name}' if department else '') + '. Change the prices to yours.')
+    else:
+        messages.info(request, 'Those services are already on your price list.' if department else 'Your price list already has services.')
     return redirect('billing:services')

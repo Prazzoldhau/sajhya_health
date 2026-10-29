@@ -376,6 +376,13 @@ class AppointmentForm(forms.Form):
         self.fields['practitioner'].label_from_instance = lambda m: m.choice_label
         self.fields['patient'].queryset = profile.workspace_patients().exclude(status=Patient.DISCHARGED).order_by('name')
 
+    def clean(self):
+        data = super().clean()
+        who, department = data.get('practitioner'), data.get('department')
+        if who and department and not who.works_in(department):
+            self.add_error('practitioner', f'{who.display_name} does not work in {department.name}. Choose someone from that department.')
+        return data
+
 
 class RescheduleForm(forms.Form):
     """Change the day, time or details of an appointment or a calendar block already on the calendar."""

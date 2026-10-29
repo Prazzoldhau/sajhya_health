@@ -136,7 +136,8 @@ def _detail_context(request, profile, clinic, is_owner, tab, form=None, login_fo
             'month_visits': sum(v['n'] for v in visits), 'percent': percent, 'missing': missing, 'module_rows': clinic.module_rows,
         })
     elif tab == 'team':
-        context.update({'members': clinic.members.exclude(status__in=[ClinicMember.LEFT, ClinicMember.DECLINED]).select_related('physio'),
+        context.update({'members': clinic.members.exclude(status__in=[ClinicMember.LEFT, ClinicMember.DECLINED]).select_related('physio').prefetch_related('departments'),
+                        'clinic_departments': clinic.calendar_owner.departments.all(),
                         'staff_form': StaffForm(clinic=clinic), 'past': clinic.members.filter(status__in=[ClinicMember.LEFT, ClinicMember.DECLINED]).select_related('physio')})
     elif tab == 'patients':
         patients = clinic.patients.select_related('professional').order_by('-last_activity', '-id')
@@ -207,6 +208,21 @@ def staff_login(request, pk, member_id):
     return _back(clinic, 'team')
 
 
+@login_required
+@require_POST
+def member_departments(request, pk, member_id):
+    """The owner sets which departments a team member works in (so only they are offered when booking into those departments)."""
+    profile, clinic = clinic_for_owner(request, pk)
+    member = get_object_or_404(ClinicMember, pk=member_id, clinic=clinic)
+    if member.role == ClinicMember.DEPARTMENT:
+        raise Http404
+    chosen = clinic.calendar_owner.departments.filter(pk__in=[int(i) for i in request.POST.getlist('departments') if i.isdigit()])
+    member.departments.set(chosen)
+    names = ', '.join(d.name for d in chosen)
+    messages.success(request, f'{member.display_name} works in {names}.' if names else f'{member.display_name} can be booked into any department.')
+    return _back(clinic, 'team')
+
+
 def _plan_needed(request, clinic):
     """Team and queue work once the Clinic plan is active; until then send the owner back with an explanation."""
     if clinic.is_usable:
@@ -266,6 +282,7 @@ def staff_add(request, pk):
         member = form.save(commit=False)
         member.clinic, member.status, member.joined_at = clinic, ClinicMember.ACTIVE, timezone.now()
         member.save()
+        form.save_m2m()
         messages.success(request, f'{member.name} added as {member.get_role_display().lower()}.')
     else:
         messages.error(request, first_error(form))

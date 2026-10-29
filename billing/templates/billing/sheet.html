@@ -1,4 +1,4 @@
-{% extends 'accounts/pro_base.html' %}
+{% extends base_template|default:'accounts/pro_base.html' %}
 {% block title %}Billing sheet | Sajhya Health{% endblock %}
 {% block extra_css %}
   .sh-bar { display: flex; gap: 10px; flex-wrap: wrap; align-items: end; background: #fff; border: 1px solid var(--line); border-radius: 12px; padding: 12px 14px; margin-bottom: 12px; }

@@ -1,11 +1,11 @@
-{% extends 'accounts/pro_base.html' %}
+{% extends base_template|default:'accounts/pro_base.html' %}
 {% block title %}Services & prices | Sajhya Health{% endblock %}
 {% block extra_css %}
   .sv-card { background: #fff; border: 1px solid var(--line); border-radius: 12px; padding: 14px 16px; margin-bottom: 14px; }
-  .sv-row { display: grid; grid-template-columns: minmax(160px, 1fr) 120px 140px auto auto; gap: 8px; align-items: center; padding: 8px 0; border-bottom: 1px solid #eef3ef; }
+  .sv-row { display: grid; grid-template-columns: minmax(160px, 1fr) 110px 150px 130px auto auto; gap: 8px; align-items: center; padding: 8px 0; border-bottom: 1px solid #eef3ef; }
   .sv-row input[type=text], .sv-row input[type=number], .sv-row select { height: 36px; border: 1px solid var(--line); border-radius: 8px; padding: 0 9px; width: 100%; background: #fff; }
   .sv-row form { display: contents; } .sv-row.off { opacity: .55; }
-  .sv-head { font-size: 10.5px; font-weight: 800; color: var(--muted); letter-spacing: .05em; text-transform: uppercase; display: grid; grid-template-columns: minmax(160px, 1fr) 120px 140px auto auto; gap: 8px; padding-bottom: 6px; border-bottom: 1px solid var(--line); }
+  .sv-head { font-size: 10.5px; font-weight: 800; color: var(--muted); letter-spacing: .05em; text-transform: uppercase; display: grid; grid-template-columns: minmax(160px, 1fr) 110px 150px 130px auto auto; gap: 8px; padding-bottom: 6px; border-bottom: 1px solid var(--line); }
   @media (max-width: 800px) { .sv-row, .sv-head { grid-template-columns: 1fr 1fr; } .sv-head { display: none; } }
 {% endblock %}
 
@@ -16,12 +16,13 @@
 
 <section class="sv-card">
   {% if items %}
-  <div class="sv-head"><span>NAME</span><span>PRICE (NPR)</span><span>TYPE</span><span></span><span></span></div>
+  <div class="sv-head"><span>NAME</span><span>PRICE (NPR)</span><span>DEPARTMENT</span><span>TYPE</span><span></span><span></span></div>
   {% for s in items %}
   <div class="sv-row {% if not s.active %}off{% endif %}">
     <form method="post" action="{% url 'billing:service-save' s.pk %}">{% csrf_token %}
       <input type="text" name="name" value="{{ s.name }}" maxlength="100" required>
       <input type="number" name="price" value="{{ s.price }}" step="0.01" min="0" required>
+      <select name="department"><option value="">Every department</option>{% for d in departments %}<option value="{{ d.obj.pk }}" {% if s.department_id == d.obj.pk %}selected{% endif %}>{{ d.obj.name }}</option>{% endfor %}</select>
       <select name="kind"><option value="main" {% if not s.is_addon %}selected{% endif %}>Service</option><option value="addon" {% if s.is_addon %}selected{% endif %}>Add-on</option></select>
       <label style="font-size:12px;display:flex;gap:5px;align-items:center;white-space:nowrap"><input type="checkbox" name="active" {% if s.active %}checked{% endif %}> In use</label>
       <button class="primary-btn" type="submit" style="height:34px">Save</button>
@@ -32,15 +33,21 @@
   {% else %}
   <p style="margin:0 0 10px">No services yet. Start from the usual list and change the prices to yours:</p>
   <form method="post" action="{% url 'billing:services-seed' %}">{% csrf_token %}<button class="primary-btn" type="submit">Add the standard list</button></form>
-  <p class="patient-id" style="margin:8px 0 0">Basic Physiotherapy 400 and Consultation 200, with add-ons Manual therapy 200, Needling 300, Taping 200, Cupping 100 and CPM 200.</p>
+  <p class="patient-id" style="margin:8px 0 0">The physiotherapy list: Basic Physiotherapy 400 and Consultation 200, with add-ons Manual therapy 200, Needling 300, Taping 200, Cupping 100 and CPM 200.</p>
   {% endif %}
+  {% for d in departments %}{% if d.kind %}
+  {% if forloop.first %}<div style="margin-top:14px;font-weight:800">Start a department from a suggested list</div><div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:6px">{% endif %}
+  <form method="post" action="{% url 'billing:services-seed' %}" style="margin:0">{% csrf_token %}<input type="hidden" name="department" value="{{ d.obj.pk }}"><button class="secondary-btn" type="submit">＋ {{ d.obj.name }} services</button></form>
+  {% endif %}{% endfor %}
+  {% if departments %}</div><p class="patient-id" style="margin:8px 0 0">Prices are only starting points: change them to yours. Services you tag with a department show up when you pick that department while billing.</p>{% endif %}
 </section>
 
 <section class="sv-card">
   <div style="font-weight:800;margin-bottom:8px">Add a service or add-on</div>
-  <form method="post" action="{% url 'billing:service-save' 0 %}" style="display:grid;grid-template-columns:minmax(160px,1fr) 130px 150px auto;gap:8px;align-items:center">{% csrf_token %}
-    <input type="text" name="name" placeholder="e.g. Ultrasound" maxlength="100" required style="height:38px;border:1px solid var(--line);border-radius:8px;padding:0 10px">
+  <form method="post" action="{% url 'billing:service-save' 0 %}" style="display:grid;grid-template-columns:minmax(160px,1fr) 130px 170px 150px auto;gap:8px;align-items:center">{% csrf_token %}
+    <input type="text" name="name" placeholder="e.g. Speech therapy session" maxlength="100" required style="height:38px;border:1px solid var(--line);border-radius:8px;padding:0 10px">
     <input type="number" name="price" placeholder="Price" step="0.01" min="0" required style="height:38px;border:1px solid var(--line);border-radius:8px;padding:0 10px">
+    <select name="department" style="height:38px;border:1px solid var(--line);border-radius:8px;padding:0 10px"><option value="">Every department</option>{% for d in departments %}<option value="{{ d.obj.pk }}">{{ d.obj.name }}</option>{% endfor %}</select>
     <select name="kind" style="height:38px;border:1px solid var(--line);border-radius:8px;padding:0 10px"><option value="main">Service</option><option value="addon">Add-on</option></select>
     <button class="primary-btn" type="submit">Add</button>
   </form>

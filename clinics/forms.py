@@ -140,14 +140,19 @@ class StaffForm(forms.ModelForm):
 
     class Meta:
         model = ClinicMember
-        fields = ('name', 'role', 'specialty', 'department', 'phone', 'email')
+        fields = ('name', 'role', 'specialty', 'department', 'departments', 'phone', 'email')
+        widgets = {'departments': forms.CheckboxSelectMultiple}
+        labels = {'departments': 'Works in these departments'}
 
     def __init__(self, *args, clinic=None, **kwargs):
         super().__init__(*args, **kwargs)
         self.fields['name'].required = False  # a department login is named after its department
         self.fields['department'].required = False
         self.fields['department'].empty_label = 'Only for a department login'
-        self.fields['department'].queryset = clinic.calendar_owner.departments.all() if clinic is not None else self.fields['department'].queryset.none()
+        owned = clinic.calendar_owner.departments.all() if clinic is not None else self.fields['department'].queryset.none()
+        self.fields['department'].queryset = owned
+        self.fields['departments'].queryset = owned
+        self.fields['departments'].required = False
 
     def clean(self):
         data = super().clean()

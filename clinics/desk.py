@@ -13,7 +13,7 @@ from django.utils import timezone
 from django.views.decorators.http import require_GET, require_POST
 
 from accounts.access import first_error
-from accounts.appointments import PX_PER_MIN, apply_edit, aware, booked_prompt, build_grid, sync_next_appointment, team_of
+from accounts.appointments import PX_PER_MIN, apply_edit, aware, booked_prompt, build_grid, practitioner_options, sync_next_appointment, team_of
 from accounts.forms import DURATION_CHOICES, AppointmentForm, RescheduleForm
 from accounts.models import Appointment, Patient, Visit
 from billing import catalog, exports
@@ -77,7 +77,8 @@ def desk(request, member):
     todays = clinic.queue_entries.filter(joined_at__gte=start, joined_at__lt=end).select_related('patient')
     context = {'member': member, 'clinic': clinic, 'tabs': tabs, 'tab_keys': [key for key, _ in tabs], 'tab': tab, 'usable': clinic.is_usable,
                'can_contact': member.can('contact'), 'can_manage_queue': member.can('queue_manage') and clinic.is_usable,
-               'can_register': member.can('register'), 'can_record': member.can('record_session')}
+               'can_register': member.can('register'), 'can_record': member.can('record_session'),
+               'billing_url': reverse('billing:billing') if member.can('billing') and clinic.workspace_id else '?tab=billing'}
     if tab == 'overview':
         context.update({
             'patient_total': clinic.patients.count(), 'team_count': clinic.members.filter(status=ClinicMember.ACTIVE).count() + 1,
@@ -166,7 +167,7 @@ def _schedule_context(request, member):
             'appointments': appointments, 'departments': departments, 'dept': chosen, 'mine': mine,
             'own_department': member.department if member.department_id else None, 'can_book': can_book,
             'prompt': booked_prompt(request, owner) if member.can('appointments') else None,
-            'book_departments': list(owner.departments.all()) if can_book else [], 'book_team': [(m.pk, m.choice_label) for m in team_of(owner)] if can_book else [],
+            'book_departments': list(owner.departments.all()) if can_book else [], 'book_team': [(p['id'], p['name'], p['depts']) for p in practitioner_options(owner)] if can_book else [],
             'session_types': Visit.SESSION_CHOICES, 'durations': DURATION_CHOICES, 'default_minutes': owner.default_session_minutes}
 
 
@@ -209,7 +210,9 @@ def appt_edit(request, member, appt_id):
     if not form.is_valid():
         messages.error(request, first_error(form))
         return _appt_back(timezone.localtime(appt.start).date())
-    apply_edit(member.clinic.calendar_owner, appt, form.cleaned_data)
+    dropped = apply_edit(member.clinic.calendar_owner, appt, form.cleaned_data)
+    if dropped:
+        messages.warning(request, f'{dropped} does not work in that department, so the appointment is not booked with anyone yet.')
     messages.success(request, 'Appointment rescheduled.')
     return _appt_back(form.cleaned_data['date'], appt.pk, 'rescheduled')
 

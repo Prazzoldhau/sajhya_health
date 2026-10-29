@@ -260,10 +260,10 @@
 <div class="app">
   <header class="topbar">
     <div class="brand">
-      <a href="{% url 'accounts:dashboard' %}" class="brand-mark" title="Sajhya Health"><img src="{% static 'images/logo-128.png' %}" alt="Sajhya Health" width="40" height="40"></a>
+      <a href="{% block brand_url %}{% url 'accounts:dashboard' %}{% endblock %}" class="brand-mark" title="Sajhya Health"><img src="{% static 'images/logo-128.png' %}" alt="Sajhya Health" width="40" height="40"></a>
       <div><div class="brand-name">Sajhya Health</div><div class="brand-tagline">{% block tagline %}Professional workspace{% endblock %}</div></div>
     </div>
-    {% if not profile.is_business_owner %}<form class="global-search" method="get" action="{% url 'accounts:patients' %}"><span>⌕</span><input id="globalSearch" name="q" type="search" value="{{ q|default:'' }}" placeholder="Search patient by name, phone, ID..." aria-label="Search patients"></form>{% endif %}
+    {% block global_search %}{% if not profile.is_business_owner %}<form class="global-search" method="get" action="{% url 'accounts:patients' %}"><span>⌕</span><input id="globalSearch" name="q" type="search" value="{{ q|default:'' }}" placeholder="Search patient by name, phone, ID..." aria-label="Search patients"></form>{% endif %}{% endblock %}
     <div class="top-spacer"></div>
     <button class="icon-btn" aria-label="Notifications" onclick="notify('You are all caught up on notifications.')">♧<i class="dot"></i></button>
     <details class="profile">
@@ -273,9 +273,9 @@
         <span class="icon-btn">⌄</span>
       </summary>
       <div class="profile-menu">
-        <a href="{% url 'accounts:profile-picture' %}">Change profile photo</a>
+        {% block profile_links %}        <a href="{% url 'accounts:profile-picture' %}">Change profile photo</a>
         <a href="{% url 'accounts:password-change' %}">Change password</a>
-        {% if user.is_staff %}<a href="{% url 'accounts:review-list' %}">Review applications</a>{% endif %}
+        {% if user.is_staff %}<a href="{% url 'accounts:review-list' %}">Review applications</a>{% endif %}{% endblock %}
         <form method="post" action="{% url 'accounts:logout' %}">{% csrf_token %}<button type="submit">Log out</button></form>
       </div>
     </details>

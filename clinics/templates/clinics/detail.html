@@ -108,10 +108,11 @@
         {% for m in members %}
         <tr>
           <td><b>{{ m.display_name }}</b>{% if m.physio %}<div class="hint">{{ m.physio.title }} · verified</div>{% endif %}</td>
-          <td>{{ m.get_role_display }}{% if m.specialty %} <span class="hint">({{ m.specialty }})</span>{% endif %}{% if m.department %}<div class="hint">{{ m.department.name }}</div>{% endif %}</td>
+          <td>{{ m.get_role_display }}{% if m.specialty %} <span class="hint">({{ m.specialty }})</span>{% endif %}{% if m.department %}<div class="hint">{{ m.department.name }}</div>{% endif %}{% for d in m.departments.all %}{% if forloop.first %}<div class="hint">{% endif %}{{ d.name }}{% if not forloop.last %}, {% else %}</div>{% endif %}{% endfor %}</td>
           <td>{% if m.status == 'invited' %}<span class="tone warn">Invitation sent</span>{% else %}<span class="tone good">Active</span>{% endif %}</td>
           <td>{% if m.physio %}{{ m.physio.mobile }}{% else %}{{ m.phone }}{% if m.email %}<div class="hint">{{ m.email }}</div>{% endif %}{% endif %}</td>
           <td>{% if clinic.owner_id == profile.pk and not m.physio_id %}<button type="button" class="text-link" data-staff-login="{{ m.pk }}" data-name="{{ m.name }}" data-username="{{ m.user.username }}" data-role="{{ m.get_role_display }}">{% if m.user_id %}🔑 Login: {{ m.user.username }}{% else %}🔑 Give a login{% endif %}</button>{% endif %}
+          {% if is_owner and m.role != 'department' %}<button type="button" class="text-link" data-member-depts="{{ m.pk }}" data-name="{{ m.display_name }}" data-selected="{% for d in m.departments.all %}{{ d.pk }}{% if not forloop.last %},{% endif %}{% endfor %}">▦ Departments</button>{% endif %}
           {% if is_owner %}<form method="post" action="{% url 'clinics:member-remove' clinic.pk m.pk %}" onsubmit="return confirm('Remove {{ m.display_name|escapejs }} from the team?')">{% csrf_token %}<button class="text-link" title="Remove">✕ Remove</button></form>{% endif %}</td>
         </tr>
         {% endfor %}
@@ -137,13 +138,38 @@
         <div data-teampane="staff" hidden>
             <p class="hint" style="margin-top:0">Add receptionists, assistants and managers here, then use <b>Give a login</b> on their row so they can sign in with limited access.</p>
       <form method="post" action="{% url 'clinics:staff-add' clinic.pk %}" class="cl-form">{% csrf_token %}
-        <label>Name{{ staff_form.name }}</label><label>Role{{ staff_form.role }}</label><label>Specialty{{ staff_form.specialty }}</label><label>Department{{ staff_form.department }}</label><label>Phone{{ staff_form.phone }}</label><label>Email{{ staff_form.email }}</label>
+        <label>Name{{ staff_form.name }}</label><label>Role{{ staff_form.role }}</label><label>Specialty{{ staff_form.specialty }}</label><label>Department login for{{ staff_form.department }}</label>
+        <div style="grid-column:1/-1"><div class="hint" style="margin-bottom:4px">Works in these departments (optional)</div>{{ staff_form.departments }}</div><label>Phone{{ staff_form.phone }}</label><label>Email{{ staff_form.email }}</label>
         <button class="primary-btn" type="submit" style="width:fit-content">Add staff member</button>
       </form>
         </div>
       </div>
     </div>
   </div>
+  {% if is_owner %}
+  <div class="modal-backdrop" id="memberDeptModal" role="dialog" aria-modal="true">
+    <div class="modal-card" style="max-width:440px">
+      <div class="modal-head"><h2 id="mdTitle">Departments</h2><button type="button" class="modal-x" data-close aria-label="Close">×</button></div>
+      <form method="post" id="memberDeptForm" class="cl-form" style="padding:6px 18px 18px" data-url="{% url 'clinics:member-departments' clinic.pk 0 %}">{% csrf_token %}
+        <p class="hint" style="margin:0">Tick the departments this person works in. When someone books into a department, only the people who work in it are offered. Tick none to allow any department.</p>
+        {% for d in clinic_departments %}<label style="display:flex;gap:8px;align-items:center;font-weight:600"><input type="checkbox" name="departments" value="{{ d.pk }}" style="width:auto;height:auto"> {{ d.name }}</label>
+        {% empty %}<p class="hint">No departments yet. Add them under Appointments, Manage departments.</p>{% endfor %}
+        <button class="primary-btn" type="submit" style="width:fit-content">Save</button>
+      </form>
+    </div>
+  </div>
+  <script>
+  document.querySelectorAll('[data-member-depts]').forEach(function (b) {
+    b.addEventListener('click', function () {
+      var f = document.getElementById('memberDeptForm'), picked = (b.dataset.selected || '').split(',');
+      f.action = f.dataset.url.replace('/0/', '/' + b.dataset.memberDepts + '/');
+      document.getElementById('mdTitle').textContent = 'Departments of ' + b.dataset.name;
+      f.querySelectorAll('input[type=checkbox]').forEach(function (c) { c.checked = picked.indexOf(c.value) > -1; });
+      SajhyaUI.openModal('memberDeptModal');
+    });
+  });
+  </script>
+  {% endif %}
   {% if clinic.owner_id == profile.pk %}
   <div class="modal-backdrop" id="staffLoginModal" role="dialog" aria-modal="true">
     <div class="modal-card" style="max-width:480px">

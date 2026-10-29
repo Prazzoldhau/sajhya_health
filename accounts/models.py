@@ -356,7 +356,7 @@ class Icd10Code(models.Model):
 class Department(models.Model):
     """A department of the practice or clinic (Physical Therapy, Occupational Therapy...) that appointments are booked into, so the calendar can
     show who is seen in which department at the same time."""
-    SUGGESTED = ['Physical Therapy', 'Occupational Therapy', 'Speech Therapy', 'Pediatric Therapy', 'Sports Rehabilitation', 'Neuro Rehabilitation']
+    SUGGESTED = ['Physical Therapy', 'Occupational Therapy', 'Speech Therapy', 'Audiology', 'Behaviour Therapy', 'Pediatric Therapy', 'Sports Rehabilitation', 'Neuro Rehabilitation']
 
     professional = models.ForeignKey(ProfessionalProfile, on_delete=models.CASCADE, related_name='departments')
     name = models.CharField(max_length=80)

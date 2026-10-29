@@ -11,12 +11,12 @@ Use inside the form with the form's id, as in the billing page: include this fil
     .svc-picker .chip small { font-weight: 600; opacity: .8; margin-left: 4px; }
     .svc-picker .sum { font-size: 12px; color: #426052; }
   </style>
-  <div class="t">Services from your price list <a href="{% url 'billing:services' %}" target="_blank" rel="noopener">edit prices</a></div>
+  <div class="t">Services from your price list <select data-svc-dept hidden aria-label="Show the services of one department" style="height:28px;border:1px solid #cfe6d8;border-radius:8px;background:#fff;font-weight:700"></select> {% if not hide_prices %}<a href="{% url 'billing:services' %}" target="_blank" rel="noopener">edit prices</a>{% endif %}</div>
   {% if service_catalog %}
   <div class="g" data-svc-chips></div>
   <div class="sum" data-svc-sum>Tap a service or add-on to fill in the bill. You can still change the text and amount.</div>
   {% else %}
-  <div class="sum">No price list yet. <a href="{% url 'billing:services' %}" target="_blank" rel="noopener">Set up your services and add-ons</a> and they appear here as buttons.</div>
+  <div class="sum">No price list yet. {% if hide_prices %}Ask the manager to set up the services and add-ons.{% else %}<a href="{% url 'billing:services' %}" target="_blank" rel="noopener">Set up your services and add-ons</a> and they appear here as buttons.{% endif %}</div>
   {% endif %}
   <input type="hidden" name="lines" value="[]">
 </div>
@@ -27,7 +27,7 @@ Use inside the form with the form's id, as in the billing page: include this fil
   var box = document.querySelector('.svc-picker[data-picker-for="{{ form_id }}"]'), form = document.getElementById("{{ form_id }}");
   if (!box || !form) return;
   var catalog = JSON.parse(document.getElementById('service-catalog').textContent), chips = box.querySelector('[data-svc-chips]'), sumEl = box.querySelector('[data-svc-sum]');
-  var linesInput = box.querySelector('input[name=lines]'), selected = {};
+  var linesInput = box.querySelector('input[name=lines]'), selected = {}, deptSelect = box.querySelector('[data-svc-dept]');
   function money(n) { return (Math.round(n * 100) / 100).toString(); }
   function apply() {
     var picked = catalog.filter(function (s) { return selected[s.id]; }), total = picked.reduce(function (a, s) { return a + parseFloat(s.price); }, 0);
@@ -39,13 +39,26 @@ Use inside the form with the form's id, as in the billing page: include this fil
       sumEl.textContent = picked.map(function (s) { return s.name + ' ' + s.price; }).join(' + ') + ' = NPR ' + money(total);
     } else { sumEl.textContent = 'Tap a service or add-on to fill in the bill. You can still change the text and amount.'; }
   }
-  catalog.forEach(function (s) {
-    var b = document.createElement('button'); b.type = 'button'; b.className = 'chip' + (s.addon ? ' addon' : '');
-    b.innerHTML = (s.addon ? '+ ' : '') + s.name.replace(/</g, '&lt;') + '<small>' + money(parseFloat(s.price)) + '</small>';
-    b.addEventListener('click', function () { selected[s.id] = !selected[s.id]; b.classList.toggle('on', !!selected[s.id]); apply(); });
-    chips.appendChild(b);
-  });
-  form.addEventListener('reset', function () { selected = {}; chips.querySelectorAll('.chip').forEach(function (c) { c.classList.remove('on'); }); setTimeout(apply, 0); });
+  // a department filter appears once some services belong to a department; services of every department are always shown
+  var depts = {};
+  catalog.forEach(function (s) { if (s.dept) depts[s.dept] = s.dept_name; });
+  if (Object.keys(depts).length) {
+    deptSelect.hidden = false;
+    deptSelect.innerHTML = '<option value="">All services</option>' + Object.keys(depts).map(function (id) { return '<option value="' + id + '">' + depts[id].replace(/</g, '&lt;') + '</option>'; }).join('');
+    deptSelect.addEventListener('change', render);
+  }
+  function render() {
+    chips.innerHTML = '';
+    catalog.forEach(function (s) {
+      if (deptSelect.value && s.dept && String(s.dept) !== deptSelect.value) return;
+      var b = document.createElement('button'); b.type = 'button'; b.className = 'chip' + (s.addon ? ' addon' : '') + (selected[s.id] ? ' on' : '');
+      b.innerHTML = (s.addon ? '+ ' : '') + s.name.replace(/</g, '&lt;') + '<small>' + money(parseFloat(s.price)) + '</small>';
+      b.addEventListener('click', function () { selected[s.id] = !selected[s.id]; b.classList.toggle('on', !!selected[s.id]); apply(); });
+      chips.appendChild(b);
+    });
+  }
+  render();
+  form.addEventListener('reset', function () { selected = {}; render(); setTimeout(apply, 0); });
 })();
 </script>
 {% endif %}

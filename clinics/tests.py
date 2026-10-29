@@ -782,7 +782,7 @@ class FrontDeskRegisteredByAndBillingTests(Base):
         self.as_user('ram-desk')
         self.register()
         patient = Patient.objects.get(name='Walk In')
-        self.assertContains(self.client.get(reverse('clinics:desk')), 'tab=billing')
+        self.assertContains(self.client.get(reverse('clinics:desk')), f'href="{reverse("billing:billing")}"')  # the full billing pages, now that the clinic has its own login
         bill = {'patient_id': patient.pk, 'entry_date': timezone.localdate().isoformat(), 'service': 'Therapy', 'rate': '700', 'payment_mode': 'cash'}
         self.client.post(reverse('clinics:desk-bill-create'), {**bill, 'payment_status': 'paid', 'amount_given': '1000'})  # no change: 300 carried over
         first = BillingEntry.objects.get()
@@ -1031,9 +1031,10 @@ class ClinicModulesTests(Base):
     def test_the_front_desk_loses_the_billing_tab_when_billing_is_off(self):
         clinic = self.setup_desk()
         self.as_user('ram-desk')
-        self.assertContains(self.client.get(reverse('clinics:desk')), 'tab=billing')
+        self.assertContains(self.client.get(reverse('clinics:desk')), f'href="{reverse("billing:billing")}"')
         clinic.modules = ['appointments']
         clinic.save()
+        self.assertNotContains(self.client.get(reverse('clinics:desk')), f'href="{reverse("billing:billing")}"')
         self.assertNotContains(self.client.get(reverse('clinics:desk')), 'tab=billing')
         self.assertEqual(self.client.post(reverse('clinics:desk-bill-create'), {}).status_code, 404)
         self.assertNotEqual(self.client.get(reverse('clinics:desk'), {'tab': 'billing'}).context['tab'], 'billing')
@@ -1259,6 +1260,11 @@ class SeedQaClinicTests(TestCase):
             self.assertEqual({a.department.name for a in rows}, {department})  # only their own bookings
             self.assertContains(page, 'Bhaktapur Speech and Hearing Center')
             self.client.logout()
+        from billing.models import ServiceItem
+        self.assertEqual({i.department.name for i in ServiceItem.objects.filter(professional=clinic.workspace).select_related('department')},
+                         {'Occupational Therapy', 'Speech Therapy', 'Physiotherapy', 'Behaviour Therapy'})  # each department bills its own services
+        for member in clinic.members.filter(role='physio'):
+            self.assertEqual(member.departments.count(), 1)
         self.assertTrue(self.client.login(username='qa-bshc-clinic', password=passwords['qa-bshc-clinic']))
         calendar = self.client.get(reverse('accounts:appointments'))
         self.assertEqual(calendar.status_code, 200)
@@ -1430,3 +1436,200 @@ class FrontDeskWorkspaceTests(Base):
         self.assertNotContains(page, 'data-open="bookModal"')
         self.assertNotContains(page, 'Patient A')
         self.assertEqual(page.context['columns'][0]['events'][0]['links'], {})
+
+
+class StaffByDepartmentTests(Base):
+    """Team members belong to departments, so booking into OT only offers the people who work in OT."""
+    CREDS = StaffLoginTests.CREDS
+    add_staff = StaffLoginTests.add_staff
+    setup_desk = FrontDeskRegisteredByAndBillingTests.setup_desk
+    prepare = SchedulesTests.prepare
+
+    def test_the_owner_sets_which_departments_a_person_works_in(self):
+        clinic = self.prepare()
+        self.as_user('owner')
+        url = reverse('clinics:member-departments', args=[clinic.pk, self.member.pk])
+        self.client.post(url, {'departments': [self.pt.pk]})
+        self.assertEqual(list(self.member.departments.all()), [self.pt])
+        team = self.client.get(reverse('clinics:detail', args=[clinic.pk]), {'tab': 'team'})
+        self.assertContains(team, 'Physical Therapy')
+        self.assertContains(team, 'data-member-depts')
+        self.client.post(url, {'departments': []})  # none = can be booked anywhere
+        self.assertEqual(self.member.departments.count(), 0)
+        other, _ = make_professional('someone-else')
+        self.client.post(url, {'departments': [999999]})  # not a department of this clinic: ignored
+        self.assertEqual(self.member.departments.count(), 0)
+        self.as_user('ram-desk')  # only the owner
+        self.assertEqual(self.client.post(url, {'departments': [self.pt.pk]}).status_code, 404)
+        # adding staff can set them straight away
+        self.as_user('owner')
+        self.client.post(reverse('clinics:staff-add', args=[clinic.pk]), {'name': 'Dr Sailendra', 'role': 'clinician', 'specialty': 'Ortho', 'departments': [self.pt.pk, self.ot.pk]})
+        self.assertEqual(set(ClinicMember.objects.get(name='Dr Sailendra').departments.all()), {self.pt, self.ot})
+
+    def test_booking_only_accepts_people_from_the_chosen_department(self):
+        from accounts.models import Appointment
+        clinic = self.prepare()
+        self.member.departments.set([self.pt])
+        self.asha.departments.set([self.ot])
+        self.as_user('himal-clinic')
+        patient = make_patient(self.workspace, 'Walk In')
+        patient.clinic = clinic
+        patient.save()
+        day = (timezone.localdate() + datetime.timedelta(days=2)).isoformat()
+        base = {'patient': patient.pk, 'date': day, 'start_time': '10:00', 'duration': 30, 'session_type': 'treatment', 'notes': ''}
+        page = self.client.get(reverse('accounts:appointments'))
+        self.assertContains(page, f'data-depts="{self.pt.pk}"')  # the booking form can narrow the list
+        self.client.post(reverse('accounts:appointment-create'), {**base, 'department': self.ot.pk, 'practitioner': self.member.pk})  # PT person into OT
+        self.assertFalse(Appointment.objects.filter(patient=patient).exists())
+        self.client.post(reverse('accounts:appointment-create'), {**base, 'department': self.ot.pk, 'practitioner': self.asha.pk})
+        appt = Appointment.objects.get(patient=patient)
+        self.assertEqual((appt.department, appt.practitioner), (self.ot, self.asha))
+        # moving it to PT with the OT person drops the person and says so
+        edit = {'date': day, 'start_time': '10:30', 'end_time': '11:00', 'session_type': 'treatment', 'notes': '', 'department': self.pt.pk, 'practitioner': self.asha.pk}
+        r = self.client.post(reverse('accounts:appointment-edit', args=[appt.pk]), edit, follow=True)
+        appt.refresh_from_db()
+        self.assertEqual((appt.department, appt.practitioner), (self.pt, None))
+        self.assertContains(r, 'does not work in that department')
+        # a person with no department set can go anywhere
+        self.member.departments.clear()
+        self.client.post(reverse('accounts:appointment-edit', args=[appt.pk]), {**edit, 'department': self.ot.pk, 'practitioner': self.member.pk})
+        appt.refresh_from_db()
+        self.assertEqual(appt.practitioner, self.member)
+
+    def test_the_front_desk_books_the_same_way(self):
+        from accounts.models import Appointment
+        clinic = self.prepare()
+        self.c.clinic = clinic
+        self.c.professional = self.workspace
+        self.c.save()
+        self.member.departments.set([self.pt])
+        self.as_user('ram-desk')
+        page = self.client.get(reverse('clinics:desk'), {'tab': 'schedule'})
+        self.assertContains(page, f'data-depts="{self.pt.pk}"')
+        booking = {'patient': self.c.pk, 'date': timezone.localdate().isoformat(), 'start_time': '09:30', 'duration': 30, 'session_type': 'treatment', 'notes': 'desk'}
+        self.client.post(reverse('clinics:desk-appt-create'), {**booking, 'department': self.ot.pk, 'practitioner': self.member.pk})
+        self.assertFalse(Appointment.objects.filter(notes='desk').exists())
+        self.client.post(reverse('clinics:desk-appt-create'), {**booking, 'department': self.pt.pk, 'practitioner': self.member.pk})
+        self.assertTrue(Appointment.objects.filter(notes='desk', practitioner=self.member).exists())
+
+
+class ReceptionFullBillingTests(Base):
+    """Reception and the manager use the same billing pages as the clinic itself: bills, payments, advances, packages, the sheet, the invoice picture."""
+    CREDS = StaffLoginTests.CREDS
+    add_staff = StaffLoginTests.add_staff
+    setup_desk = FrontDeskRegisteredByAndBillingTests.setup_desk
+    register = FrontDeskRegisteredByAndBillingTests.register
+
+    def prepare(self):
+        clinic = self.setup_desk()
+        self.as_user('ram-desk')
+        self.register()
+        self.patient = Patient.objects.get(name='Walk In')
+        return clinic
+
+    def bill(self, **extra):
+        data = {'entry_date': timezone.localdate().isoformat(), 'patient': self.patient.pk, 'patient_name': 'Walk In', 'service': 'Speech Therapy Session', 'rate': '600',
+                'payment_mode': 'cash', 'payment_status': 'paid', **extra}
+        return self.client.post(reverse('billing:entry-create'), data)
+
+    def test_reception_opens_the_full_billing_book_in_the_front_desk_layout(self):
+        self.prepare()
+        page = self.client.get(reverse('billing:billing'))
+        self.assertEqual(page.status_code, 200)
+        self.assertContains(page, 'Front desk')
+        self.assertContains(page, f'href="{reverse("clinics:desk")}?tab=queue"')  # the front-desk menu
+        self.assertNotContains(page, reverse('accounts:patients'))  # not the clinical one
+        self.assertNotContains(page, reverse('accounts:reports'))
+        self.assertEqual(page.context['display_name'], 'Ram')
+        for url in ('billing:packages', 'billing:advances', 'billing:sheet'):
+            self.assertEqual(self.client.get(reverse(url)).status_code, 200, url)
+        self.assertEqual(self.client.get(reverse('billing:export-xlsx')).status_code, 200)
+        # the desk's own menu goes there too
+        self.assertContains(self.client.get(reverse('clinics:desk')), f'href="{reverse("billing:billing")}"')
+
+    def test_a_bill_is_stamped_with_who_made_it_and_can_be_paid_corrected_cancelled_and_restored(self):
+        clinic = self.prepare()
+        self.bill(payment_status='due')
+        entry = BillingEntry.objects.get()
+        self.assertEqual((entry.created_by_name, entry.created_by_role, entry.professional), ('Ram', 'Receptionist', clinic.workspace))
+        self.assertEqual((entry.rate, entry.amount_paid), (600, 0))
+        self.client.post(reverse('billing:entry-payment', args=[entry.pk]), {'amount': '250', 'payment_mode': 'cash', 'paid_on': timezone.localdate().isoformat()})
+        entry.refresh_from_db()
+        self.assertEqual(entry.amount_paid, 250)
+        self.client.post(reverse('billing:entry-correct', args=[entry.pk]), {'entry_date': timezone.localdate().isoformat(), 'service': 'Speech Assessment', 'rate': '650',
+                                                                            'payment_mode': 'cash', 'payment_status': 'partial', 'amount_received': '250', 'notes': ''})
+        entry.refresh_from_db()
+        self.assertEqual((entry.service, entry.rate), ('Speech Assessment', 650))
+        self.client.post(reverse('billing:entry-cancel', args=[entry.pk]))
+        entry.refresh_from_db()
+        self.assertTrue(entry.is_cancelled)
+        self.client.post(reverse('billing:entry-restore', args=[entry.pk]))
+        entry.refresh_from_db()
+        self.assertFalse(entry.is_cancelled)
+        # the clinic itself sees the same bill and who made it
+        self.as_user('himal-clinic')
+        self.assertContains(self.client.get(reverse('billing:billing')), 'Walk In')
+
+    def test_the_invoice_can_be_shown_sent_as_a_picture_and_as_a_pdf(self):
+        self.prepare()
+        self.bill()
+        entry = BillingEntry.objects.get()
+        page = self.client.get(reverse('billing:invoice', args=[entry.pk]))
+        self.assertEqual(page.status_code, 200)
+        self.assertContains(page, entry.invoice_number)
+        png = self.client.get(reverse('billing:invoice-png', args=[entry.pk]))
+        self.assertEqual((png.status_code, png['Content-Type']), (200, 'image/png'))
+        pdf = self.client.get(reverse('billing:invoice-pdf', args=[entry.pk]))
+        self.assertEqual((pdf.status_code, pdf['Content-Type']), (200, 'application/pdf'))
+
+    def test_a_patients_bill_advances_and_packages_work_from_the_billing_pages(self):
+        self.prepare()
+        r = self.client.post(reverse('billing:patient-bill', args=[self.patient.pk]), {'entry_date': timezone.localdate().isoformat(), 'service': 'Hearing Test (Audiometry)',
+                                                                                       'rate': '500', 'payment_mode': 'cash', 'payment_status': 'paid'})
+        self.assertRedirects(r, f"{reverse('billing:billing')}?patient={self.patient.pk}", fetch_redirect_response=False)  # staff cannot open the patient record
+        self.assertEqual(BillingEntry.objects.get().service, 'Hearing Test (Audiometry)')
+        r = self.client.post(reverse('billing:advance-add', args=[self.patient.pk]), {'amount': '1000', 'payment_mode': 'cash'})
+        self.assertEqual(r.status_code, 302)
+        self.assertNotIn('/accounts/patients/', r['Location'])
+        search = self.client.get(reverse('billing:billing'), {'patient': self.patient.pk})
+        self.assertContains(search, 'Walk In')
+        self.assertNotContains(search, '/accounts/patients/')
+
+    def test_who_may_delete_and_who_may_edit_prices(self):
+        clinic = self.prepare()
+        self.bill()
+        entry = BillingEntry.objects.get()
+        self.assertEqual(self.client.post(reverse('billing:entry-delete', args=[entry.pk])).status_code, 404)  # reception cannot delete for good
+        self.assertTrue(BillingEntry.objects.filter(pk=entry.pk).exists())
+        self.assertEqual(self.client.get(reverse('billing:services')).status_code, 404)
+        self.assertNotContains(self.client.get(reverse('billing:billing')), reverse('billing:services'))
+        self.as_user('mani')
+        manager = self.client.get(reverse('billing:services'))
+        self.assertEqual(manager.status_code, 200)
+        self.client.post(reverse('billing:service-save', args=[0]), {'name': 'Hearing screening', 'price': '350', 'kind': 'main'})
+        from billing.models import ServiceItem
+        self.assertTrue(ServiceItem.objects.filter(professional=clinic.workspace, name='Hearing screening').exists())
+        self.client.post(reverse('billing:entry-delete', args=[entry.pk]))
+        self.assertFalse(BillingEntry.objects.filter(pk=entry.pk).exists())
+
+    def test_only_billing_roles_only_the_clinics_own_patients_and_only_while_the_plan_is_active(self):
+        clinic = self.prepare()
+        self.bill()
+        entry = BillingEntry.objects.get()
+        stranger_user, stranger = make_professional('far-physio')
+        elsewhere = make_patient(stranger, 'Elsewhere')
+        self.assertEqual(self.client.post(reverse('billing:patient-bill', args=[elsewhere.pk]), {'entry_date': timezone.localdate().isoformat(), 'service': 'x', 'rate': '1', 'payment_mode': 'cash',
+                                                                                                  'payment_status': 'paid'}).status_code, 404)
+        self.bill(patient=elsewhere.pk, patient_name='Elsewhere')
+        self.assertEqual(BillingEntry.objects.count(), 1)  # a patient of another practice is refused
+        self.as_user('asha')
+        for url in (reverse('billing:billing'), reverse('billing:invoice', args=[entry.pk]), reverse('billing:invoice-png', args=[entry.pk])):
+            self.assertEqual(self.client.get(url).status_code, 404, url)  # an assistant does not bill
+        self.as_user('ram-desk')
+        ClinicSubscription.objects.filter(professional=self.owner).update(status='cancelled')
+        self.assertEqual(self.client.get(reverse('billing:billing')).status_code, 200)  # can still look
+        self.assertEqual(self.bill().status_code, 403)  # but nothing changes while the plan is off
+        ClinicSubscription.objects.filter(professional=self.owner).update(status='active')
+        clinic.modules = ['appointments']
+        clinic.save()
+        self.assertEqual(self.client.get(reverse('billing:billing')).status_code, 404)  # Billing is off in the plan
