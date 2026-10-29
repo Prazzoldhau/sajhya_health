@@ -226,7 +226,7 @@ class ClinicMember(models.Model):
     # what each staff role may do at the front desk (clinical records are never part of it)
     PERMISSIONS = {
         MANAGER: {'overview', 'patients', 'contact', 'register', 'queue', 'queue_manage', 'billing', 'team', 'schedule', 'appointments'},
-        RECEPTIONIST: {'patients', 'contact', 'register', 'queue', 'queue_manage', 'billing', 'schedule', 'appointments'},
+        RECEPTIONIST: {'overview', 'patients', 'contact', 'register', 'queue', 'queue_manage', 'billing', 'schedule', 'appointments'},
         ASSISTANT: {'patients', 'queue', 'queue_manage', 'record_session', 'schedule'},
         OTHER: {'queue'},
         CLINICIAN: {'patients', 'queue', 'queue_manage', 'record_session', 'schedule'},  # a visiting doctor / therapist who is not on Sajhya

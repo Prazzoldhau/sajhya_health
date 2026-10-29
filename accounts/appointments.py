@@ -117,6 +117,57 @@ def _task_label(task, today):
     return f"Due {local:%b} {local.day} - {clock}"
 
 
+def build_grid(profile, events, day_list, today, patient_link=True, with_links=True):
+    """Place events on a time grid, one column per day. Returns (columns, hours, grid_height, grid_start_min).
+    patient_link=False leaves the patient's page link out and with_links=False leaves the message links out (for screens that may not see them)."""
+    tints = {d.pk: i % DEPARTMENT_TINTS for i, d in enumerate(profile.departments.all())}
+    first_hour, last_hour = DEFAULT_FIRST_HOUR, DEFAULT_LAST_HOUR
+    for ev in events:
+        first_hour = min(first_hour, timezone.localtime(ev.start).hour)
+        last_hour = max(last_hour, min(timezone.localtime(ev.end).hour + 1, 24))
+    grid_start_min = first_hour * 60
+
+    columns = []
+    for day in day_list:
+        items = []
+        for ev in events:
+            s, e = timezone.localtime(ev.start), timezone.localtime(ev.end)
+            if s.date() != day:
+                continue
+            start_min = s.hour * 60 + s.minute
+            end_min = min(e.hour * 60 + e.minute if e.date() == day else 24 * 60, 24 * 60)
+            items.append({
+                'id': ev.pk, 'kind': ev.kind, 'status': ev.status,
+                'title': ev.patient.name if ev.patient else (ev.title or ev.get_kind_display()),
+                'time_label': f'{fmt_time(ev.start)} - {fmt_time(ev.end)}',
+                'type_label': ev.get_session_type_display() if ev.patient else ev.get_kind_display(),
+                'css': TYPE_CLASS.get(ev.session_type, 'treatment') if ev.kind == Appointment.APPOINTMENT else ev.kind,
+                'start_min': start_min, 'end_min': max(end_min, start_min + 15),
+                'top': round((start_min - grid_start_min) * PX_PER_MIN),
+                'height': max(round((end_min - start_min) * PX_PER_MIN), 26),
+                'patient_url': reverse('accounts:patient-detail', args=[ev.patient_id]) if ev.patient and patient_link else '',
+                'patient_code': ev.patient.patient_code if ev.patient else '',
+                'wa': {k: appointment_whatsapp(profile, ev, k) for k in ('booked', 'reminder', 'rescheduled')} if with_links and ev.kind == Appointment.APPOINTMENT and ev.patient and ev.status == Appointment.SCHEDULED else {},
+                'links': {k: appointment_links(profile, ev, k) for k in ('booked', 'reminder', 'rescheduled')} if with_links and ev.kind == Appointment.APPOINTMENT and ev.patient and ev.status == Appointment.SCHEDULED else {},
+                'notes': ev.notes, 'raw_title': ev.title, 'session_type': ev.session_type,
+                'department': ev.department.name if ev.department_id else '', 'department_id': ev.department_id or '',
+                'practitioner': ev.practitioner.label if ev.practitioner_id else '', 'practitioner_id': ev.practitioner_id or '',
+                'tint': tints.get(ev.department_id, '') if ev.department_id and ev.kind == Appointment.APPOINTMENT else '',
+                'date': s.date().isoformat(), 'start_hm': s.strftime('%H:%M'), 'end_hm': e.strftime('%H:%M'),
+            })
+        _layout_lanes(items)
+        for it in items:
+            it['links_json'] = json.dumps(it['links'])
+        columns.append({
+            'date': day, 'iso': day.isoformat(), 'is_today': day == today,
+            'label': f"{day:%a}, {ordinal(day.day)} {day:%b}", 'events': items,
+        })
+
+    hours = [{'label': f"{h % 12 or 12} {'AM' if h < 12 else 'PM'}", 'top': round((h * 60 - grid_start_min) * PX_PER_MIN)}
+             for h in range(first_hour, last_hour)]
+    return columns, hours, (last_hour - first_hour) * 60 * PX_PER_MIN, grid_start_min
+
+
 @login_required
 def appointments(request):
     profile = workspace_profile(request)
@@ -146,50 +197,7 @@ def appointments(request):
             start__lt=aware(day_list[-1] + datetime.timedelta(days=1), datetime.time.min),
         ).exclude(status=Appointment.CANCELLED).select_related('patient', 'professional', 'department', 'practitioner__physio'))
 
-    first_hour, last_hour = DEFAULT_FIRST_HOUR, DEFAULT_LAST_HOUR
-    for ev in events:
-        first_hour = min(first_hour, timezone.localtime(ev.start).hour)
-        last_hour = max(last_hour, min(timezone.localtime(ev.end).hour + 1, 24))
-    grid_start_min = first_hour * 60
-
-    columns = []
-    for day in day_list:
-        items = []
-        for ev in events:
-            s, e = timezone.localtime(ev.start), timezone.localtime(ev.end)
-            if s.date() != day:
-                continue
-            start_min = s.hour * 60 + s.minute
-            end_min = min(e.hour * 60 + e.minute if e.date() == day else 24 * 60, 24 * 60)
-            items.append({
-                'id': ev.pk, 'kind': ev.kind, 'status': ev.status,
-                'title': ev.patient.name if ev.patient else (ev.title or ev.get_kind_display()),
-                'time_label': f'{fmt_time(ev.start)} - {fmt_time(ev.end)}',
-                'type_label': ev.get_session_type_display() if ev.patient else ev.get_kind_display(),
-                'css': TYPE_CLASS.get(ev.session_type, 'treatment') if ev.kind == Appointment.APPOINTMENT else ev.kind,
-                'start_min': start_min, 'end_min': max(end_min, start_min + 15),
-                'top': round((start_min - grid_start_min) * PX_PER_MIN),
-                'height': max(round((end_min - start_min) * PX_PER_MIN), 26),
-                'patient_url': reverse('accounts:patient-detail', args=[ev.patient_id]) if ev.patient else '',
-                'patient_code': ev.patient.patient_code if ev.patient else '',
-                'wa': {k: appointment_whatsapp(profile, ev, k) for k in ('booked', 'reminder', 'rescheduled')} if ev.kind == Appointment.APPOINTMENT and ev.patient and ev.status == Appointment.SCHEDULED else {},
-                'links': {k: appointment_links(profile, ev, k) for k in ('booked', 'reminder', 'rescheduled')} if ev.kind == Appointment.APPOINTMENT and ev.patient and ev.status == Appointment.SCHEDULED else {},
-                'notes': ev.notes, 'raw_title': ev.title, 'session_type': ev.session_type,
-                'department': ev.department.name if ev.department_id else '', 'department_id': ev.department_id or '',
-                'practitioner': ev.practitioner.label if ev.practitioner_id else '', 'practitioner_id': ev.practitioner_id or '',
-                'tint': tints.get(ev.department_id, '') if ev.department_id and ev.kind == Appointment.APPOINTMENT else '',
-                'date': s.date().isoformat(), 'start_hm': s.strftime('%H:%M'), 'end_hm': e.strftime('%H:%M'),
-            })
-        _layout_lanes(items)
-        for it in items:
-            it['links_json'] = json.dumps(it['links'])
-        columns.append({
-            'date': day, 'iso': day.isoformat(), 'is_today': day == today,
-            'label': f"{day:%a}, {ordinal(day.day)} {day:%b}", 'events': items,
-        })
-
-    hours = [{'label': f"{h % 12 or 12} {'AM' if h < 12 else 'PM'}", 'top': round((h * 60 - grid_start_min) * PX_PER_MIN)}
-             for h in range(first_hour, last_hour)]
+    columns, hours, grid_height, grid_start_min = build_grid(profile, events, day_list, today)
 
     # mini month calendar for the left panel
     month_first = start_date.replace(day=1)
@@ -207,7 +215,7 @@ def appointments(request):
     context = workspace_context(request.user, profile)
     context.update({
         'active': 'appointments', 'columns': columns, 'hours': hours, 'days': days,
-        'grid_height': (last_hour - first_hour) * 60 * PX_PER_MIN, 'grid_start_min': grid_start_min,
+        'grid_height': grid_height, 'grid_start_min': grid_start_min,
         'px_per_min': PX_PER_MIN, 'start_date': start_date, 'today': today,
         'prev_date': start_date - datetime.timedelta(days=days),
         'next_date': start_date + datetime.timedelta(days=days),

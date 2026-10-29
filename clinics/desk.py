@@ -13,7 +13,7 @@ from django.utils import timezone
 from django.views.decorators.http import require_GET, require_POST
 
 from accounts.access import first_error
-from accounts.appointments import apply_edit, aware, booked_prompt, sync_next_appointment, team_of
+from accounts.appointments import PX_PER_MIN, apply_edit, aware, booked_prompt, build_grid, sync_next_appointment, team_of
 from accounts.forms import DURATION_CHOICES, AppointmentForm, RescheduleForm
 from accounts.models import Appointment, Patient, Visit
 from billing import catalog, exports
@@ -23,9 +23,9 @@ from billing.models import ADVANCE, BillingEntry, EntryPayment, PatientAdvance, 
 
 from .forms import FrontDeskPatientForm
 from .models import ClinicMember, QueueEntry
-from .schedule import appointments_on, day_context, parse_day
+from .schedule import appointments_between, appointments_on, day_context, parse_day
 
-TABS = [('overview', 'Overview', 'overview'), ('queue', 'Queue', 'queue'), ('schedule', 'Schedule', 'schedule'), ('patients', 'Patients', 'patients'),
+TABS = [('overview', 'Dashboard', 'overview'), ('schedule', 'Schedule', 'schedule'), ('queue', 'Queue', 'queue'), ('patients', 'Patients', 'patients'),
         ('register', 'Register patient', 'register'), ('session', 'Record treatment', 'record_session'), ('billing', 'Billing', 'billing'), ('team', 'Team', 'team')]
 
 
@@ -71,16 +71,18 @@ def _usable(request, member):
 def desk(request, member):
     clinic = member.clinic
     tabs = [(key, label) for key, label, perm in TABS if member.can(perm)]
-    tab = request.GET.get('tab') if request.GET.get('tab') in dict(tabs) else tabs[0][0]
+    opens_on = 'overview' if 'overview' in dict(tabs) else 'queue' if 'queue' in dict(tabs) else tabs[0][0]  # the home page, else the queue, else the only tab
+    tab = request.GET.get('tab') if request.GET.get('tab') in dict(tabs) else opens_on
     start, end = _today()
     todays = clinic.queue_entries.filter(joined_at__gte=start, joined_at__lt=end).select_related('patient')
-    context = {'member': member, 'clinic': clinic, 'tabs': tabs, 'tab': tab, 'usable': clinic.is_usable,
+    context = {'member': member, 'clinic': clinic, 'tabs': tabs, 'tab_keys': [key for key, _ in tabs], 'tab': tab, 'usable': clinic.is_usable,
                'can_contact': member.can('contact'), 'can_manage_queue': member.can('queue_manage') and clinic.is_usable,
                'can_register': member.can('register'), 'can_record': member.can('record_session')}
     if tab == 'overview':
         context.update({
             'patient_total': clinic.patients.count(), 'team_count': clinic.members.filter(status=ClinicMember.ACTIVE).count() + 1,
             'queue_counts': {s: todays.filter(status=s).count() for s in (QueueEntry.WAITING, QueueEntry.CALLED, QueueEntry.COMPLETED)}})
+        context.update(_dashboard_context(member, start, end, todays))
     elif tab == 'queue':
         context['entries'] = todays.exclude(status=QueueEntry.CANCELLED)
     elif tab == 'patients':
@@ -102,6 +104,32 @@ def desk(request, member):
     return render(request, 'clinics/desk.html', context)
 
 
+def _dashboard_context(member, start, end, todays):
+    """The front desk's home: today's appointments, the queue, new registrations and (for those who bill) today's money."""
+    clinic = member.clinic
+    owner = clinic.calendar_owner
+    today_appts = list(Appointment.objects.filter(professional=owner, kind=Appointment.APPOINTMENT, start__gte=start, start__lt=end)
+                       .exclude(status=Appointment.CANCELLED).select_related('patient', 'department', 'practitioner__physio').order_by('start', 'id'))
+    now = timezone.now()
+    context = {
+        'appt_total': len(today_appts), 'appt_attended': sum(a.status == Appointment.ATTENDED for a in today_appts),
+        'appt_waiting': sum(a.status == Appointment.SCHEDULED for a in today_appts),
+        'next_up': [a for a in today_appts if a.status == Appointment.SCHEDULED and a.end >= now][:6],
+        'registered_today': clinic.patients.filter(created_at__gte=start, created_at__lt=end).count(),
+        'queue_now': list(todays.exclude(status__in=[QueueEntry.CANCELLED, QueueEntry.COMPLETED]).select_related('patient')[:6]),
+        'can_book': member.can('appointments') and clinic.is_usable,
+    }
+    if member.can('billing'):
+        today = timezone.localdate()
+        bills = BillingEntry.objects.filter(patient__clinic=clinic)
+        context['billed_today'] = bills.filter(entry_date=today, cancelled_at__isnull=True).aggregate(t=Sum('rate'))['t'] or 0
+        got = EntryPayment.objects.filter(entry__patient__clinic=clinic, entry__cancelled_at__isnull=True, paid_on=today).exclude(payment_mode=ADVANCE).aggregate(t=Sum('amount'))['t'] or 0
+        got += PatientAdvance.objects.filter(patient__clinic=clinic, paid_on=today, kind__in=[PatientAdvance.DEPOSIT, PatientAdvance.REFUND]).aggregate(t=Sum('amount'))['t'] or 0
+        context['received_today'] = got
+        context['due_total'] = sum((e.amount_due for e in bills.filter(cancelled_at__isnull=True, amount_paid__lt=F('rate'))[:500]), 0)
+    return context
+
+
 def _schedule_context(request, member):
     """The clinic's appointments for a day. A department's sign-in sees only its own department; a therapy assistant starts with the
     appointments that are with them; everyone else sees the whole clinic and can narrow it to a department."""
@@ -120,7 +148,22 @@ def _schedule_context(request, member):
     if mine:
         filters['practitioner'] = member
     can_book = member.can('appointments') and clinic.is_usable
-    return {**day_context(day), 'appointments': appointments_on(day, **filters), 'departments': departments, 'dept': chosen, 'mine': mine,
+    view = request.GET.get('view') if request.GET.get('view') in ('calendar', 'list') else ('calendar' if member.can('appointments') else 'list')
+    days = int(request.GET['days']) if request.GET.get('days') in ('1', '3', '7') else 3
+    keep = (f'&dept={chosen}' if chosen else '') + ('&all=1' if member.books_own_schedule and not mine else '')
+    calendar = {}
+    if view == 'calendar':
+        day_list = [day + datetime.timedelta(days=i) for i in range(days)]
+        events = appointments_between(day_list[0], day_list[-1], **filters)
+        columns, hours, grid_height, grid_start = build_grid(owner, events, day_list, timezone.localdate(), patient_link=False, with_links=member.can('appointments'))
+        calendar = {'columns': columns, 'hours': hours, 'grid_height': grid_height, 'grid_start_min': grid_start, 'px_per_min': PX_PER_MIN,
+                    'range_label': f"{day_list[0]:%d %b}" + (f" - {day_list[-1]:%d %b %Y}" if days > 1 else f" {day_list[0]:%Y}"),
+                    'prev_start': day - datetime.timedelta(days=days), 'next_start': day + datetime.timedelta(days=days)}
+        appointments = [a for a in events if timezone.localtime(a.start).date() == day]
+    else:
+        appointments = appointments_on(day, **filters)
+    return {**day_context(day), **calendar, 'view': view, 'days': days, 'keep': keep,
+            'appointments': appointments, 'departments': departments, 'dept': chosen, 'mine': mine,
             'own_department': member.department if member.department_id else None, 'can_book': can_book,
             'prompt': booked_prompt(request, owner) if member.can('appointments') else None,
             'book_departments': list(owner.departments.all()) if can_book else [], 'book_team': [(m.pk, m.choice_label) for m in team_of(owner)] if can_book else [],

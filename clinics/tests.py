@@ -690,7 +690,7 @@ class StaffLoginTests(Base):
         self.assertNotContains(self.client.get(reverse('clinics:desk'), {'tab': 'patients'}), 'tab=patients')  # only the queue tab exists
         self.assertEqual(self.client.post(reverse('clinics:desk-queue-add'), {'patient_id': patient.pk}).status_code, 404)
         self.as_user('mani')
-        self.assertContains(self.client.get(reverse('clinics:desk')), 'Waiting today')
+        self.assertContains(self.client.get(reverse('clinics:desk')), 'Waiting in queue')
 
     def test_removed_staff_cannot_sign_in(self):
         clinic = self.make_clinic()
@@ -1371,3 +1371,62 @@ class ReceptionRunsTheAppointmentBookTests(Base):
         clinic.save()
         self.as_user('ram-desk')
         self.assertEqual(self.client.post(reverse('clinics:desk-appt-create'), self.booking()).status_code, 404)  # Appointments is off in the plan
+
+
+class FrontDeskWorkspaceTests(Base):
+    """The front desk is a workspace: a sidebar, a dashboard as the home page and a calendar for the appointment book."""
+    CREDS = StaffLoginTests.CREDS
+    add_staff = StaffLoginTests.add_staff
+    setup_desk = FrontDeskRegisteredByAndBillingTests.setup_desk
+    prepare = SchedulesTests.prepare
+
+    def test_reception_lands_on_a_dashboard_with_todays_numbers(self):
+        clinic = self.prepare()
+        self.a.clinic = clinic
+        self.a.save()
+        self.as_user('ram-desk')
+        page = self.client.get(reverse('clinics:desk'))
+        self.assertEqual(page.context['tab'], 'overview')
+        self.assertEqual([label for _, label in page.context['tabs']][:2], ['Dashboard', 'Schedule'])
+        self.assertEqual(page.context['appt_total'], 2)  # the two seeded appointments are today
+        self.assertEqual(page.context['appt_waiting'], page.context['appt_total'] - page.context['appt_attended'])
+        self.assertIsNotNone(page.context['billed_today'])  # reception bills, so the money cards show
+        self.assertContains(page, 'Appointments today')
+        self.assertContains(page, 'Book an appointment')
+        self.assertContains(page, 'Coming up today')
+        self.as_user('asha')  # an assistant has no dashboard and no money
+        assistant = self.client.get(reverse('clinics:desk'))
+        self.assertNotEqual(assistant.context['tab'], 'overview')
+        self.assertNotContains(assistant, 'Billed today')
+
+    def test_the_calendar_shows_the_clinics_appointments_in_columns_and_departments_side_by_side(self):
+        self.prepare()
+        self.as_user('ram-desk')
+        page = self.client.get(reverse('clinics:desk'), {'tab': 'schedule'})
+        self.assertEqual(page.context['view'], 'calendar')  # reception opens on the calendar
+        self.assertEqual(len(page.context['columns']), 3)
+        events = page.context['columns'][0]['events']
+        self.assertEqual(sorted((e['title'], e['department']) for e in events), [('Patient A', 'Physical Therapy'), ('Patient C', 'Occupational Therapy')])
+        self.assertEqual({e['lane'] for e in events}, {0, 1})
+        self.assertContains(page, 'Click an empty time to book')
+        self.assertContains(page, 'data-open="bookModal"')
+        self.assertEqual(len(self.client.get(reverse('clinics:desk'), {'tab': 'schedule', 'days': 7}).context['columns']), 7)
+        filtered = self.client.get(reverse('clinics:desk'), {'tab': 'schedule', 'dept': self.pt.pk})
+        self.assertEqual([e['title'] for e in filtered.context['columns'][0]['events']], ['Patient A'])
+        listing = self.client.get(reverse('clinics:desk'), {'tab': 'schedule', 'view': 'list'})
+        self.assertEqual(listing.context['view'], 'list')
+        self.assertEqual(len(listing.context['appointments']), 2)
+
+    def test_a_department_login_gets_a_read_only_view_without_phone_numbers_or_message_links(self):
+        clinic = self.prepare()
+        self.as_user('owner')
+        self.client.post(reverse('clinics:staff-add', args=[clinic.pk]), {'role': 'department', 'department': self.ot.pk, 'name': ''})
+        member = ClinicMember.objects.get(role='department')
+        self.client.post(reverse('clinics:staff-login', args=[clinic.pk, member.pk]), {'username': 'ot-room', 'password1': '1234', 'password2': '1234'})
+        self.assertTrue(self.client.login(username='ot-room', password='1234'))
+        page = self.client.get(reverse('clinics:desk'), {'tab': 'schedule', 'view': 'calendar'})
+        self.assertEqual([e['title'] for e in page.context['columns'][0]['events']], ['Patient C'])
+        self.assertNotContains(page, 'wa.me')
+        self.assertNotContains(page, 'data-open="bookModal"')
+        self.assertNotContains(page, 'Patient A')
+        self.assertEqual(page.context['columns'][0]['events'][0]['links'], {})

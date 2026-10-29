@@ -170,3 +170,7 @@ Add them under Team, Add team, Staff with the role **Doctor / therapist** and a 
 ### Reception runs the appointment book
 
 Receptionists and managers (not assistants, doctors or department logins) can **book, change and cancel** the clinic's appointments from the front desk: Schedule tab, *Book an appointment*. They pick one of the clinic's own patients, the date, time and length, and optionally a department and the therapist it is with. After booking, changing or cancelling they get the same WhatsApp / Viber / SMS message buttons as the clinic login. Reception does not mark an appointment attended, because that records a clinical session. Needs the Appointments module and an active Clinic plan.
+
+### The front desk as a workspace
+
+The front desk has a sidebar like the main workspace. Receptionists and managers open on a **Dashboard**: appointments today (to come / attended), the queue, patients registered today, what was billed and received today and what is still to collect, who is coming up next, who is in the queue, and quick buttons (book, register, add to queue, new bill). Assistants and doctors see no money. The **Schedule** tab is a **calendar** (1, 3 or 7 days, departments side by side, a department filter): click an empty time to book, click an appointment to change it, cancel it or send the patient a message. A **List** view shows the same day as a table. A department login gets the same calendar read-only, without phone numbers or message links.
