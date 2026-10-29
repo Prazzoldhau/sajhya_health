@@ -56,6 +56,12 @@ class BillingEntry(models.Model):
         return self.cancelled_at is not None
 
     @property
+    def line_items(self):
+        """The services the bill was made of, when they still explain the amount (a hand-corrected amount shows just the one service text)."""
+        lines = list(self.lines.all())
+        return lines if lines and sum((l.price for l in lines), Decimal('0')) == self.rate else []
+
+    @property
     def carried_over(self):
         """Extra cash the patient handed over on this bill that was kept as their advance (no change given back)."""
         return sum((m.amount for m in self.advance_moves.all() if m.kind == 'deposit' and m.amount > 0), Decimal('0'))
@@ -161,6 +167,37 @@ class BillingEntry(models.Model):
                     payment.save(update_fields=['amount'])
             self.amount_paid = target
             self.save(update_fields=['amount_paid', 'updated_at'])
+
+
+class ServiceItem(models.Model):
+    """One line of a practice's price list: a service (Basic Physiotherapy 400) or an add-on (Needling 300). The bill forms offer them as buttons."""
+    professional = models.ForeignKey('accounts.ProfessionalProfile', on_delete=models.CASCADE, related_name='service_items')
+    name = models.CharField(max_length=100)
+    price = models.DecimalField(max_digits=10, decimal_places=2)
+    is_addon = models.BooleanField(default=False, help_text='An extra on top of a main service (shown with a +).')
+    active = models.BooleanField(default=True, help_text='Untick to stop offering it without losing it.')
+    order = models.PositiveSmallIntegerField(default=0)
+
+    class Meta:
+        ordering = ['is_addon', 'order', 'id']
+        unique_together = [('professional', 'name')]
+
+    def __str__(self):
+        return f'{self.name} ({self.price})'
+
+
+class BillLine(models.Model):
+    """What a bill was made of: the services and add-ons picked from the price list, with the price each had on that day."""
+    entry = models.ForeignKey(BillingEntry, on_delete=models.CASCADE, related_name='lines')
+    name = models.CharField(max_length=150)
+    price = models.DecimalField(max_digits=10, decimal_places=2)
+    order = models.PositiveSmallIntegerField(default=0)
+
+    class Meta:
+        ordering = ['order', 'id']
+
+    def __str__(self):
+        return f'{self.name} {self.price}'
 
 
 class EntryPayment(models.Model):

@@ -22,6 +22,10 @@ urlpatterns = [
     path('entry/<int:pk>/restore/', views.entry_restore, name='entry-restore'),
     path('entry/<int:pk>/delete/', views.entry_delete, name='entry-delete'),
     # patient packages (1 / 2 / 3 / 4 weeks)
+    path('services/', views.services, name='services'),
+    path('services/seed/', views.services_seed, name='services-seed'),
+    path('services/<int:pk>/save/', views.service_save, name='service-save'),
+    path('services/<int:pk>/delete/', views.service_delete, name='service-delete'),
     path('sheet/', views.sheet, name='sheet'),
     path('export.xlsx', views.export_xlsx, name='export-xlsx'),
     path('export.csv', views.export_csv, name='export-csv'),

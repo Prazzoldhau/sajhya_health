@@ -237,6 +237,7 @@
   <div class="section-title" style="padding-top:8px"><span class="bar">Billing history</span><button type="button" class="secondary-btn" style="height:34px" onclick="var f=document.getElementById('patientBill');f.hidden=!f.hidden;if(!f.hidden)f.querySelector('[name=rate]').focus()">＋ New bill</button></div>
   <form method="post" action="{% url 'billing:patient-bill' patient.pk %}" id="patientBill" hidden style="margin:0 24px 14px;padding:14px 16px;border:1px solid var(--line);border-radius:10px;background:#f6faf7">
     {% csrf_token %}
+    {% include 'billing/_service_picker.html' with form_id='patientBill' %}
     <div class="patient-id" style="margin-bottom:10px">Bill for <b>{{ patient.name }}</b> -- name, age and contact are filled in from the patient record.</div>
     <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;align-items:end">
       <label>Date {{ bill_form.entry_date }}</label>

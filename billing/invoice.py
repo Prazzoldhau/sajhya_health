@@ -138,16 +138,19 @@ def build_pdf(entry, online_url=''):
     c.drawRightString(right - 3 * mm, top + 3 * mm, 'AMOUNT (NPR)')
     c.setFillColor(ink)
     c.setFont('Helvetica', 11)
-    c.drawString(left + 3 * mm, top - 6 * mm, _latin(entry.service, 'Service'))
-    c.drawRightString(right - 3 * mm, top - 6 * mm, f'{entry.rate:,.2f}')
+    lines = [(l.name, l.price) for l in entry.line_items] or [(entry.service, entry.rate)]  # the services picked from the price list, else the one service text
+    for i, (name, price) in enumerate(lines):
+        c.drawString(left + 3 * mm, top - 6 * mm - i * 6 * mm, _latin(name, 'Service'))
+        c.drawRightString(right - 3 * mm, top - 6 * mm - i * 6 * mm, f'{price:,.2f}')
+    extra_h = (len(lines) - 1) * 6 * mm
     if entry.notes and _latin(entry.notes, ''):
         c.setFont('Helvetica', 8.5)
         c.setFillColor(muted)
-        c.drawString(left + 3 * mm, top - 11 * mm, _latin(entry.notes, '')[:110])
+        c.drawString(left + 3 * mm, top - 11 * mm - extra_h, _latin(entry.notes, '')[:110])
     c.setStrokeColor(colors.HexColor('#e1ebe5'))
-    c.line(left, top - 14 * mm, right, top - 14 * mm)
+    c.line(left, top - 14 * mm - extra_h, right, top - 14 * mm - extra_h)
 
-    ty = top - 24 * mm
+    ty = top - 24 * mm - extra_h
     c.setFillColor(ink)
     for label, value, bold in (('Total', entry.rate, True), ('Received', entry.amount_paid, False), ('Balance due', entry.amount_due, True)):
         c.setFont('Helvetica-Bold' if bold else 'Helvetica', 11)
@@ -228,7 +231,7 @@ def build_png(entry):
     lines_right = [f'Date: {entry.entry_date:%d %b %Y}', f'Status: {entry.status_label}', f'Payment mode: {entry.get_payment_mode_display()}']
     extra = entry.carried_over if not entry.is_cancelled else 0
     payments = list(entry.payments.all())[:8]
-    H = 660 + (110 if extra > 0 else 0) + (50 + 32 * len(payments) if payments else 0)
+    H = 660 + 36 * max(len(entry.line_items) - 1, 0) + (110 if extra > 0 else 0) + (50 + 32 * len(payments) if payments else 0)
     img = Image.new('RGB', (W, H), 'white')
     d = ImageDraw.Draw(img)
     d.rectangle([0, 0, W, 120], fill=green)
@@ -248,8 +251,11 @@ def build_png(entry):
     d.rectangle([pad, y, W - pad, y + 46], fill=soft)
     d.text((pad + 14, y + 12), 'SERVICE', font=_font(True, 18), fill=green)
     d.text((W - pad - 14, y + 12), 'AMOUNT (NPR)', font=_font(True, 18), fill=green, anchor='ra')
-    d.text((pad + 14, y + 66), _latin(entry.service, 'Service'), font=_font(False, 24), fill=ink)
-    d.text((W - pad - 14, y + 66), f'{entry.rate:,.2f}', font=_font(False, 24), fill=ink, anchor='ra')
+    lines = [(l.name, l.price) for l in entry.line_items] or [(entry.service, entry.rate)]
+    for i, (name, price) in enumerate(lines):
+        d.text((pad + 14, y + 66 + i * 36), _latin(name, 'Service'), font=_font(False, 24), fill=ink)
+        d.text((W - pad - 14, y + 66 + i * 36), f'{price:,.2f}', font=_font(False, 24), fill=ink, anchor='ra')
+    y += (len(lines) - 1) * 36
     d.line([pad, y + 110, W - pad, y + 110], fill=(225, 235, 229), width=2)
     y += 140
     for label, value, bold in (('Total', entry.rate, True), ('Received', entry.amount_paid, False), ('Balance due', entry.amount_due, True)):

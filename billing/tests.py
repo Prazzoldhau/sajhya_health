@@ -935,7 +935,7 @@ class BillingSheetTests(BillingBase):
         self.bill(rate='700', status='due')
         self.client.post(reverse('billing:advance-add', args=[self.patient.pk]), {'amount': '1000', 'payment_mode': 'online'})
         wb = self.workbook()
-        self.assertEqual(wb.sheetnames, ['Summary', 'Bills', 'Payments received', 'Advances', 'Packages'])
+        self.assertEqual(wb.sheetnames, ['Summary', 'Bills', 'Payments received', 'Advances', 'Packages', 'By service'])
         bills = wb['Bills']
         self.assertEqual([c.value for c in bills[1]][:9], ['Date', 'Invoice', 'Patient', 'Patient ID', 'Phone', 'Service', 'Amount (NPR)', 'Received (NPR)', 'Due (NPR)'])
         self.assertEqual((bills['A2'].value.date() if hasattr(bills['A2'].value, 'date') else bills['A2'].value), self.today)
@@ -1013,3 +1013,102 @@ class BillingSheetTests(BillingBase):
         finally:
             exports.MAX_SHEET_ROWS = old
         self.assertEqual(self.workbook()['Bills'].max_row, 1 + 3 + 1)  # header, three bills and the total row
+
+
+class PriceListTests(BillingBase):
+    def seed(self):
+        return self.client.post(reverse('billing:services-seed'))
+
+    def pick(self, *names):
+        import json
+        from .models import ServiceItem
+        lines = [{'name': s.name, 'price': str(s.price)} for s in ServiceItem.objects.filter(name__in=names).order_by('id')]
+        return json.dumps(lines), sum(s.price for s in ServiceItem.objects.filter(name__in=names))
+
+    def test_the_standard_list_can_be_added_edited_and_removed(self):
+        from .models import ServiceItem
+        page = self.client.get(reverse('billing:services'))
+        self.assertContains(page, 'Add the standard list')
+        self.seed()
+        items = {s.name: (s.price, s.is_addon) for s in ServiceItem.objects.all()}
+        self.assertEqual(items, {'Basic Physiotherapy': (400, False), 'Consultation': (200, False), 'Manual therapy': (200, True), 'Needling': (300, True),
+                                 'Taping': (200, True), 'Cupping': (100, True), 'CPM': (200, True)})
+        self.seed()  # not twice
+        self.assertEqual(ServiceItem.objects.count(), 7)
+        cupping = ServiceItem.objects.get(name='Cupping')
+        self.client.post(reverse('billing:service-save', args=[cupping.pk]), {'name': 'Cupping', 'price': '150', 'kind': 'addon', 'active': 'on'})
+        cupping.refresh_from_db()
+        self.assertEqual(cupping.price, 150)
+        self.client.post(reverse('billing:service-save', args=[0]), {'name': 'Ultrasound', 'price': '250', 'kind': 'addon'})
+        self.assertTrue(ServiceItem.objects.get(name='Ultrasound').active)
+        self.client.post(reverse('billing:service-save', args=[0]), {'name': 'ultrasound', 'price': '1', 'kind': 'main'})  # same name, any case
+        self.client.post(reverse('billing:service-save', args=[0]), {'name': 'Bad', 'price': '-5', 'kind': 'main'})
+        self.client.post(reverse('billing:service-save', args=[0]), {'name': '', 'price': '5', 'kind': 'main'})
+        self.assertEqual(ServiceItem.objects.count(), 8)
+        self.client.post(reverse('billing:service-save', args=[cupping.pk]), {'name': 'Cupping', 'price': '150', 'kind': 'addon'})  # "in use" unticked
+        cupping.refresh_from_db()
+        self.assertFalse(cupping.active)
+        from . import catalog
+        self.assertNotIn('Cupping', [s['name'] for s in catalog.catalog_for(self.profile)])  # not offered any more
+        self.client.post(reverse('billing:service-delete', args=[cupping.pk]))
+        self.assertFalse(ServiceItem.objects.filter(name='Cupping').exists())
+
+    def test_a_bill_made_from_the_price_list_keeps_its_lines_and_the_invoice_shows_them(self):
+        from .models import BillLine
+        self.seed()
+        lines, total = self.pick('Basic Physiotherapy', 'Needling', 'Taping')
+        self.assertEqual(total, 900)
+        self.client.post(reverse('billing:patient-bill', args=[self.patient.pk]), {'entry_date': self.today.isoformat(), 'service': 'Basic Physiotherapy + Needling + Taping', 'rate': '900',
+                                                                                 'payment_mode': 'cash', 'payment_status': 'paid', 'lines': lines})
+        entry = BillingEntry.objects.get()
+        self.assertEqual([(l.name, l.price) for l in entry.lines.all()], [('Basic Physiotherapy', 400), ('Needling', 300), ('Taping', 200)])
+        self.assertEqual(len(entry.line_items), 3)
+        page = self.client.get(reverse('billing:invoice', args=[entry.pk]))
+        self.assertEqual([l.name for l in page.context['lines']], ['Basic Physiotherapy', 'Needling', 'Taping'])
+        self.assertContains(page, 'Needling')
+        self.assertTrue(self.client.get(reverse('billing:invoice-pdf', args=[entry.pk])).content.startswith(b'%PDF'))
+        self.assertTrue(self.client.get(reverse('billing:invoice-png', args=[entry.pk])).content.startswith(b'\x89PNG'))
+        # a corrected amount no longer matches the lines: the invoice falls back to the single service text
+        self.client.post(reverse('billing:entry-correct', args=[entry.pk]), {'entry_date': self.today.isoformat(), 'service': 'Basic + extras', 'rate': '850', 'payment_mode': 'cash', 'payment_status': 'paid'})
+        entry = BillingEntry.objects.get(pk=entry.pk)
+        self.assertEqual(entry.line_items, [])
+        self.assertEqual(BillLine.objects.count(), 3)  # kept, just not shown while they disagree with the amount
+        self.assertTrue(self.client.get(reverse('billing:invoice-pdf', args=[entry.pk])).content.startswith(b'%PDF'))
+
+    def test_the_forms_show_the_price_list_buttons_and_bad_lines_are_ignored(self):
+        from .models import BillLine
+        self.assertContains(self.client.get(reverse('billing:billing')), 'No price list yet')
+        self.seed()
+        for page in (self.client.get(reverse('billing:billing')), self.client.get(reverse('accounts:patient-detail', args=[self.patient.pk]) + '?tab=billing')):
+            self.assertContains(page, 'data-svc-chips')
+            self.assertContains(page, 'Basic Physiotherapy')
+        self.client.post(reverse('billing:entry-create'), {'entry_date': self.today.isoformat(), 'patient_name': 'Walk In', 'service': 'X', 'rate': '100', 'payment_mode': 'cash', 'payment_status': 'paid',
+                                                           'lines': 'not json'})
+        self.client.post(reverse('billing:entry-create'), {'entry_date': self.today.isoformat(), 'patient_name': 'Walk Two', 'service': 'X', 'rate': '100', 'payment_mode': 'cash', 'payment_status': 'paid',
+                                                           'lines': '[{"name": "", "price": "5"}, {"name": "Neg", "price": "-1"}, {"name": "Junk", "price": "abc"}, "x", {"name": "Ok", "price": "100"}]'})
+        self.assertEqual(BillingEntry.objects.count(), 2)
+        self.assertEqual([(l.name, l.price) for l in BillLine.objects.all()], [('Ok', 100)])
+
+    def test_the_excel_file_adds_up_by_service_and_the_price_list_is_private(self):
+        import io
+
+        from openpyxl import load_workbook
+        self.seed()
+        for names, rate in ((('Basic Physiotherapy', 'Needling'), '700'), (('Basic Physiotherapy',), '400')):
+            lines, _ = self.pick(*names)
+            self.client.post(reverse('billing:patient-bill', args=[self.patient.pk]), {'entry_date': self.today.isoformat(), 'service': ' + '.join(names), 'rate': rate, 'payment_mode': 'cash',
+                                                                                     'payment_status': 'paid', 'lines': lines})
+        wb = load_workbook(io.BytesIO(self.client.get(reverse('billing:export-xlsx')).content))
+        self.assertEqual(wb.sheetnames, ['Summary', 'Bills', 'Payments received', 'Advances', 'Packages', 'By service'])
+        rows = {r[0].value: (r[1].value, r[2].value) for r in wb['By service'].iter_rows(min_row=2)}
+        self.assertEqual(rows, {'Basic Physiotherapy': (2, 800), 'Needling': (1, 300)})
+        stranger, _ = make_professional('stranger')
+        other = self.client_class()
+        other.force_login(stranger)
+        self.assertEqual(list(other.get(reverse('billing:services')).context['items']), [])  # nobody else's price list is shown
+        from .models import ServiceItem
+        item = ServiceItem.objects.get(name='Needling')
+        other.post(reverse('billing:service-delete', args=[item.pk]))
+        other.post(reverse('billing:service-save', args=[item.pk]), {'name': 'Hacked', 'price': '1', 'kind': 'main', 'active': 'on'})
+        item.refresh_from_db()
+        self.assertEqual((item.name, item.price), ('Needling', 300))

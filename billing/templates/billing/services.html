@@ -1,0 +1,49 @@
+{% extends 'accounts/pro_base.html' %}
+{% block title %}Services & prices | Sajhya Health{% endblock %}
+{% block extra_css %}
+  .sv-card { background: #fff; border: 1px solid var(--line); border-radius: 12px; padding: 14px 16px; margin-bottom: 14px; }
+  .sv-row { display: grid; grid-template-columns: minmax(160px, 1fr) 120px 140px auto auto; gap: 8px; align-items: center; padding: 8px 0; border-bottom: 1px solid #eef3ef; }
+  .sv-row input[type=text], .sv-row input[type=number], .sv-row select { height: 36px; border: 1px solid var(--line); border-radius: 8px; padding: 0 9px; width: 100%; background: #fff; }
+  .sv-row form { display: contents; } .sv-row.off { opacity: .55; }
+  .sv-head { font-size: 10.5px; font-weight: 800; color: var(--muted); letter-spacing: .05em; text-transform: uppercase; display: grid; grid-template-columns: minmax(160px, 1fr) 120px 140px auto auto; gap: 8px; padding-bottom: 6px; border-bottom: 1px solid var(--line); }
+  @media (max-width: 800px) { .sv-row, .sv-head { grid-template-columns: 1fr 1fr; } .sv-head { display: none; } }
+{% endblock %}
+
+{% block main %}
+{% include 'billing/_tabs.html' %}
+<div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:10px"><h1 style="margin:0;font-size:24px">Services &amp; prices</h1>
+  <span class="patient-id" style="display:inline">Your price list. When you bill, tap the services and add-ons and the bill fills itself in.</span></div>
+
+<section class="sv-card">
+  {% if items %}
+  <div class="sv-head"><span>NAME</span><span>PRICE (NPR)</span><span>TYPE</span><span></span><span></span></div>
+  {% for s in items %}
+  <div class="sv-row {% if not s.active %}off{% endif %}">
+    <form method="post" action="{% url 'billing:service-save' s.pk %}">{% csrf_token %}
+      <input type="text" name="name" value="{{ s.name }}" maxlength="100" required>
+      <input type="number" name="price" value="{{ s.price }}" step="0.01" min="0" required>
+      <select name="kind"><option value="main" {% if not s.is_addon %}selected{% endif %}>Service</option><option value="addon" {% if s.is_addon %}selected{% endif %}>Add-on</option></select>
+      <label style="font-size:12px;display:flex;gap:5px;align-items:center;white-space:nowrap"><input type="checkbox" name="active" {% if s.active %}checked{% endif %}> In use</label>
+      <button class="primary-btn" type="submit" style="height:34px">Save</button>
+    </form>
+  </div>
+  <form method="post" action="{% url 'billing:service-delete' s.pk %}" style="margin:0;text-align:right" onsubmit="return confirm('Remove {{ s.name|escapejs }} from the price list? Bills already made keep it.')">{% csrf_token %}<button class="text-link" type="submit" style="font-size:11.5px">Remove {{ s.name }}</button></form>
+  {% endfor %}
+  {% else %}
+  <p style="margin:0 0 10px">No services yet. Start from the usual list and change the prices to yours:</p>
+  <form method="post" action="{% url 'billing:services-seed' %}">{% csrf_token %}<button class="primary-btn" type="submit">Add the standard list</button></form>
+  <p class="patient-id" style="margin:8px 0 0">Basic Physiotherapy 400 and Consultation 200, with add-ons Manual therapy 200, Needling 300, Taping 200, Cupping 100 and CPM 200.</p>
+  {% endif %}
+</section>
+
+<section class="sv-card">
+  <div style="font-weight:800;margin-bottom:8px">Add a service or add-on</div>
+  <form method="post" action="{% url 'billing:service-save' 0 %}" style="display:grid;grid-template-columns:minmax(160px,1fr) 130px 150px auto;gap:8px;align-items:center">{% csrf_token %}
+    <input type="text" name="name" placeholder="e.g. Ultrasound" maxlength="100" required style="height:38px;border:1px solid var(--line);border-radius:8px;padding:0 10px">
+    <input type="number" name="price" placeholder="Price" step="0.01" min="0" required style="height:38px;border:1px solid var(--line);border-radius:8px;padding:0 10px">
+    <select name="kind" style="height:38px;border:1px solid var(--line);border-radius:8px;padding:0 10px"><option value="main">Service</option><option value="addon">Add-on</option></select>
+    <button class="primary-btn" type="submit">Add</button>
+  </form>
+  <p class="patient-id" style="margin:8px 0 0">A <b>service</b> is the main thing billed; an <b>add-on</b> is something extra on top (shown with a + and a dashed outline). Both are tapped the same way when billing, in any combination.</p>
+</section>
+{% endblock %}

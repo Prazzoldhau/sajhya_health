@@ -17,10 +17,10 @@ from accounts.access import actor_of, can_see_contact, first_error, own_patient,
 
 from accounts.messaging import channel_links
 
-from . import exports
+from . import catalog, exports
 from . import invoice as inv
 from .forms import AdvanceForm, BillCorrectionForm, BillingEntryForm, EntryPaymentForm, PackagePaymentForm, PatientBillForm, PatientPackageForm
-from .models import ADVANCE, BillingEntry, EntryPayment, PackagePayment, PatientAdvance, PatientPackage, advance_balance, lock_patient
+from .models import ServiceItem, ADVANCE, BillingEntry, EntryPayment, PackagePayment, PatientAdvance, PatientPackage, advance_balance, lock_patient
 
 
 def revenue_for(profile, date):
@@ -104,7 +104,7 @@ def billing(request):
         'prev_date': selected - datetime.timedelta(days=1), 'next_date': selected + datetime.timedelta(days=1),
         'total': total, 'by_mode': [(mode_names[m], v) for m, v in by_mode.items()],
         'month_total': month_total, 'month_label': f'{selected:%B %Y}', 'package_payments': revenue_for(profile, selected) - collected - advance_net, 'collected': collected, 'advance_net': advance_net, 'received_total': revenue_for(profile, selected), 'advance_held': advance_held, 'advance_held_total': advance_held,
-        'packages_due': packages_due, 'owed': owed, 'bills_due': bills_due, 'pay_form': EntryPaymentForm(), 'correct_form': BillCorrectionForm(), 'open_new': request.GET.get('new') == '1', 'open_edit': request.GET.get('edit', '') if request.GET.get('edit', '').isdigit() else '',
+        'packages_due': packages_due, 'owed': owed, 'bills_due': bills_due, 'pay_form': EntryPaymentForm(), 'correct_form': BillCorrectionForm(), 'service_catalog': catalog.catalog_for(profile), 'open_new': request.GET.get('new') == '1', 'open_edit': request.GET.get('edit', '') if request.GET.get('edit', '').isdigit() else '',
     })
     return render(request, 'billing/billing.html', context)
 
@@ -133,6 +133,7 @@ def entry_save(request, pk=None):
         obj.save()
         carried = None
         if not pk:
+            catalog.save_lines(obj, request.POST.get('lines'))
             form.apply_payment(obj, request.user)
             carried = getattr(form, 'carried', 0)
         messages.success(request, f'Saved - {obj.invoice_number}' + (f'. NPR {carried:g} carried over as advance for {obj.patient_name}.' if carried else ''))
@@ -159,6 +160,7 @@ def patient_bill(request, patient_id):
         entry.contact_number = patient.phone if can_see_contact(profile, patient) else ''
         entry.created_by_name, entry.created_by_role = actor_of(request.user, profile)
         entry.save()
+        catalog.save_lines(entry, request.POST.get('lines'))
         form.apply_payment(entry, request.user)
         carried = getattr(form, 'carried', 0)
         if form.cleaned_data.get('payment_status') == 'advance' and entry.amount_paid == 0:
@@ -496,7 +498,7 @@ def invoice(request, pk):
     context = workspace_context(request.user, profile)
     from .models import advance_balance
     context.update({
-        'carried': entry.carried_over, 'cash_handed_over': entry.cash_handed_over, 'advance_now': advance_balance(entry.patient_id) if entry.patient_id else 0,
+        'lines': entry.line_items, 'carried': entry.carried_over, 'cash_handed_over': entry.cash_handed_over, 'advance_now': advance_balance(entry.patient_id) if entry.patient_id else 0,
         'active': 'billing', 'entry': entry, 'practice': inv.practice_of(entry), 'payments': entry.payments.all(), 'public_url': public_url,
         'links': channel_links(phone, inv.share_message(entry, public_url), entry.patient.messaging_app if entry.patient_id else 'whatsapp', profile.whatsapp_web), 'whatsapp': inv.whatsapp_link(entry, phone, public_url), 'whatsapp_chat': inv.whatsapp_chat(phone, profile.whatsapp_web), 'message': inv.share_message(entry, public_url), 'phone': phone, 'email': email,
         'back': back if back.startswith('/') and not back.startswith('//') else reverse('billing:billing') + f'?date={entry.entry_date.isoformat()}',
@@ -611,3 +613,70 @@ def export_csv(request):
         raise Http404
     f = exports.Filters.from_query(request.GET)
     return _download(exports.build_csv(exports.profile_scope(profile), f), f'billing_{f.start:%Y%m%d}_{f.end:%Y%m%d}.csv', 'text/csv; charset=utf-8')
+
+
+# ---------------------------------------------------------------------------
+# The price list
+# ---------------------------------------------------------------------------
+
+@login_required
+def services(request):
+    profile = workspace_profile(request)
+    if profile is None:
+        return redirect('accounts:welcome')
+    context = workspace_context(request.user, profile)
+    context.update({'active': 'billing', 'billing_tab': 'services', 'items': ServiceItem.objects.filter(professional=profile),
+                    'advance_held_total': PatientAdvance.objects.filter(professional=profile).aggregate(t=Sum('amount'))['t'] or 0})
+    return render(request, 'billing/services.html', context)
+
+
+@login_required
+def service_save(request, pk):
+    """Add a service (pk 0) or change one: name, price, service / add-on, in use."""
+    profile = workspace_profile(request)
+    if profile is None or request.method != 'POST':
+        return redirect('billing:services')
+    item = get_object_or_404(ServiceItem, pk=pk, professional=profile) if pk else None
+    name = (request.POST.get('name') or '').strip()[:100]
+    try:
+        price = Decimal(request.POST.get('price', ''))
+    except Exception:  # noqa: BLE001 - any bad number is the same message
+        price = None
+    if not name or price is None or price < 0 or price >= Decimal('10000000'):
+        messages.error(request, 'Give the service a name and a price of zero or more.')
+        return redirect('billing:services')
+    if ServiceItem.objects.filter(professional=profile, name__iexact=name).exclude(pk=pk or 0).exists():
+        messages.error(request, f'"{name}" is already on your price list.')
+        return redirect('billing:services')
+    if ServiceItem.objects.filter(professional=profile).count() >= 60 and item is None:
+        messages.error(request, 'The price list can hold up to 60 items.')
+        return redirect('billing:services')
+    if item is None:
+        item = ServiceItem(professional=profile, order=ServiceItem.objects.filter(professional=profile).count())
+        item.active = True
+    else:
+        item.active = request.POST.get('active') == 'on'
+    item.name, item.price, item.is_addon = name, price.quantize(Decimal('0.01')), request.POST.get('kind') == 'addon'
+    item.save()
+    messages.success(request, f'{item.name} saved at NPR {item.price:g}.')
+    return redirect('billing:services')
+
+
+@login_required
+def service_delete(request, pk):
+    profile = workspace_profile(request)
+    if profile is None or request.method != 'POST':
+        return redirect('billing:services')
+    ServiceItem.objects.filter(pk=pk, professional=profile).delete()
+    messages.success(request, 'Removed from the price list.')
+    return redirect('billing:services')
+
+
+@login_required
+def services_seed(request):
+    profile = workspace_profile(request)
+    if profile is None or request.method != 'POST':
+        return redirect('billing:services')
+    added = catalog.seed_suggested(profile)
+    messages.success(request, f'{added} services added. Change the prices to yours.' if added else 'Your price list already has services.')
+    return redirect('billing:services')

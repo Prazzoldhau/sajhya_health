@@ -112,6 +112,7 @@
         <span style="position:relative;display:block"><input type="search" id="billSearch" placeholder="Search by name, phone or patient ID..." autocomplete="off"></span>
       </label>
       {{ form.patient }}
+      <div id="svcPicker">{% include 'billing/_service_picker.html' with form_id='entryForm' %}</div>
       <div class="two"><label>Full name {{ form.patient_name }}</label><label>Date {{ form.entry_date }}</label></div>
       <div class="two"><label>Age {{ form.age }}</label><label>Sex {{ form.sex }}</label></div>
       <label>Contact number {{ form.contact_number }}</label>
@@ -139,11 +140,11 @@
   }
   f('payment_status').addEventListener('change', syncPay);
   $('newEntry').addEventListener('click', function () {
-    form.reset(); form.action = form.dataset.create; $('entryTitle').textContent = 'New billing entry'; $('payFields').hidden = false; syncPay(); f('patient').value = ''; f('entry_date').value = "{{ selected|date:'Y-m-d' }}"; open();
+    form.reset(); form.action = form.dataset.create; $('entryTitle').textContent = 'New billing entry'; $('payFields').hidden = false; $('svcPicker').hidden = false; syncPay(); f('patient').value = ''; f('entry_date').value = "{{ selected|date:'Y-m-d' }}"; open();
   });
   document.querySelectorAll('[data-edit]').forEach(function (b) {
     b.addEventListener('click', function () {
-      var d = b.dataset; form.action = d.url; $('entryTitle').textContent = 'Edit billing entry'; $('payFields').hidden = true;
+      var d = b.dataset; form.action = d.url; $('entryTitle').textContent = 'Edit billing entry'; $('payFields').hidden = true; $('svcPicker').hidden = true;
       f('patient').value = d.patient; f('patient_name').value = d.name; f('entry_date').value = d.date; f('age').value = d.age; f('sex').value = d.sex;
       f('contact_number').value = d.contact; f('service').value = d.service; f('rate').value = d.rate; f('payment_mode').value = d.mode; f('notes').value = d.notes; open();
     });

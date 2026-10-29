@@ -14,7 +14,7 @@ from django.views.decorators.http import require_GET, require_POST
 
 from accounts.access import first_error
 from accounts.models import Patient
-from billing import exports
+from billing import catalog, exports
 from billing import invoice as inv
 from billing.forms import EntryPaymentForm, PatientBillForm
 from billing.models import ADVANCE, BillingEntry, EntryPayment, PatientAdvance, advance_balance
@@ -120,7 +120,7 @@ def _billing_context(request, member):
     return {
         'selected': selected, 'today': today, 'prev_date': selected - datetime.timedelta(days=1), 'next_date': selected + datetime.timedelta(days=1),
         'day_bills': day, 'owed': owed, 'billed': sum((e.rate for e in day if not e.is_cancelled), 0), 'received': got,
-        'due_total': sum((e.amount_due for e in owed), 0), 'bill_form': PatientBillForm(initial={'entry_date': selected}), 'pay_form': EntryPaymentForm(),
+        'due_total': sum((e.amount_due for e in owed), 0), 'bill_form': PatientBillForm(initial={'entry_date': selected}), 'pay_form': EntryPaymentForm(), 'service_catalog': catalog.catalog_for(billing_owner(clinic)),
         'can_bill': member.clinic.is_usable,
     }
 
@@ -145,6 +145,7 @@ def bill_create(request, member):
     entry.contact_number = patient.phone if member.can('contact') else ''
     entry.created_by_name, entry.created_by_role = member.name, member.get_role_display()
     entry.save()
+    catalog.save_lines(entry, request.POST.get('lines'))
     form.apply_payment(entry, request.user)
     carried = getattr(form, 'carried', 0)
     messages.success(request, f'Bill {entry.invoice_number} saved for {patient.name}.' + (f' NPR {entry.amount_due:g} is due.' if entry.amount_due else '')

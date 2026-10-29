@@ -120,6 +120,7 @@
   </div>
   {% if can_bill %}
   <form method="post" action="{% url 'clinics:desk-bill-create' %}" id="deskBill" class="form" hidden style="max-width:none;border:1px solid var(--line);border-radius:10px;padding:14px 16px;background:#f6faf7;margin-bottom:16px">{% csrf_token %}
+    {% include 'billing/_service_picker.html' with form_id='deskBill' %}
     <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:10px">
       <label>Patient<span class="search"><input type="text" id="billSearch" placeholder="Search the clinic's patients..." autocomplete="off"></span></label>
       <label>Date {{ bill_form.entry_date }}</label><label>Service {{ bill_form.service }}</label><label>Amount (NPR) {{ bill_form.rate }}</label>

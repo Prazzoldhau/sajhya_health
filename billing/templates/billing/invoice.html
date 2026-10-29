@@ -47,7 +47,9 @@
       <div><div class="l">Invoice details</div><div>Date: <b>{{ entry.entry_date|date:"j M Y" }}</b><br>Status: <span class="badge-s {{ entry.status_key }}">{{ entry.status_label }}</span><br>Payment mode: {{ entry.get_payment_mode_display }}{% if practice.person %}<br>Therapist: {{ practice.person }}{% endif %}</div></div>
     </div>
     <table class="inv-table"><thead><tr><th>SERVICE</th><th>AMOUNT (NPR)</th></tr></thead>
-      <tbody><tr><td><b>{{ entry.service }}</b>{% if entry.notes %}<div style="font-size:12px;color:var(--muted);margin-top:3px">{{ entry.notes }}</div>{% endif %}</td><td>{{ entry.rate }}</td></tr></tbody></table>
+      <tbody>{% if lines %}{% for l in lines %}<tr><td><b>{{ l.name }}</b></td><td>{{ l.price }}</td></tr>{% endfor %}
+      {% if entry.notes %}<tr><td colspan="2" style="font-size:12px;color:var(--muted);padding-top:4px">{{ entry.notes }}</td></tr>{% endif %}
+      {% else %}<tr><td><b>{{ entry.service }}</b>{% if entry.notes %}<div style="font-size:12px;color:var(--muted);margin-top:3px">{{ entry.notes }}</div>{% endif %}</td><td>{{ entry.rate }}</td></tr>{% endif %}</tbody></table>
     <div class="inv-totals">
       <div><span>Total</span><b>NPR {{ entry.rate }}</b></div>
       {% if carried and not entry.is_cancelled %}<div><span>Cash handed over</span><span>NPR {{ cash_handed_over }}</span></div>{% endif %}

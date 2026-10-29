@@ -207,6 +207,20 @@ def build_workbook(scope, f):
                                            (p.total_sessions, None), (p.total_amount, MONEY), (p.amount_paid, MONEY), (p.amount_due, MONEY), (p.effective_status_display, None)), 1):
             _put(pk, r, c, value, fmt)
 
+    svc = wb.create_sheet('By service')
+    _header(svc, ['Service / add-on', 'Times billed', 'Amount (NPR)'], [34, 14, 16])
+    by_service = {}
+    for e in bills(scope, f)[:MAX_EXPORT_ROWS]:
+        if e.is_cancelled:
+            continue
+        for name, price in ([(l.name, l.price) for l in e.line_items] or [(e.service, e.rate)]):
+            count, amount = by_service.get(name, (0, Decimal('0')))
+            by_service[name] = (count + 1, amount + price)
+    for r, (name, (count, amount)) in enumerate(sorted(by_service.items(), key=lambda kv: -kv[1][1]), 2):
+        _put(svc, r, 1, name)
+        _put(svc, r, 2, count)
+        _put(svc, r, 3, amount, MONEY)
+
     summary = wb.create_sheet('Summary', 0)
     t = totals(rows)
     _put(summary, 1, 1, scope.title, bold=True)
