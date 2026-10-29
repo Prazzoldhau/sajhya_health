@@ -1,5 +1,6 @@
 import datetime
 
+from django.contrib.auth.models import User
 from django.test import TestCase
 from django.urls import reverse
 from django.utils import timezone
@@ -1220,3 +1221,80 @@ class VisitingClinicianTests(Base):
         self.as_user('owner')
         self.client.post(reverse('clinics:staff-add', args=[clinic.pk]), {'name': 'Sita', 'role': 'receptionist', 'specialty': 'Ortho'})
         self.assertEqual(ClinicMember.objects.get(name='Sita').specialty, '')
+
+
+class SeedQaClinicTests(TestCase):
+    """python manage.py seed_qa_clinic: a mock clinic for QA, and a clean way to remove it."""
+    def run_command(self, *args):
+        import io
+        from django.core.management import call_command
+        out = io.StringIO()
+        call_command('seed_qa_clinic', *args, stdout=out)
+        text = out.getvalue()
+        passwords = {}
+        for line in text.splitlines():
+            parts = line.split()
+            if parts and parts[0].startswith('qa-bshc-') and len(parts) > 1 and not parts[1].startswith('('):
+                passwords[parts[0]] = parts[1]
+        return text, passwords
+
+    def test_it_builds_the_clinic_with_four_therapists_who_each_see_their_own_bookings(self):
+        from accounts.models import Appointment, Department
+        text, passwords = self.run_command()
+        clinic = Clinic.objects.get(name='Bhaktapur Speech and Hearing Center')
+        self.assertTrue(clinic.is_usable)
+        self.assertEqual(set(passwords), {'qa-bshc-owner', 'qa-bshc-clinic', 'qa-bshc-reception', 'qa-bshc-ot', 'qa-bshc-speech', 'qa-bshc-physio', 'qa-bshc-behaviour'})
+        self.assertEqual(sorted(clinic.calendar_owner.departments.values_list('name', flat=True)),
+                         ['Behaviour Therapy', 'Occupational Therapy', 'Physiotherapy', 'Speech Therapy'])
+        professions = {m.physio.account.profession.name for m in clinic.members.filter(role='physio')}
+        self.assertEqual(professions, {'occupational therapist', 'speech therapist', 'physiotherapist', 'behaviour therapist'})
+        # one time slot shared by the four departments
+        shared = Appointment.objects.filter(professional=clinic.workspace, start__hour=13, start__minute=30, start__date=timezone.localdate())
+        self.assertEqual(sorted(a.department.name for a in shared), ['Behaviour Therapy', 'Occupational Therapy', 'Physiotherapy', 'Speech Therapy'])
+        for suffix, department in (('ot', 'Occupational Therapy'), ('speech', 'Speech Therapy'), ('physio', 'Physiotherapy'), ('behaviour', 'Behaviour Therapy')):
+            self.assertTrue(self.client.login(username=f'qa-bshc-{suffix}', password=passwords[f'qa-bshc-{suffix}']), suffix)
+            page = self.client.get(reverse('clinics:my-schedule'))
+            rows = page.context['appointments']
+            self.assertTrue(rows, suffix)
+            self.assertEqual({a.department.name for a in rows}, {department})  # only their own bookings
+            self.assertContains(page, 'Bhaktapur Speech and Hearing Center')
+            self.client.logout()
+        self.assertTrue(self.client.login(username='qa-bshc-clinic', password=passwords['qa-bshc-clinic']))
+        calendar = self.client.get(reverse('accounts:appointments'))
+        self.assertEqual(calendar.status_code, 200)
+        self.assertEqual(len(calendar.context['departments']), 4)
+        self.client.logout()
+        self.assertTrue(self.client.login(username='qa-bshc-reception', password=passwords['qa-bshc-reception']))
+        desk = self.client.get(reverse('clinics:desk'), {'tab': 'schedule'})
+        self.assertGreaterEqual(len(desk.context['appointments']), 4)
+
+    def test_running_it_again_changes_nothing_but_the_dates_and_keeps_passwords(self):
+        from accounts.models import Appointment
+        _, first = self.run_command()
+        counts = (User.objects.filter(username__startswith='qa-bshc-').count(), Patient.objects.count(), Clinic.objects.count(), Appointment.objects.count())
+        text, second = self.run_command()
+        self.assertEqual(second, {})  # no password is printed again
+        self.assertIn('unchanged', text)
+        self.assertEqual((User.objects.filter(username__startswith='qa-bshc-').count(), Patient.objects.count(), Clinic.objects.count(), Appointment.objects.count()), counts)
+        self.assertTrue(self.client.login(username='qa-bshc-ot', password=first['qa-bshc-ot']))
+        self.client.logout()
+        _, third = self.run_command('--reset-passwords')
+        self.assertNotEqual(third['qa-bshc-ot'], first['qa-bshc-ot'])
+        self.assertFalse(self.client.login(username='qa-bshc-ot', password=first['qa-bshc-ot']))
+        self.assertTrue(self.client.login(username='qa-bshc-ot', password=third['qa-bshc-ot']))
+
+    def test_remove_deletes_only_the_qa_clinic(self):
+        from accounts.models import Appointment
+        real_user, real = make_professional('real-physio')
+        make_patient(real, 'Real Patient')
+        self.run_command()
+        self.assertGreater(Appointment.objects.count(), 0)
+        text, _ = self.run_command('--remove')
+        self.assertIn('Removed', text)
+        self.assertFalse(User.objects.filter(username__startswith='qa-bshc-').exists())
+        self.assertFalse(Clinic.objects.filter(name='Bhaktapur Speech and Hearing Center').exists())
+        self.assertEqual(Appointment.objects.count(), 0)
+        self.assertEqual(list(Patient.objects.values_list('name', flat=True)), ['Real Patient'])
+        self.assertTrue(User.objects.filter(username='real-physio').exists())
+        self.run_command()  # and it can be built again
+        self.assertTrue(Clinic.objects.filter(name='Bhaktapur Speech and Hearing Center').exists())

@@ -140,3 +140,11 @@ and hosted (Supabase) links are stored as URLs and played from there.
 ## Money integrity check
 
 `python manage.py check_money` compares every bill, package and advance with the payments behind it and lists any that disagree (it changes nothing; exit status 1 if something is wrong). Run it after restoring a backup or editing money rows in the admin, or on a schedule. Money moves are done under database locks (`select_for_update`), so two people receiving the same bill, or spending the same advance, at once cannot both count it.
+
+## Mock clinic for QA
+
+`python manage.py seed_qa_clinic` builds **Bhaktapur Speech and Hearing Center** with an owner, the clinic's own login, a receptionist and four verified therapists (occupational, speech, physiotherapy, behaviour), their departments, eight "QA Patient" records and appointments for today and tomorrow (four departments share the 1:30 pm slot). It prints each username (all start `qa-bshc-`) with a generated password, once.
+
+- Sign in as a therapist: **My schedule** lists only the appointments booked with them. Sign in as `qa-bshc-clinic`: **Appointments** to book and edit.
+- Run it again: nothing is duplicated, passwords are kept, the sample appointments move to today and tomorrow. `--reset-passwords` gives new passwords.
+- `python manage.py seed_qa_clinic --remove` deletes the QA clinic and the `qa-bshc-*` sign-ins with their patients, appointments and bills, and nothing else.
