@@ -263,7 +263,7 @@
       <a href="{% url 'accounts:dashboard' %}" class="brand-mark" title="Sajhya Health"><img src="{% static 'images/logo-128.png' %}" alt="Sajhya Health" width="40" height="40"></a>
       <div><div class="brand-name">Sajhya Health</div><div class="brand-tagline">{% block tagline %}Professional workspace{% endblock %}</div></div>
     </div>
-    <form class="global-search" method="get" action="{% url 'accounts:patients' %}"><span>⌕</span><input id="globalSearch" name="q" type="search" value="{{ q|default:'' }}" placeholder="Search patient by name, phone, ID..." aria-label="Search patients"></form>
+    {% if not profile.is_business_owner %}<form class="global-search" method="get" action="{% url 'accounts:patients' %}"><span>⌕</span><input id="globalSearch" name="q" type="search" value="{{ q|default:'' }}" placeholder="Search patient by name, phone, ID..." aria-label="Search patients"></form>{% endif %}
     <div class="top-spacer"></div>
     <button class="icon-btn" aria-label="Notifications" onclick="notify('You are all caught up on notifications.')">♧<i class="dot"></i></button>
     <details class="profile">
@@ -284,19 +284,23 @@
     <aside class="sidebar">
       {% block sidebar %}
       <div class="nav-label">Workspace</div>
+      {% if not profile.is_business_owner %}
       <a class="nav {% if active == 'dashboard' %}active{% endif %}" href="{% url 'accounts:dashboard' %}"><span class="nav-icon">⌂</span><span class="nav-text">Dashboard</span></a>
       <a class="nav {% if active == 'patients' %}active{% endif %}" href="{% url 'accounts:patients' %}"><span class="nav-icon">♙</span><span class="nav-text">Patients</span></a>
       <a class="nav {% if active == 'appointments' %}active{% endif %}" href="{% url 'accounts:appointments' %}"><span class="nav-icon">▦</span><span class="nav-text">Appointments</span></a>
       <a class="nav {% if active == 'plans' %}active{% endif %}" href="{% url 'accounts:plans' %}"><span class="nav-icon">▤</span><span class="nav-text">Treatment Plans</span></a>
       <a class="nav {% if active == 'exercises' %}active{% endif %}" href="{% url 'exercises:library' %}"><span class="nav-icon">♧</span><span class="nav-text">Exercise Library</span></a>
       <a class="nav {% if active == 'billing' %}active{% endif %}" href="{% url 'billing:billing' %}"><span class="nav-icon">▣</span><span class="nav-text">Billing</span></a>
+      {% endif %}
       {% if workspace_clinic %}
       <a class="nav {% if active == 'clinics' %}active{% endif %}" href="{% url 'clinics:detail' workspace_clinic.pk %}"><span class="nav-icon">✚</span><span class="nav-text">Clinic &amp; team</span></a>
       {% else %}
       <a class="nav {% if active == 'clinics' %}active{% endif %}" href="{% url 'clinics:hub' %}"><span class="nav-icon">✚</span><span class="nav-text">Clinic Connect</span>{% if clinic_invites %}<span class="nav-badge">{{ clinic_invites }}</span>{% endif %}</a>
       {% endif %}
+      {% if not profile.is_business_owner %}
       <a class="nav {% if active == 'messages' %}active{% endif %}" href="{% url 'accounts:messages' %}"><span class="nav-icon">✉</span><span class="nav-text">Messages</span></a>
       <a class="nav {% if active == 'reports' %}active{% endif %}" href="{% url 'accounts:reports' %}"><span class="nav-icon">▥</span><span class="nav-text">Reports</span></a>
+      {% endif %}
       <a class="nav {% if active == 'settings' %}active{% endif %}" href="{% url 'accounts:settings' %}"><span class="nav-icon">⚙</span><span class="nav-text">Settings</span></a>
       <div class="sidebar-bottom"><strong>Clinic workspace</strong><p>Manage appointments, assessments, treatment plans and patient progress from one place.</p></div>
       {% endblock %}

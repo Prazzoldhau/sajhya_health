@@ -9,18 +9,27 @@
 <div class="form-panel" style="max-width:640px">
     <h5>Account</h5>
     <p>{{ profile.full_name }}, {{ profile.title }}<br>{{ profile.account.user.email }} &middot; {{ profile.mobile }}</p>
+    {% if business %}
+    <h5>Business</h5>
+    <p>{{ profile.business_name }}<br>Registration no. {{ profile.business_registration_number }} &middot; PAN / tax no. {{ profile.tax_number }}<br>Registered with {{ profile.issuing_authority }}</p>
+    {% else %}
     <h5>Licensing</h5>
     <p>{{ profile.license_number }} &middot; {{ profile.issuing_authority }}<br>Expires {{ profile.license_expiry }}</p>
+    {% endif %}
     <h5>Documents</h5>
     <ul>
         {% if profile.id_document %}<li><a href="{% url 'accounts:professional-document' 'id_document' %}" target="_blank">Government ID</a></li>{% endif %}
+        {% if profile.registration_document %}<li><a href="{% url 'accounts:professional-document' 'registration_document' %}" target="_blank">Business registration certificate</a></li>{% endif %}
+        {% if profile.tax_document %}<li><a href="{% url 'accounts:professional-document' 'tax_document' %}" target="_blank">PAN / tax certificate</a></li>{% endif %}
         {% if profile.license_document %}<li><a href="{% url 'accounts:professional-document' 'license_document' %}" target="_blank">Licence proof</a></li>{% endif %}
         {% if profile.degree_document %}<li><a href="{% url 'accounts:professional-document' 'degree_document' %}" target="_blank">Degrees / certifications</a></li>{% endif %}
     </ul>
+    {% if not business %}
     <h5>Practice</h5>
     <p>{{ profile.years_experience }} years of experience<br>
        Focus: {% for f in profile.focus_areas.all %}{{ f }}{% if not forloop.last %}, {% endif %}{% endfor %}<br>
        Services: {% for s in profile.services.all %}{{ s }}{% if not forloop.last %}, {% endif %}{% endfor %}</p>
+    {% endif %}
     <form method="post">
         {% csrf_token %}
         <button type="submit" class="btn btn-gradient">Submit for verification</button>

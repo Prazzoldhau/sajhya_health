@@ -9,6 +9,7 @@ from django.utils import timezone
 
 class Profession(models.Model):
     name = models.CharField(max_length=100, unique=True)
+    is_business_owner = models.BooleanField(default=False, help_text='Not a health profession: owns and registers clinics. Gives business registration and tax documents instead of a licence.')
 
     class Meta:
         db_table = 'professions'
@@ -108,7 +109,7 @@ class ProfessionalProfile(models.Model):
         (DRAFT, 'Draft'), (SUBMITTED, 'Submitted - awaiting verification'),
         (APPROVED, 'Approved'), (REJECTED, 'Rejected'),
     ]
-    DOCUMENT_FIELDS = ('id_document', 'license_document', 'degree_document')
+    DOCUMENT_FIELDS = ('id_document', 'license_document', 'degree_document', 'registration_document', 'tax_document')
 
     account = models.OneToOneField(Account, on_delete=models.CASCADE, related_name='profile')
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default=DRAFT)
@@ -136,6 +137,13 @@ class ProfessionalProfile(models.Model):
     license_document = models.FileField(upload_to=document_path, storage=get_private_storage, blank=True)
     degree_document = models.FileField(upload_to=document_path, storage=get_private_storage, blank=True)
 
+    # Business owners give these instead of a licence and degrees
+    business_name = models.CharField(max_length=200, blank=True)
+    business_registration_number = models.CharField('Business registration number', max_length=60, blank=True)
+    tax_number = models.CharField('PAN / tax number', max_length=30, blank=True)
+    registration_document = models.FileField(upload_to=document_path, storage=get_private_storage, blank=True)
+    tax_document = models.FileField(upload_to=document_path, storage=get_private_storage, blank=True)
+
     # Step 4 - practice
     years_experience = models.PositiveSmallIntegerField(null=True, blank=True)
     focus_areas = models.ManyToManyField(ClinicalFocus, blank=True)
@@ -162,6 +170,12 @@ class ProfessionalProfile(models.Model):
     @property
     def full_name(self):
         return ' '.join(p for p in (self.first_name, self.middle_name, self.last_name) if p)
+
+    @property
+    def is_business_owner(self):
+        """A business owner registers clinics but does not treat patients; they verify with business documents, not a licence."""
+        profession = self.account.profession
+        return bool(profession and profession.is_business_owner)
 
     def recent_patients(self, limit=5):
         """Patients added, opened or seen most recently, newest first. Empty only when there are no patients.

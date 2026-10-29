@@ -225,3 +225,95 @@ class ReviewAccessTests(TestCase):
         staff, _ = make_professional('boss', staff=True)
         self.client.force_login(staff)
         self.assertEqual(self.client.get(reverse('accounts:review-list')).status_code, 200)
+
+
+class BusinessOwnerTests(TestCase):
+    """A business owner signs up as a professional, verifies with business documents and then registers clinics."""
+    BUSINESS = {'business_name': 'Himal Care Pvt. Ltd.', 'business_registration_number': 'REG-1234', 'tax_number': '601234567', 'issuing_authority': 'Office of the Company Registrar'}
+
+    def signup(self):
+        owner = Profession.objects.get(is_business_owner=True)
+        url = reverse('accounts:signup', args=['professional', owner.pk])
+        self.assertNotIn('title', self.client.get(url).context['form'].fields)  # no professional title for an owner
+        data = {k: v for k, v in SIGNUP.items() if k != 'title'}
+        self.assertRedirects(self.client.post(url, data), reverse('accounts:professional-step', args=[2]))
+        return ProfessionalProfile.objects.get(account__user__username='asha')
+
+    def test_business_owner_is_a_profession_choice_beside_the_health_professions(self):
+        page = self.client.get(reverse('accounts:select-type', args=['professional']))
+        self.assertIn('business owner', [p.name for p in page.context['options']])
+        self.assertEqual(Profession.objects.first().name, 'physiotherapist')  # existing choices are untouched
+        self.assertEqual(Profession.objects.filter(is_business_owner=True).count(), 1)
+
+    def test_business_onboarding_asks_for_registration_and_tax_documents_not_a_licence(self):
+        profile = self.signup()
+        self.assertTrue(profile.is_business_owner)
+        self.assertEqual(profile.title, 'Owner')
+        step2 = self.client.get(reverse('accounts:professional-step', args=[2]))
+        self.assertContains(step2, 'Business registration number')
+        self.assertContains(step2, 'PAN / tax number')
+        self.assertNotContains(step2, 'Licence expiry')
+        self.assertEqual([label for _, label, _ in step2.context['steps']], ['Account', 'Business', 'Documents', 'Review'])
+        self.assertEqual(self.client.post(reverse('accounts:professional-step', args=[2]), {'business_name': 'X'}).status_code, 200)  # all four are required
+        r = self.client.post(reverse('accounts:professional-step', args=[2]), self.BUSINESS)
+        self.assertRedirects(r, reverse('accounts:professional-step', args=[3]))
+        with private_storage():
+            step3 = self.client.get(reverse('accounts:professional-step', args=[3]))
+            self.assertContains(step3, 'Business registration certificate')
+            self.assertContains(step3, 'PAN / tax registration certificate')
+            self.assertNotContains(step3, 'Academic degrees')
+            self.assertNotContains(step3, 'Proof of professional licence')
+            docs = lambda: {'id_document': pdf('id.pdf'), 'registration_document': pdf('reg.pdf'), 'tax_document': pdf('pan.pdf')}  # fresh files for each post
+            missing = self.client.post(reverse('accounts:professional-step', args=[3]), {k: v for k, v in docs().items() if k != 'tax_document'})
+            self.assertTrue(missing.context['form'].errors.get('tax_document'))
+            # straight to the review: there is no practice step
+            self.assertRedirects(self.client.post(reverse('accounts:professional-step', args=[3]), docs()), reverse('accounts:professional-step', args=[5]))
+            self.assertEqual(self.client.get(reverse('accounts:professional-step', args=[4])).status_code, 404)
+            review = self.client.get(reverse('accounts:professional-step', args=[5]))
+            self.assertContains(review, 'Himal Care Pvt. Ltd.')
+            self.assertContains(review, 'Business registration certificate')
+            self.assertNotContains(review, 'years of experience')
+            self.assertRedirects(self.client.post(reverse('accounts:professional-step', args=[5])), reverse('accounts:welcome'), fetch_redirect_response=False)
+            profile.refresh_from_db()
+            self.assertEqual(profile.status, 'submitted')
+            # the documents are private to the owner and the verification team
+            stranger, _ = make_professional('stranger')
+            other = self.client_class()
+            other.force_login(stranger)
+            for field in ('registration_document', 'tax_document'):
+                self.assertEqual(self.client.get(reverse('accounts:professional-document', args=[field])).status_code, 200)
+                self.assertEqual(other.get(reverse('accounts:professional-document', args=[field])).status_code, 404)
+            staff, _ = make_professional('boss', staff=True)
+            reviewer = self.client_class()
+            reviewer.force_login(staff)
+            detail = reviewer.get(reverse('accounts:review-detail', args=[profile.pk]))
+            self.assertContains(detail, 'REG-1234')
+            self.assertContains(detail, '601234567')
+            self.assertContains(detail, 'Business registration certificate')
+            self.assertContains(detail, 'PAN / tax certificate')
+            self.assertNotContains(detail, 'Licensing')
+            reviewer.post(reverse('accounts:review-detail', args=[profile.pk]), {'decision': 'approve'})
+        profile.refresh_from_db()
+        self.assertEqual(profile.status, 'approved')
+
+    def test_an_approved_business_owner_is_sent_to_clinic_connect_and_can_register_a_clinic(self):
+        profile = self.signup()
+        ProfessionalProfile.objects.filter(pk=profile.pk).update(status='approved', completed_step=4, **self.BUSINESS)
+        self.assertRedirects(self.client.get(reverse('accounts:welcome')), reverse('accounts:dashboard'), fetch_redirect_response=False)
+        self.assertRedirects(self.client.get(reverse('accounts:dashboard')), reverse('clinics:hub'), fetch_redirect_response=False)
+        hub = self.client.get(reverse('clinics:hub'))
+        self.assertEqual(hub.status_code, 200)
+        self.assertNotContains(hub, reverse('accounts:patients'))  # no patient workspace in the menu
+        self.assertNotContains(hub, reverse('accounts:reports'))
+        self.assertEqual(self.client.get(reverse('clinics:create')).status_code, 200)
+        r = self.client.post(reverse('clinics:create'), {'name': 'Himal Physio Centre', 'phone': '9800000001', 'province': 'Bagmati', 'district': 'Lalitpur', 'slot_minutes': 30})
+        self.assertEqual(r.status_code, 302)
+        from clinics.models import Clinic
+        self.assertEqual(Clinic.objects.get().owner_id, profile.pk)
+
+    def test_health_professionals_are_unchanged(self):
+        user, profile = make_professional()
+        self.assertFalse(profile.is_business_owner)
+        self.client.force_login(user)
+        self.assertEqual(self.client.get(reverse('accounts:dashboard')).status_code, 200)
+        self.assertContains(self.client.get(reverse('accounts:patients')), reverse('accounts:reports'))

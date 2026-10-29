@@ -94,6 +94,9 @@ class SignupForm(UserCreationForm):
             for name in self.PROFESSIONAL_FIELDS:
                 del self.fields[name]
         else:
+            if getattr(subtype, 'is_business_owner', False):
+                del self.fields['title']  # a business owner has no professional title
+                self.fields['first_name'].label = 'First name (as on your ID)'
             order = ['first_name', 'middle_name', 'last_name', 'title', 'email', 'mobile',
                      'profile_picture', 'username', 'password1', 'password2']
             self.order_fields(order)
@@ -111,9 +114,10 @@ class SignupForm(UserCreationForm):
             user=user, account_type=self.account_type,
             organization_name=self.cleaned_data.get('organization_name', ''), **extra)
         if self.account_type == Account.PROFESSIONAL:
-            ProfessionalProfile.objects.create(
-                account=account,
-                **{f: self.cleaned_data[f] for f in self.PROFESSIONAL_FIELDS if self.cleaned_data.get(f)})
+            fields = {f: self.cleaned_data[f] for f in self.PROFESSIONAL_FIELDS if self.cleaned_data.get(f)}
+            if getattr(self.subtype, 'is_business_owner', False):
+                fields['title'] = 'Owner'
+            ProfessionalProfile.objects.create(account=account, **fields)
         return user
 
 
@@ -145,11 +149,38 @@ class DocumentsForm(forms.ModelForm):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        for name in ('id_document', 'license_document', 'degree_document'):
+        for name in self._meta.fields:
             f = self.fields[name]
             f.validators.append(validate_document)
             f.widget.attrs['accept'] = '.pdf,.jpg,.jpeg,.png'
             f.required = not getattr(self.instance, name)  # already uploaded -> keep it
+
+
+class BusinessForm(forms.ModelForm):
+    """Step 2 for a business owner: the business behind the clinics."""
+    class Meta:
+        model = ProfessionalProfile
+        fields = ('business_name', 'business_registration_number', 'tax_number', 'issuing_authority')
+        labels = {'business_name': 'Registered business name', 'business_registration_number': 'Business registration number',
+                  'tax_number': 'PAN / tax number', 'issuing_authority': 'Registering office (e.g. Office of Company Registrar)'}
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        for field in self.fields.values():
+            field.required = True
+
+
+class BusinessDocumentsForm(DocumentsForm):
+    """Step 3 for a business owner: ID, business registration certificate and PAN / tax certificate."""
+    class Meta:
+        model = ProfessionalProfile
+        fields = ('id_document', 'registration_document', 'tax_document')
+        labels = {
+            'id_document': 'Government-issued ID of the owner (passport, driving licence or national ID)',
+            'registration_document': 'Business registration certificate',
+            'tax_document': 'PAN / tax registration certificate',
+        }
+        help_texts = {'id_document': 'PDF, JPEG or PNG, up to 5 MB each.'}
 
 
 class PracticeForm(forms.ModelForm):
@@ -210,6 +241,9 @@ class SettingsEmailForm(forms.Form):
 
 STEP_FORMS = {2: CredentialsForm, 3: DocumentsForm, 4: PracticeForm}
 STEP_TITLES = {1: 'Account', 2: 'Credentials', 3: 'Documents', 4: 'Practice', 5: 'Review'}
+# a business owner has no licence, degrees or clinical practice, so the practice step is left out
+BUSINESS_STEP_FORMS = {2: BusinessForm, 3: BusinessDocumentsForm}
+BUSINESS_STEP_TITLES = {1: 'Account', 2: 'Business', 3: 'Documents', 5: 'Review'}
 
 
 class AgeOrBirthDate(forms.Form):

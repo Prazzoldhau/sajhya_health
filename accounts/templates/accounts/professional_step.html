@@ -4,10 +4,12 @@
 {% include 'accounts/_progress.html' %}
 <div class="text-center mb-4">
     <h1 class="fw-bold page-title">
-        {% if step == 2 %}Professional identity &amp; licensing
+        {% if step == 2 and business %}Your business
+        {% elif step == 2 %}Professional identity &amp; licensing
         {% elif step == 3 %}Required documents
         {% else %}Practice &amp; specialisation{% endif %}
     </h1>
+    {% if step == 2 and business %}<p class="page-lead">The business that owns the clinics you will register on Sajhya Health.</p>{% endif %}
     {% if step == 3 %}<p class="page-lead">Files are stored privately and are only visible to you and our verification team.</p>{% endif %}
 </div>
 <form method="post" enctype="multipart/form-data" class="form-panel" style="max-width:640px">

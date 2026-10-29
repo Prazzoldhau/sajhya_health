@@ -132,3 +132,11 @@ by the owner from the same button.
 - Managers and receptionists have a **Billing** tab at the front desk: bill a clinic patient (paid / part paid / credit / from advance, with the cash-handed-over carry-over), receive payments on credit, download the PDF or open WhatsApp. Bills are kept in the clinic's own workspace (its login when it has one, otherwise the owner) and each shows **who billed**. Staff cannot edit or cancel a bill; the owner or the clinic login can.
 - Every patient records **who registered them** (name and role: Physiotherapist, Clinic login, Receptionist, Manager...). It shows in the clinic Patients tab, the front desk list and the clinic login. The clinic's own login sees all of the clinic's patients in its workspace, including those reception registered.
 - A patient can be registered with an **age** when the date of birth is not known; the date is then an estimate and the age is shown as approximate. A real date of birth always wins.
+
+## Business owners
+
+A business owner owns and registers clinics but does not treat patients. They sign up as a **professional** and choose **business owner** in place of a health profession (`Profession.is_business_owner`, added by migration `accounts/0027`).
+
+- **Onboarding:** Account, **Business** (registered business name, business registration number, PAN / tax number, registering office), **Documents** (owner ID, business registration certificate, PAN / tax certificate), then Review. There is no licence, degree or practice step.
+- **Verification:** staff review it on the same applications page, which shows the business details and both certificates. The files are private, like the other credential documents.
+- **After approval:** the owner lands on Clinic Connect (no dashboard, patients, billing or reports of their own) and registers clinics exactly as a physiotherapist does. The Clinic plan is still activated by staff, and each clinic then gets its own login and team.

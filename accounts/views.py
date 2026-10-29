@@ -17,7 +17,7 @@ from sajhya_health.throttle import too_many
 
 from .access import actor_of, can_see_contact, first_error, own_patient, own_profile, staff_required, workspace_context, workspace_profile
 from .services import record_visit
-from .forms import SUBTYPES, STEP_FORMS, STEP_TITLES, NextVisitForm, PatientEditForm, PatientForm, PatientNotesForm, PatientPhotoForm, ProfilePictureForm, SignupForm, VisitForm
+from .forms import BUSINESS_STEP_FORMS, BUSINESS_STEP_TITLES, SUBTYPES, STEP_FORMS, STEP_TITLES, NextVisitForm, PatientEditForm, PatientForm, PatientNotesForm, PatientPhotoForm, ProfilePictureForm, SignupForm, VisitForm
 from .treatments import parse_treatments
 from billing.catalog import catalog_for
 from billing.models import advance_balance
@@ -90,13 +90,15 @@ def professional_step(request, step):
     profile = own_profile(request)
     if profile.status not in (ProfessionalProfile.DRAFT, ProfessionalProfile.REJECTED):
         return redirect('accounts:welcome')
-    if step not in STEP_FORMS and step != 5:
+    business = profile.is_business_owner
+    forms_for, titles = (BUSINESS_STEP_FORMS, BUSINESS_STEP_TITLES) if business else (STEP_FORMS, STEP_TITLES)
+    if step not in forms_for and step != 5:
         raise Http404
     if step > profile.completed_step + 1:  # no skipping ahead
         return redirect('accounts:professional-step', step=profile.completed_step + 1)
 
-    context = {'profile': profile, 'step': step, 'titles': STEP_TITLES,
-               'steps': [(n, STEP_TITLES[n], n <= profile.completed_step) for n in range(1, 6)]}
+    context = {'profile': profile, 'step': step, 'titles': titles, 'business': business,
+               'steps': [(n, label, n <= profile.completed_step) for n, label in titles.items()]}
 
     if step == 5:
         if request.method == 'POST':
@@ -110,7 +112,8 @@ def professional_step(request, step):
         return render(request, 'accounts/professional_review.html', context)
 
     save_for_later = request.POST.get('action') == 'later'
-    form = STEP_FORMS[step](request.POST or None, request.FILES or None, instance=profile)
+    form = forms_for[step](request.POST or None, request.FILES or None, instance=profile)
+    last_input_step = business and step == 3  # a business owner goes from the documents straight to the review (step 4 is skipped)
     if request.method == 'POST':
         if save_for_later:
             for field in form.fields.values():  # partial progress is allowed
@@ -119,10 +122,11 @@ def professional_step(request, step):
             form.save()
             if save_for_later:
                 return redirect('accounts:welcome')
-            if step > profile.completed_step:
-                profile.completed_step = step
+            done = 4 if last_input_step else step
+            if done > profile.completed_step:
+                profile.completed_step = done
                 profile.save(update_fields=['completed_step'])
-            return redirect('accounts:professional-step', step=step + 1)
+            return redirect('accounts:professional-step', step=5 if last_input_step else step + 1)
     context['form'] = form
     return render(request, 'accounts/professional_step.html', context)
 
@@ -186,6 +190,8 @@ def dashboard(request):
     profile = workspace_profile(request)
     if profile is None:
         return redirect('accounts:welcome')
+    if profile.is_business_owner:  # no patients of their own: they run their clinics from Clinic Connect
+        return redirect('clinics:hub')
     context = workspace_context(request.user, profile)
     context.update(_dashboard_data(profile))
     context['active'] = 'dashboard'
