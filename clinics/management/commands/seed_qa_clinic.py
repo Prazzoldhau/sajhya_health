@@ -147,7 +147,7 @@ class Command(BaseCommand):
     def patients(self, clinic, workspace):
         patients = []
         for i, name in enumerate(PATIENTS):
-            patient = Patient.objects.filter(professional=workspace, name=name).first() or Patient.objects.create(
+            patient = workspace.workspace_patients().filter(name=name).first() or Patient.objects.create(
                 professional=workspace, clinic=clinic, name=name, phone=f'98000004{i:02d}', gender='M' if i % 2 == 0 else 'F',
                 date_of_birth=datetime.date(2016 - i, 3, 4), registered_by_name='QA seed', registered_by_role='Clinic login', status=Patient.ACTIVE)
             patients.append(patient)
