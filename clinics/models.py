@@ -171,9 +171,11 @@ class Clinic(models.Model):
 
 class ClinicMember(models.Model):
     """A physio (a verified professional, joins by accepting an invitation) or a staff member (a record without a login)."""
-    PHYSIO, MANAGER, RECEPTIONIST, ASSISTANT, OTHER, DEPARTMENT = 'physio', 'manager', 'receptionist', 'assistant', 'other', 'department'
+    PHYSIO, MANAGER, RECEPTIONIST, ASSISTANT, OTHER, DEPARTMENT, CLINICIAN = 'physio', 'manager', 'receptionist', 'assistant', 'other', 'department', 'clinician'
     ROLE_CHOICES = [(PHYSIO, 'Physiotherapist'), (MANAGER, 'Manager'), (RECEPTIONIST, 'Receptionist'), (ASSISTANT, 'Therapy assistant'), (OTHER, 'Other staff'),
-                    (DEPARTMENT, 'Department login')]
+                    (DEPARTMENT, 'Department login'), (CLINICIAN, 'Doctor / therapist')]
+    BOOKABLE_ROLES = (PHYSIO, ASSISTANT, CLINICIAN)  # appointments can be booked with these
+    OWN_SCHEDULE_ROLES = (ASSISTANT, CLINICIAN)  # their Schedule tab starts with the appointments booked with them
     STAFF_ROLES = ROLE_CHOICES[1:]  # everything except physio
     INVITED, ACTIVE, DECLINED, LEFT = 'invited', 'active', 'declined', 'left'
     STATUS_CHOICES = [(INVITED, 'Invited'), (ACTIVE, 'Active'), (DECLINED, 'Declined'), (LEFT, 'Left / removed')]
@@ -185,6 +187,7 @@ class ClinicMember(models.Model):
                                 help_text='Staff only: the sign-in the owner gave this person.')
     department = models.ForeignKey('accounts.Department', null=True, blank=True, on_delete=models.SET_NULL, related_name='logins',
                                    help_text='Department login only: the department whose schedule this sign-in shows.')
+    specialty = models.CharField(max_length=80, blank=True, help_text='Doctor / therapist only, e.g. Ortho.')
     name = models.CharField(max_length=150, blank=True, help_text='Staff only; physios use their profile name.')
     phone = models.CharField(max_length=20, blank=True)
     email = models.EmailField(blank=True)
@@ -204,6 +207,19 @@ class ClinicMember(models.Model):
         return self.physio.full_name if self.physio_id else self.name
 
     @property
+    def label(self):
+        """Name with the specialty, for calendars and pickers: Dr Sailendra Maharjan (Ortho)."""
+        return f'{self.display_name} ({self.specialty})' if self.specialty else self.display_name
+
+    @property
+    def choice_label(self):
+        return self.label if self.role == self.CLINICIAN else f'{self.display_name} ({self.get_role_display()})'
+
+    @property
+    def books_own_schedule(self):
+        return self.role in self.OWN_SCHEDULE_ROLES
+
+    @property
     def is_physio(self):
         return self.role == self.PHYSIO
 
@@ -213,6 +229,7 @@ class ClinicMember(models.Model):
         RECEPTIONIST: {'patients', 'contact', 'register', 'queue', 'queue_manage', 'billing', 'schedule'},
         ASSISTANT: {'patients', 'queue', 'queue_manage', 'record_session', 'schedule'},
         OTHER: {'queue'},
+        CLINICIAN: {'patients', 'queue', 'queue_manage', 'record_session', 'schedule'},  # a visiting doctor / therapist who is not on Sajhya
         DEPARTMENT: {'schedule'},  # a department's screen shows its own appointments and nothing else
     }
 

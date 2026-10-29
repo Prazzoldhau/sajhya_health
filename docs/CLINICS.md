@@ -162,3 +162,7 @@ Appointments on a clinic's calendar can be booked **with** a therapist or assist
 - **Front desk:** managers and receptionists see the whole clinic and can narrow to a department; a therapy assistant starts with the appointments booked with them (Show everyone to widen).
 - **Therapist:** a physiotherapist on a clinic's team gets **My schedule** in their menu, across every clinic they work at.
 - Turning the Appointments module off for a clinic also removes the Schedule tab.
+
+### Visiting doctors and therapists who are not on Sajhya
+
+Add them under Team, Add team, Staff with the role **Doctor / therapist** and a specialty (for example Ortho). They are bookable ("Book with") and shown as *Dr Sailendra Maharjan (Ortho)*. With *Give a login* they sign in to the front desk: Schedule opens on their own appointments, and like a therapy assistant they can call patients and record the treatment given and exercises supervised, stamped with their name and the role *Doctor / therapist*. No phone numbers and no billing. If they later join Sajhya they can be invited as a physiotherapist; their earlier appointments stay on the staff record (they are not moved across automatically).

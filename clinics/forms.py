@@ -140,7 +140,7 @@ class StaffForm(forms.ModelForm):
 
     class Meta:
         model = ClinicMember
-        fields = ('name', 'role', 'department', 'phone', 'email')
+        fields = ('name', 'role', 'specialty', 'department', 'phone', 'email')
 
     def __init__(self, *args, clinic=None, **kwargs):
         super().__init__(*args, **kwargs)
@@ -158,6 +158,8 @@ class StaffForm(forms.ModelForm):
                 data['name'] = data['department'].name
         else:
             data['department'] = None
+            if data.get('role') != ClinicMember.CLINICIAN:
+                data['specialty'] = ''
             if not (data.get('name') or '').strip():
                 self.add_error('name', 'Type the name.')
         return data

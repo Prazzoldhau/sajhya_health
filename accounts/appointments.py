@@ -176,7 +176,7 @@ def appointments(request):
                 'links': {k: appointment_links(profile, ev, k) for k in ('booked', 'reminder', 'rescheduled')} if ev.kind == Appointment.APPOINTMENT and ev.patient and ev.status == Appointment.SCHEDULED else {},
                 'notes': ev.notes, 'raw_title': ev.title, 'session_type': ev.session_type,
                 'department': ev.department.name if ev.department_id else '', 'department_id': ev.department_id or '',
-                'practitioner': ev.practitioner.display_name if ev.practitioner_id else '', 'practitioner_id': ev.practitioner_id or '',
+                'practitioner': ev.practitioner.label if ev.practitioner_id else '', 'practitioner_id': ev.practitioner_id or '',
                 'tint': tints.get(ev.department_id, '') if ev.department_id and ev.kind == Appointment.APPOINTMENT else '',
                 'date': s.date().isoformat(), 'start_hm': s.strftime('%H:%M'), 'end_hm': e.strftime('%H:%M'),
             })
@@ -214,7 +214,7 @@ def appointments(request):
         'range_label': f"{day_list[0]:%d %b}" + (f" - {day_list[-1]:%d %b %Y}" if days > 1 else f" {day_list[0]:%Y}"),
         'weeks': weeks, 'month_label': f'{month_first:%B %Y}', 'prev_month': prev_month, 'next_month': next_month,
         'departments': [{'id': d.pk, 'name': d.name, 'tint': tints[d.pk]} for d in departments], 'dept': chosen,
-        'practitioners': [{'id': m.pk, 'name': f'{m.display_name} ({m.get_role_display()})'} for m in team_of(profile)],
+        'practitioners': [{'id': m.pk, 'name': m.choice_label} for m in team_of(profile)],
         'tasks': tasks, 'open_count': sum(not t.done for t in tasks), 'done_count': sum(t.done for t in tasks),
         'panel': request.GET.get('panel', 'calendar'),
         'appointment_form': AppointmentForm(profile=profile, initial={'date': today, 'duration': profile.default_session_minutes}),
@@ -232,7 +232,7 @@ def team_of(profile):
     clinic = getattr(profile, 'clinic_workspace', None)
     if clinic is None:
         return ClinicMember.objects.none()
-    return clinic.members.filter(status=ClinicMember.ACTIVE, role__in=[ClinicMember.PHYSIO, ClinicMember.ASSISTANT]).select_related('physio')
+    return clinic.members.filter(status=ClinicMember.ACTIVE, role__in=ClinicMember.BOOKABLE_ROLES).select_related('physio')
 
 
 def _back(date, days, booked=None, kind='booked'):

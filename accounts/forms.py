@@ -371,9 +371,9 @@ class AppointmentForm(forms.Form):
         self.fields['department'].queryset = profile.departments.all()  # only this practice's own departments
         from clinics.models import ClinicMember
         clinic = getattr(profile, 'clinic_workspace', None)
-        self.fields['practitioner'].queryset = (clinic.members.filter(status=ClinicMember.ACTIVE, role__in=[ClinicMember.PHYSIO, ClinicMember.ASSISTANT]).select_related('physio')
+        self.fields['practitioner'].queryset = (clinic.members.filter(status=ClinicMember.ACTIVE, role__in=ClinicMember.BOOKABLE_ROLES).select_related('physio')
                                                 if clinic else ClinicMember.objects.none())  # only a clinic's own team
-        self.fields['practitioner'].label_from_instance = lambda m: f'{m.display_name} ({m.get_role_display()})'
+        self.fields['practitioner'].label_from_instance = lambda m: m.choice_label
         self.fields['patient'].queryset = profile.workspace_patients().exclude(status=Patient.DISCHARGED).order_by('name')
 
 

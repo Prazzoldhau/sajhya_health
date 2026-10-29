@@ -1155,3 +1155,68 @@ class SchedulesTests(Base):
         self.client.post(reverse('accounts:appointment-edit', args=[appt.pk]), {**edit, 'practitioner': outsider.pk})
         appt.refresh_from_db()
         self.assertIsNone(appt.practitioner)  # never attached to someone outside the clinic
+
+
+class VisitingClinicianTests(Base):
+    """A doctor or therapist who is not on Sajhya: added by name, bookable, with a login of their own."""
+    CREDS = StaffLoginTests.CREDS
+    add_staff = StaffLoginTests.add_staff
+    setup_desk = FrontDeskRegisteredByAndBillingTests.setup_desk
+    prepare = SchedulesTests.prepare
+
+    def add_doctor(self, clinic):
+        self.as_user('owner')
+        self.client.post(reverse('clinics:staff-add', args=[clinic.pk]), {'name': 'Dr Sailendra Maharjan', 'role': 'clinician', 'specialty': 'Ortho'})
+        doctor = ClinicMember.objects.get(role='clinician')
+        self.client.post(reverse('clinics:staff-login', args=[clinic.pk, doctor.pk]), {'username': 'dr-sailendra', 'password1': PASSWORD, 'password2': PASSWORD})
+        doctor.refresh_from_db()
+        return doctor
+
+    def test_the_owner_adds_a_visiting_doctor_with_a_login_and_books_patients_with_them(self):
+        from accounts.models import Appointment
+        clinic = self.prepare()
+        doctor = self.add_doctor(clinic)
+        self.assertEqual((doctor.specialty, doctor.label, doctor.physio), ('Ortho', 'Dr Sailendra Maharjan (Ortho)', None))
+        self.assertIsNotNone(doctor.user)
+        self.as_user('himal-clinic')
+        patient = make_patient(self.workspace, 'Walk In')
+        page = self.client.get(reverse('accounts:appointments'))
+        self.assertContains(page, 'Dr Sailendra Maharjan (Ortho)')  # in "Book with"
+        day = timezone.localdate()
+        self.client.post(reverse('accounts:appointment-create'), {'patient': patient.pk, 'date': day.isoformat(), 'start_time': '15:00', 'duration': 30, 'session_type': 'treatment',
+                                                                  'department': self.pt.pk, 'practitioner': doctor.pk, 'notes': ''})
+        self.assertEqual(Appointment.objects.get(patient=patient).practitioner, doctor)
+
+    def test_the_doctor_signs_in_sees_their_own_appointments_and_records_treatment_under_their_name(self):
+        import json
+        from accounts.models import Appointment, Visit
+        clinic = self.prepare()
+        doctor = self.add_doctor(clinic)
+        patient = make_patient(self.workspace, 'Walk In')
+        patient.clinic = clinic
+        patient.save()
+        start = self.when + datetime.timedelta(hours=2)
+        Appointment.objects.create(professional=self.workspace, patient=patient, start=start, end=start + datetime.timedelta(minutes=30), department=self.pt, practitioner=doctor)
+        self.client.logout()
+        self.assertTrue(self.client.login(username='dr-sailendra', password=PASSWORD))
+        mine = self.client.get(reverse('clinics:desk'), {'tab': 'schedule'})
+        self.assertEqual([a.patient.name for a in mine.context['appointments']], ['Walk In'])
+        self.assertEqual(len(self.client.get(reverse('clinics:desk'), {'tab': 'schedule', 'all': 1}).context['appointments']), 3)
+        tabs = [t[0] for t in mine.context['tabs']]
+        self.assertIn('session', tabs)
+        self.assertNotIn('billing', tabs)
+        self.assertNotContains(mine, '9841')
+        self.client.post(reverse('clinics:desk-session-create'), {'patient_id': patient.pk, 'date': timezone.localdate().isoformat(), 'session_type': 'treatment',
+                                                                  'treatments': json.dumps([{'name': 'Joint mobilization (Grade I-II)'}]), 'exercises': '[]'})
+        visit = Visit.objects.get()
+        self.assertEqual((visit.therapist, visit.recorded_by_role), ('Dr Sailendra Maharjan', 'Doctor / therapist'))
+        self.as_user('himal-clinic')
+        treated = self.client.get(reverse('accounts:treated'))
+        self.assertContains(treated, 'Doctor / therapist')
+        self.assertContains(treated, 'Dr Sailendra Maharjan')
+
+    def test_a_specialty_is_only_kept_for_a_visiting_doctor(self):
+        clinic = self.prepare()
+        self.as_user('owner')
+        self.client.post(reverse('clinics:staff-add', args=[clinic.pk]), {'name': 'Sita', 'role': 'receptionist', 'specialty': 'Ortho'})
+        self.assertEqual(ClinicMember.objects.get(name='Sita').specialty, '')

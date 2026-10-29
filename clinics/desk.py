@@ -74,7 +74,7 @@ def desk(request, member):
     todays = clinic.queue_entries.filter(joined_at__gte=start, joined_at__lt=end).select_related('patient')
     context = {'member': member, 'clinic': clinic, 'tabs': tabs, 'tab': tab, 'usable': clinic.is_usable,
                'can_contact': member.can('contact'), 'can_manage_queue': member.can('queue_manage') and clinic.is_usable,
-               'can_register': member.can('register')}
+               'can_register': member.can('register'), 'can_record': member.can('record_session')}
     if tab == 'overview':
         context.update({
             'patient_total': clinic.patients.count(), 'team_count': clinic.members.filter(status=ClinicMember.ACTIVE).count() + 1,
@@ -114,7 +114,7 @@ def _schedule_context(request, member):
     elif request.GET.get('dept') in {str(d.pk) for d in departments}:
         chosen = request.GET['dept']
         filters['department_id'] = int(chosen)
-    mine = member.role == ClinicMember.ASSISTANT and request.GET.get('all') != '1'
+    mine = member.books_own_schedule and request.GET.get('all') != '1'
     if mine:
         filters['practitioner'] = member
     return {**day_context(day), 'appointments': appointments_on(day, **filters), 'departments': departments, 'dept': chosen, 'mine': mine,
