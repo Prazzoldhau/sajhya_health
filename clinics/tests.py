@@ -965,3 +965,28 @@ class AssistantRecordsTreatmentTests(Base):
         self.save()
         package.refresh_from_db()
         self.assertEqual(package.sessions_used, 1)
+
+
+class ClinicLoginSeesAssistantsTreatmentsTests(Base):
+    CREDS = StaffLoginTests.CREDS
+    add_staff = StaffLoginTests.add_staff
+    setup_desk = FrontDeskRegisteredByAndBillingTests.setup_desk
+    register = FrontDeskRegisteredByAndBillingTests.register
+
+    def test_the_clinic_login_and_the_owner_see_who_the_assistant_treated(self):
+        import json
+        self.setup_desk()
+        self.as_user('ram-desk')
+        self.register()
+        patient = Patient.objects.get(name='Walk In')
+        self.as_user('asha')
+        self.client.post(reverse('clinics:desk-session-create'), {'patient_id': patient.pk, 'date': timezone.localdate().isoformat(), 'session_type': 'treatment',
+                                                                  'treatments': json.dumps([{'name': 'Hot pack', 'dosage': '10 min'}]), 'exercises': json.dumps([{'name': 'Bridging'}])})
+        for who in ('himal-clinic', 'owner'):
+            self.as_user(who)
+            page = self.client.get(reverse('accounts:treated'))
+            self.assertEqual(page.context['summary'], {'sessions': 1, 'patients': 1, 'by_therapist': 0, 'by_assistant': 1}, who)
+            self.assertContains(page, 'Asha')
+            self.assertContains(page, 'Therapy assistant')
+            self.assertContains(page, 'Bridging')
+            self.assertEqual(self.client.get(reverse('accounts:dashboard')).context['stats']['treated_today'], 1, who)

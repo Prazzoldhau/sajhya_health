@@ -76,7 +76,7 @@ MIDDLEWARE = [
 # URL prefixes that belong to the clinical workspace. Professionals whose credentials are not approved are kept out of all
 # of them (see accounts/middleware.py). Add the prefix of any new workspace area here.
 WORKSPACE_PATH_PREFIXES = [
-    '/accounts/dashboard/', '/accounts/patients/', '/accounts/appointments/', '/accounts/plans/', '/accounts/tasks/', '/accounts/reports/', '/accounts/messages/', '/accounts/settings/',
+    '/accounts/dashboard/', '/accounts/patients/', '/accounts/appointments/', '/accounts/plans/', '/accounts/tasks/', '/accounts/reports/', '/accounts/treated/', '/accounts/messages/', '/accounts/settings/',
     '/accounts/icd10/', '/billing/', '/exercises/', '/profiles/', '/assessments/', '/clinics/', '/soapnotes/', '/lab-tests/search/',
 ]
 

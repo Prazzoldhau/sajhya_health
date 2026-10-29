@@ -294,6 +294,15 @@ class Visit(models.Model):
     class Meta:
         ordering = ['-date', '-id']
 
+    @property
+    def treated_by_role(self):
+        """Who treated: the physiotherapist (the default) or, when someone else recorded the session, their role (for example Therapy assistant)."""
+        return self.recorded_by_role or 'Physiotherapist'
+
+    @property
+    def is_by_assistant(self):
+        return bool(self.recorded_by_role)
+
     def __str__(self):
         return f'{self.patient.name} - {self.date}'
 

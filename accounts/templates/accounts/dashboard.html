@@ -16,8 +16,9 @@
       </div>
 
 
-      <section class="metrics" aria-label="Clinic summary">
+      <section class="metrics" aria-label="Clinic summary" style="grid-template-columns:repeat(auto-fit,minmax(215px,1fr))">
         <a class="metric" href="{% url 'accounts:appointments' %}?date={{ today|date:'Y-m-d' }}&days=1" title="Open today's appointments"><div class="metric-top"><div class="metric-icon">▦</div><div><div class="metric-label">Today's Appointments</div><div class="metric-value">{{ stats.today_appointments }}</div></div></div><div class="metric-note">{{ stats.week_appointments }} in the next 7 days</div></a>
+        <a class="metric" href="{% url 'accounts:treated' %}" title="Who was treated today, by whom and when"><div class="metric-top"><div class="metric-icon" style="background:#e5eefc;color:#3d6fb0">✚</div><div><div class="metric-label">Treated Today</div><div class="metric-value">{{ stats.treated_today }}</div></div></div><div class="metric-note" style="color:#3d6fb0">{{ treated_summary.sessions }} session{{ treated_summary.sessions|pluralize }}{% if treated_summary.by_assistant %} · {{ treated_summary.by_assistant }} by assistant{{ treated_summary.by_assistant|pluralize }}{% endif %}</div></a>
         <a class="metric" href="{% url 'accounts:patients' %}?status=active" title="Open the patients to treat"><div class="metric-top"><div class="metric-icon">♙</div><div><div class="metric-label">Patients to Treat</div><div class="metric-value">{{ stats.active }}</div></div></div><div class="metric-note">of {{ stats.total }} total patients</div></a>
         <a class="metric" href="{% url 'accounts:patients' %}?followup=due" title="Open the patients due for a follow-up"><div class="metric-top"><div class="metric-icon">◷</div><div><div class="metric-label">Follow-ups Due</div><div class="metric-value">{{ stats.followups_due }}</div></div></div><div class="metric-note" style="color:#b78317">{% if stats.followups_due %}Needs attention{% else %}All caught up{% endif %}</div></a>
         <a class="metric" href="{% url 'billing:billing' %}" title="Open today's billing"><div class="metric-top"><div class="metric-icon">▤</div><div><div class="metric-label">Revenue Today</div><div class="metric-value" style="font-size:22px">NPR {{ stats.revenue_today }}</div></div></div><div class="metric-note" style="text-decoration:underline">View billing →</div></a>
@@ -40,6 +41,25 @@
                 </tr>
               {% empty %}
                 <tr><td colspan="5" style="padding:22px;text-align:center;color:var(--muted)">No upcoming appointments. Book a visit from a patient's page.</td></tr>
+              {% endfor %}
+              </tbody>
+            </table></div>
+          </section>
+
+          <section class="panel">
+            <div class="panel-header"><div class="panel-title"><span class="small-icon">✚</span>Treated Today</div><a class="text-link" href="{% url 'accounts:treated' %}" style="text-decoration:none">Details →</a></div>
+            <div class="table-wrap"><table id="treatedTable">
+              <thead><tr><th>TIME</th><th>PATIENT</th><th>TREATED BY</th><th>WHAT WAS DONE</th></tr></thead>
+              <tbody>
+              {% for v in treated %}
+                <tr>
+                  <td>{{ v.recorded_time|time:"g:i A" }}</td>
+                  <td><a href="{% url 'accounts:patient-detail' v.patient.pk %}" style="color:inherit;text-decoration:none;font-weight:700">{{ v.patient.name }}</a></td>
+                  <td><b>{{ v.therapist }}</b><div class="patient-id">{{ v.treated_by_role }}</div></td>
+                  <td style="white-space:normal;max-width:240px">{% for t in v.treatments.all %}{{ t.name }}{% if not forloop.last %}, {% endif %}{% empty %}—{% endfor %}</td>
+                </tr>
+              {% empty %}
+                <tr><td colspan="4" style="padding:22px;text-align:center;color:var(--muted)">Nobody has been treated yet today. Sessions appear here once they are recorded.</td></tr>
               {% endfor %}
               </tbody>
             </table></div>

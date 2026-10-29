@@ -22,6 +22,7 @@ urlpatterns = [
     path('review/', views.review_list, name='review-list'),
     path('review/<int:profile_id>/', views.review_detail, name='review-detail'),
     path('dashboard/', views.dashboard, name='dashboard'),
+    path('treated/', views.treated_page, name='treated'),
     path('messages/', notices.messages_page, name='messages'),
     path('messages/whatsapp-number/', notices.whatsapp_number_save, name='whatsapp-number'),
     path('messages/send/', notices.notice_send, name='notice-send'),

@@ -7,7 +7,7 @@ from django.utils import timezone
 from accounts.appointments import _layout_lanes, aware, sync_next_appointment
 from accounts.models import Appointment, Task, Visit
 
-from .helpers import make_patient, make_professional
+from .helpers import PASSWORD, make_patient, make_professional
 
 
 class AppointmentTests(TestCase):
@@ -338,3 +338,71 @@ class AppointmentWhatsAppTests(TestCase):
         other = self.client_class()
         other.force_login(stranger)
         self.assertIsNone(other.get(reverse('accounts:appointments'), {'booked': Appointment.objects.get().pk}).context['prompt'])  # someone else's booking
+
+
+class TreatedTodayTests(TestCase):
+    def setUp(self):
+        self.user, self.profile = make_professional()
+        self.client.force_login(self.user)
+        self.today = timezone.localdate()
+
+    def session(self, patient, **extra):
+        return self.client.post(reverse('accounts:patient-visit-add', args=[patient.pk]), {'date': self.today.isoformat(), 'session_type': 'treatment', 'progress': '', 'notes': '', **extra})
+
+    def test_the_dashboard_counts_patients_treated_today_and_lists_who_treated_and_when(self):
+        import json
+        a, b, c = make_patient(self.profile, 'Anita Rai'), make_patient(self.profile, 'Bina Lama'), make_patient(self.profile, 'Chandra Shah')
+        self.session(a, treatments=json.dumps([{'kind': 'clinical', 'name': 'TENS (pain relief)', 'dosage': '15 min'}]))
+        self.session(a)  # a second session for the same patient: one patient, two sessions
+        self.session(b)
+        old = Visit.objects.create(patient=c, date=self.today - datetime.timedelta(days=1), therapist='Someone')  # yesterday: not counted today
+        # a session recorded by a therapy assistant (as the front desk does)
+        Visit.objects.create(patient=c, date=self.today, therapist='Asha', recorded_by_role='Therapy assistant')
+        page = self.client.get(reverse('accounts:dashboard'))
+        self.assertEqual(page.context['stats']['treated_today'], 3)
+        self.assertEqual(page.context['treated_summary'], {'sessions': 4, 'patients': 3, 'by_therapist': 3, 'by_assistant': 1})
+        self.assertContains(page, 'Treated Today')
+        self.assertContains(page, reverse('accounts:treated'))
+        names = [v.patient.name for v in page.context['treated']]
+        self.assertEqual(names[0], 'Chandra Shah')  # latest first on the dashboard
+        row = page.context['treated'][0]
+        self.assertEqual((row.therapist, row.treated_by_role), ('Asha', 'Therapy assistant'))
+        self.assertContains(page, 'Therapy assistant')
+        self.assertContains(page, 'Asha')
+
+    def test_the_treated_page_shows_the_time_the_person_and_what_was_done_for_any_day(self):
+        import json
+        patient = make_patient(self.profile, 'Anita Rai')
+        self.session(patient, treatments=json.dumps([{'kind': 'clinical', 'name': 'Hot pack', 'dosage': '10 min'}, {'kind': 'exercise', 'name': 'Bridging', 'dosage': '3 x 10'}]), notes='Went well')
+        page = self.client.get(reverse('accounts:treated'))
+        self.assertEqual(page.status_code, 200)
+        self.assertContains(page, 'Anita Rai')
+        self.assertContains(page, 'Treatment given')
+        self.assertContains(page, 'Exercises supervised')
+        self.assertContains(page, 'Hot pack')
+        self.assertContains(page, 'Bridging')
+        self.assertContains(page, 'Physiotherapist')
+        self.assertContains(page, self.profile.full_name)
+        visit = Visit.objects.get()
+        self.assertContains(page, timezone.localtime(visit.created_at).strftime('%I:%M').lstrip('0'))  # the time it was recorded
+        self.assertEqual(page.context['summary'], {'sessions': 1, 'patients': 1, 'by_therapist': 1, 'by_assistant': 0})
+        yesterday = self.today - datetime.timedelta(days=1)
+        past = self.client.get(reverse('accounts:treated'), {'date': yesterday.isoformat()})
+        self.assertEqual(past.context['summary']['sessions'], 0)
+        self.assertContains(past, 'Nobody was treated')
+        self.assertEqual(self.client.get(reverse('accounts:treated'), {'date': 'junk'}).context['day'], self.today)
+
+    def test_it_is_private_and_a_clinic_login_sees_its_assistants_work(self):
+        mine = make_patient(self.profile, 'Anita Rai')
+        self.session(mine)
+        stranger, _ = make_professional('stranger')
+        other = self.client_class()
+        other.force_login(stranger)
+        self.assertEqual(other.get(reverse('accounts:treated')).context['summary']['sessions'], 0)
+        self.assertEqual(other.get(reverse('accounts:dashboard')).context['stats']['treated_today'], 0)
+        make_professional('waiting', status='submitted')
+        waiting = self.client_class()
+        waiting.login(username='waiting', password=PASSWORD)
+        self.assertEqual(waiting.get(reverse('accounts:treated')).status_code, 302)
+        self.client.logout()
+        self.assertEqual(self.client.get(reverse('accounts:treated')).status_code, 302)

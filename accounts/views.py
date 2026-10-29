@@ -198,6 +198,18 @@ def followups_due(patients, today):
     return patients.filter(status=Patient.ACTIVE).filter(Q(last_visit__isnull=True) | Q(last_visit__lte=stale))
 
 
+def treated_on(profile, day):
+    """Sessions on one day for this workspace's patients, oldest first, each with who treated and when it was recorded, plus the day's counts."""
+    visits = list(Visit.objects.filter(patient__in=profile.workspace_patients(), date=day).select_related('patient').prefetch_related('treatments').order_by('created_at', 'id'))
+    for v in visits:
+        v.recorded_time = timezone.localtime(v.created_at)
+        v.given = [t for t in v.treatments.all() if t.kind == 'clinical']
+        v.exercises = [t for t in v.treatments.all() if t.kind == 'exercise']
+    summary = {'sessions': len(visits), 'patients': len({v.patient_id for v in visits}), 'by_therapist': sum(1 for v in visits if not v.is_by_assistant),
+               'by_assistant': sum(1 for v in visits if v.is_by_assistant)}
+    return visits, summary
+
+
 def _dashboard_data(profile):
     from billing.views import revenue_for
     today = timezone.localdate()
@@ -207,6 +219,7 @@ def _dashboard_data(profile):
     week_end_dt = day_start + datetime.timedelta(days=8)
     live = profile.appointments.filter(kind=Appointment.APPOINTMENT, status=Appointment.SCHEDULED)
     needs_followup = followups_due(patients, today)
+    treated_visits, treated_summary = treated_on(profile, today)
 
     visits = Visit.objects.filter(patient__in=patients)
     window_start = today - datetime.timedelta(days=6)
@@ -229,9 +242,10 @@ def _dashboard_data(profile):
             'week_appointments': live.filter(start__gte=day_start, start__lt=week_end_dt).count(),
             'followups_due': needs_followup.count(),
             'visits_week': visits_week, 'visits_change': change, 'visits_change_abs': abs(change),
-            'revenue_today': revenue_for(profile, today),
+            'revenue_today': revenue_for(profile, today), 'treated_today': treated_summary['patients'],
         },
         'upcoming': live.filter(start__gte=day_start).select_related('patient').order_by('start')[:5],
+        'treated': treated_visits[-8:][::-1], 'treated_summary': treated_summary,
         'recent': profile.recent_patients(4),
         'reminders': needs_followup.order_by(F('last_visit').asc(nulls_first=True))[:3],
         'chart': chart,
@@ -493,3 +507,21 @@ def patient_photo_update(request, pk):
         else:
             messages.error(request, first_error(form))
     return redirect('accounts:patient-detail', pk=patient.pk)
+
+
+@login_required
+def treated_page(request):
+    """Who was treated on a day, by whom and when: every session recorded for the workspace's patients."""
+    profile = workspace_profile(request)
+    if profile is None:
+        return redirect('accounts:welcome')
+    today = timezone.localdate()
+    try:
+        day = datetime.date.fromisoformat(request.GET.get('date', ''))
+    except ValueError:
+        day = today
+    visits, summary = treated_on(profile, day)
+    context = workspace_context(request.user, profile)
+    context.update({'active': 'dashboard', 'day': day, 'today': today, 'visits': visits, 'summary': summary,
+                    'prev_day': day - datetime.timedelta(days=1), 'next_day': day + datetime.timedelta(days=1)})
+    return render(request, 'accounts/treated.html', context)

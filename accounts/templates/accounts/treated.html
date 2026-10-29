@@ -1,0 +1,49 @@
+{% extends 'accounts/pro_base.html' %}
+{% block title %}Treated {{ day|date:"j M Y" }} | Sajhya Health{% endblock %}
+{% block extra_css %}
+  .tr-bar { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-bottom: 14px; } .tr-bar h1 { margin: 0 10px 0 0; font-size: 24px; }
+  .tr-sum { display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 14px; } .tr-sum div { background: #fff; border: 1px solid var(--line); border-radius: 10px; padding: 9px 14px; min-width: 140px; }
+  .tr-sum .k { font-size: 10px; text-transform: uppercase; color: var(--muted); font-weight: 800; } .tr-sum .v { font-weight: 800; font-size: 19px; margin-top: 2px; }
+  .by { display: inline-block; padding: 2px 9px; border-radius: 10px; font-size: 10.5px; font-weight: 800; background: #e7f7ed; color: #16834f; } .by.assistant { background: #eaf3ff; color: #3d6fb0; }
+  .tr-list { display: grid; gap: 10px; }
+  .tr-card { background: #fff; border: 1px solid var(--line); border-radius: 12px; padding: 12px 16px; display: grid; grid-template-columns: 90px minmax(0, 1fr) 200px; gap: 14px; align-items: start; }
+  .tr-card .time { font-weight: 800; font-size: 15px; color: var(--green-dark); } .tr-card .time small { display: block; font-weight: 600; font-size: 11px; color: var(--muted); }
+  .tr-card h3 { margin: 0 0 3px; font-size: 14.5px; } .tr-card h3 a { color: inherit; text-decoration: none; }
+  .tr-card .lbl { font-size: 10px; font-weight: 800; text-transform: uppercase; letter-spacing: .05em; color: var(--muted); margin: 8px 0 2px; }
+  .tr-card .items div { font-size: 12.5px; } .tr-card .dose { color: var(--muted); font-size: 11.5px; }
+  @media (max-width: 800px) { .tr-card { grid-template-columns: 1fr; } }
+{% endblock %}
+
+{% block main %}
+<div class="tr-bar">
+  <h1>Treated {% if day == today %}today{% else %}on {{ day|date:"j M Y" }}{% endif %}</h1>
+  <a class="pill icon" href="?date={{ prev_day|date:'Y-m-d' }}" aria-label="Previous day">‹</a>
+  <form method="get" style="margin:0"><input type="date" name="date" value="{{ day|date:'Y-m-d' }}" max="{{ today|date:'Y-m-d' }}" onchange="this.form.submit()" style="height:34px;border:1px solid #b9dcc9;border-radius:18px;padding:0 12px;background:#f1faf5"></form>
+  {% if day < today %}<a class="pill icon" href="?date={{ next_day|date:'Y-m-d' }}" aria-label="Next day">›</a>{% endif %}
+  <a class="pill" href="{% url 'accounts:treated' %}">Today</a>
+  <a class="pill" href="{% url 'accounts:dashboard' %}">← Dashboard</a>
+</div>
+<div class="tr-sum">
+  <div><div class="k">Patients treated</div><div class="v">{{ summary.patients }}</div></div>
+  <div><div class="k">Sessions</div><div class="v">{{ summary.sessions }}</div></div>
+  <div><div class="k">By physiotherapists</div><div class="v">{{ summary.by_therapist }}</div></div>
+  <div><div class="k">By therapy assistants</div><div class="v" style="color:#3d6fb0">{{ summary.by_assistant }}</div></div>
+</div>
+<div class="tr-list">
+  {% for v in visits %}
+  <article class="tr-card">
+    <div class="time">{{ v.recorded_time|time:"g:i A" }}<small>recorded{% if v.date != v.recorded_time.date %} · session {{ v.date|date:"j M" }}{% endif %}</small></div>
+    <div>
+      <h3><a href="{% url 'accounts:patient-detail' v.patient.pk %}?tab=visits">{{ v.patient.name }}</a> <span class="patient-id" style="display:inline">{{ v.patient.patient_code }} · {{ v.get_session_type_display }}</span></h3>
+      {% if v.given %}<div class="lbl">Treatment given</div><div class="items">{% for t in v.given %}<div>{{ t.name }}{% if t.dosage %} <span class="dose">· {{ t.dosage }}</span>{% endif %}</div>{% endfor %}</div>{% endif %}
+      {% if v.exercises %}<div class="lbl">Exercises supervised</div><div class="items">{% for t in v.exercises %}<div>{{ t.name }}{% if t.dosage %} <span class="dose">· {{ t.dosage }}</span>{% endif %}</div>{% endfor %}</div>{% endif %}
+      {% if not v.given and not v.exercises %}<div class="patient-id" style="margin-top:4px">No treatment details were recorded.</div>{% endif %}
+      {% if v.notes %}<div class="lbl">Notes</div><div style="font-size:12.5px">{{ v.notes }}</div>{% endif %}
+    </div>
+    <div><div class="lbl" style="margin-top:0">Treated by</div><b>{{ v.therapist }}</b><div><span class="by {% if v.is_by_assistant %}assistant{% endif %}">{{ v.treated_by_role }}</span></div></div>
+  </article>
+  {% empty %}
+  <div class="panel" style="padding:30px;text-align:center;color:var(--muted)">Nobody was treated {% if day == today %}yet today{% else %}on this day{% endif %}. A patient shows here once their session is recorded, by the physiotherapist or the therapy assistant.</div>
+  {% endfor %}
+</div>
+{% endblock %}
