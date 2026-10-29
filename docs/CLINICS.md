@@ -153,3 +153,12 @@ Staff choose which parts of the workspace each clinic has: **Appointments**, **B
 ## Departments on appointments
 
 A practice or clinic workspace can list departments (Physical Therapy, Occupational Therapy...) under Appointments, Manage (`/accounts/appointments/departments/`). Each appointment can be booked into one; the calendar shows it on the appointment, colours it, and can filter by department, so patients at the same time in different departments sit side by side. Removing a department keeps its appointments, only the label goes.
+
+## Schedules: a page for each department and therapist
+
+Appointments on a clinic's calendar can be booked **with** a therapist or assistant (`Appointment.practitioner`, a clinic team member) and into a department. Everyone reads the same appointments; what changes is the filter.
+
+- **Department login:** Team, Add team, Staff, role *Department login*, choose the department, then *Give a login*. It shows only that department's appointments on the front-desk Schedule tab (no phone numbers, no clinical records, nothing else). Its password may be short and simple (4+ characters, not the username); repeated wrong guesses still lock it out.
+- **Front desk:** managers and receptionists see the whole clinic and can narrow to a department; a therapy assistant starts with the appointments booked with them (Show everyone to widen).
+- **Therapist:** a physiotherapist on a clinic's team gets **My schedule** in their menu, across every clinic they work at.
+- Turning the Appointments module off for a clinic also removes the Schedule tab.

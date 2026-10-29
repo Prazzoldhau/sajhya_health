@@ -13,7 +13,7 @@ from accounts.access import first_error, require_workspace, workspace_context, w
 from accounts.models import Patient, ProfessionalProfile, Visit
 
 from .access import clinic_allowance, clinic_for_member, clinic_for_owner
-from .forms import ClinicForm, ClinicLoginForm, StaffForm, StaffLoginForm
+from .forms import ClinicForm, ClinicLoginForm, DepartmentLoginForm, StaffForm, StaffLoginForm
 from .login import close_staff_login, set_clinic_login, set_staff_login
 from .models import Clinic, ClinicMember, ClinicSubscription, QueueEntry
 
@@ -61,6 +61,20 @@ def hub(request):
         'invitations': ClinicMember.objects.filter(physio=profile, status=ClinicMember.INVITED).select_related('clinic', 'clinic__owner'),
     })
     return render(request, 'clinics/hub.html', context)
+
+
+@login_required
+def my_schedule(request):
+    """A therapist's own page: the appointments booked with them in every clinic they work at."""
+    profile = workspace_profile(request)
+    if profile is None:
+        return redirect('accounts:welcome')
+    from .schedule import appointments_on, day_context, parse_day
+    members = ClinicMember.objects.filter(physio=profile, status=ClinicMember.ACTIVE, clinic__is_active=True)
+    day = parse_day(request.GET.get('date'))
+    context = workspace_context(request.user, profile)
+    context.update({'active': 'schedule', **day_context(day), 'appointments': appointments_on(day, practitioner__in=members) if members else [], 'memberships': members.exists()})
+    return render(request, 'clinics/my_schedule.html', context)
 
 
 # ------------------------------------------------------------------ clinics
@@ -123,7 +137,7 @@ def _detail_context(request, profile, clinic, is_owner, tab, form=None, login_fo
         })
     elif tab == 'team':
         context.update({'members': clinic.members.exclude(status__in=[ClinicMember.LEFT, ClinicMember.DECLINED]).select_related('physio'),
-                        'staff_form': StaffForm(), 'past': clinic.members.filter(status__in=[ClinicMember.LEFT, ClinicMember.DECLINED]).select_related('physio')})
+                        'staff_form': StaffForm(clinic=clinic), 'past': clinic.members.filter(status__in=[ClinicMember.LEFT, ClinicMember.DECLINED]).select_related('physio')})
     elif tab == 'patients':
         patients = clinic.patients.select_related('professional').order_by('-last_activity', '-id')
         if q:
@@ -183,11 +197,11 @@ def staff_login(request, pk, member_id):
     if clinic.owner_id != profile.pk:
         raise Http404
     member = get_object_or_404(ClinicMember, pk=member_id, clinic=clinic, physio__isnull=True, status=ClinicMember.ACTIVE)
-    form = StaffLoginForm(request.POST, member=member)
+    form = (DepartmentLoginForm if member.role == ClinicMember.DEPARTMENT else StaffLoginForm)(request.POST, member=member)
     if form.is_valid():
         set_staff_login(member, form.cleaned_data['username'], form.cleaned_data['password1'])
         messages.success(request, f'{member.name} can now sign in with the username "{form.cleaned_data["username"]}" '
-                                  f'and sees only what a {member.get_role_display().lower()} needs.')
+                                  f'and sees only what a {member.get_role_display().lower()} needs.' if member.role != ClinicMember.DEPARTMENT else f'{member.name} can now sign in with the username "{form.cleaned_data["username"]}" and sees only that department\'s appointments.')
     else:
         messages.error(request, first_error(form))
     return _back(clinic, 'team')
@@ -247,7 +261,7 @@ def staff_add(request, pk):
     profile, clinic = clinic_for_owner(request, pk)
     if (blocked := _plan_needed(request, clinic)):
         return blocked
-    form = StaffForm(request.POST)
+    form = StaffForm(request.POST, clinic=clinic)
     if form.is_valid():
         member = form.save(commit=False)
         member.clinic, member.status, member.joined_at = clinic, ClinicMember.ACTIVE, timezone.now()

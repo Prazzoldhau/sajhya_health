@@ -140,11 +140,27 @@ class StaffForm(forms.ModelForm):
 
     class Meta:
         model = ClinicMember
-        fields = ('name', 'role', 'phone', 'email')
+        fields = ('name', 'role', 'department', 'phone', 'email')
 
-    def __init__(self, *args, **kwargs):
+    def __init__(self, *args, clinic=None, **kwargs):
         super().__init__(*args, **kwargs)
-        self.fields['name'].required = True
+        self.fields['name'].required = False  # a department login is named after its department
+        self.fields['department'].required = False
+        self.fields['department'].empty_label = 'Only for a department login'
+        self.fields['department'].queryset = clinic.calendar_owner.departments.all() if clinic is not None else self.fields['department'].queryset.none()
+
+    def clean(self):
+        data = super().clean()
+        if data.get('role') == ClinicMember.DEPARTMENT:
+            if not data.get('department'):
+                self.add_error('department', 'Choose the department this login is for. Add departments under Appointments first.')
+            else:
+                data['name'] = data['department'].name
+        else:
+            data['department'] = None
+            if not (data.get('name') or '').strip():
+                self.add_error('name', 'Type the name.')
+        return data
 
     def clean_name(self):
         return self.cleaned_data['name'].strip()
@@ -198,6 +214,25 @@ class StaffLoginForm(ClinicLoginForm):
     def __init__(self, *args, member, **kwargs):
         super().__init__(*args, clinic=member.clinic, **kwargs)
         self.member = member
+        self.current_user = member.user  # keeping the same username while changing the password is fine
+        self.fields['username'].initial = member.user.get_username() if member.user_id else ''
+
+
+class DepartmentLoginForm(StaffLoginForm):
+    """A department's sign-in only shows that department's appointments, so its password may be short and simple (4 characters or more).
+    Repeated wrong guesses still lock the sign-in out."""
+    MIN_LENGTH = 4
+
+    def clean(self):
+        data = forms.Form.clean(self)  # skips the strict password rules on purpose
+        password = data.get('password1')
+        if password and password != data.get('password2'):
+            self.add_error('password2', 'The two passwords do not match.')
+        elif password and len(password) < self.MIN_LENGTH:
+            self.add_error('password1', f'Use at least {self.MIN_LENGTH} characters.')
+        elif password and password.lower() == (data.get('username') or '').lower():
+            self.add_error('password1', 'The password cannot be the same as the username.')
+        return data
         self.current_user = member.user
         if member.user_id:
             self.fields['username'].initial = member.user.get_username()

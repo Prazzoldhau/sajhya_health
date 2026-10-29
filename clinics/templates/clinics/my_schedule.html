@@ -1,0 +1,39 @@
+{% extends 'accounts/pro_base.html' %}
+{% block title %}My schedule | Sajhya Health{% endblock %}
+{% block extra_css %}
+  .ms-bar { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-bottom: 14px; } .ms-bar h1 { margin: 0 10px 0 0; font-size: 24px; }
+  .ms-table { width: 100%; border-collapse: collapse; background: #fff; border: 1px solid var(--line); border-radius: 12px; overflow: hidden; }
+  .ms-table th { text-align: left; font-size: 11px; color: var(--muted); padding: 10px 14px; border-bottom: 1px solid var(--line); }
+  .ms-table td { padding: 11px 14px; border-bottom: 1px solid var(--line); vertical-align: top; } .ms-table tr:last-child td { border-bottom: 0; }
+  .ms-time { font-weight: 800; color: var(--green-dark); white-space: nowrap; } .ms-sub { color: var(--muted); font-size: 11.5px; }
+{% endblock %}
+
+{% block main %}
+<div class="ms-bar">
+  <h1>My schedule{% if day == today %} today{% else %} {{ day|date:"j M Y" }}{% endif %}</h1>
+  <a class="pill icon" href="?date={{ prev_day|date:'Y-m-d' }}" aria-label="Previous day">&lsaquo;</a>
+  <form method="get" style="margin:0"><input type="date" name="date" value="{{ day|date:'Y-m-d' }}" onchange="this.form.submit()" style="height:34px;border:1px solid #b9dcc9;border-radius:18px;padding:0 12px;background:#f1faf5"></form>
+  <a class="pill icon" href="?date={{ next_day|date:'Y-m-d' }}" aria-label="Next day">&rsaquo;</a>
+  <a class="pill" href="{% url 'clinics:my-schedule' %}">Today</a>
+</div>
+{% if not memberships %}
+<div class="panel" style="padding:30px;text-align:center;color:var(--muted)">You are not on a clinic team yet. When a clinic adds you, the appointments booked with you appear here.</div>
+{% else %}
+<table class="ms-table">
+  <thead><tr><th>TIME</th><th>PATIENT</th><th>DEPARTMENT</th><th>CLINIC</th><th>STATUS</th></tr></thead>
+  <tbody>
+  {% for a in appointments %}
+    <tr>
+      <td class="ms-time">{{ a.start|time:"g:i A" }}<div class="ms-sub">to {{ a.end|time:"g:i A" }}</div></td>
+      <td><a href="{% url 'accounts:patient-detail' a.patient_id %}" style="color:inherit;font-weight:700;text-decoration:none">{{ a.patient.name }}</a><div class="ms-sub">{{ a.patient.patient_code }} &middot; {{ a.get_session_type_display }}</div></td>
+      <td>{{ a.department.name|default:"-" }}</td>
+      <td>{{ a.practitioner.clinic.name }}</td>
+      <td>{{ a.get_status_display }}</td>
+    </tr>
+  {% empty %}
+    <tr><td colspan="5" style="padding:26px;text-align:center;color:var(--muted)">No appointments booked with you {% if day == today %}today{% else %}on this day{% endif %}.</td></tr>
+  {% endfor %}
+  </tbody>
+</table>
+{% endif %}
+{% endblock %}

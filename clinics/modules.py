@@ -16,7 +16,7 @@ KEYS = [key for key, *_ in MODULES]
 NAMES = {key: name for key, name, *_ in MODULES}
 PREFIXES = tuple(prefix for *_, prefixes in MODULES for prefix in prefixes)
 # front-desk permissions that belong to a module
-PERMISSION_MODULES = {'billing': 'billing'}
+PERMISSION_MODULES = {'billing': 'billing', 'schedule': 'appointments'}
 
 
 def default_modules():

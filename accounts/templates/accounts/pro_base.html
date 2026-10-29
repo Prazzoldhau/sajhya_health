@@ -298,6 +298,7 @@
       <a class="nav {% if active == 'clinics' %}active{% endif %}" href="{% url 'clinics:hub' %}"><span class="nav-icon">✚</span><span class="nav-text">Clinic Connect</span>{% if clinic_invites %}<span class="nav-badge">{{ clinic_invites }}</span>{% endif %}</a>
       {% endif %}
       {% if not profile.is_business_owner %}
+      {% if my_schedule %}<a class="nav {% if active == 'schedule' %}active{% endif %}" href="{% url 'clinics:my-schedule' %}"><span class="nav-icon">◷</span><span class="nav-text">My schedule</span></a>{% endif %}
       {% if 'messages' not in disabled_modules %}<a class="nav {% if active == 'messages' %}active{% endif %}" href="{% url 'accounts:messages' %}"><span class="nav-icon">✉</span><span class="nav-text">Messages</span></a>{% endif %}
       {% if 'reports' not in disabled_modules %}<a class="nav {% if active == 'reports' %}active{% endif %}" href="{% url 'accounts:reports' %}"><span class="nav-icon">▥</span><span class="nav-text">Reports</span></a>{% endif %}
       {% endif %}

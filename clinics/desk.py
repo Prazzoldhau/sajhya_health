@@ -21,8 +21,9 @@ from billing.models import ADVANCE, BillingEntry, EntryPayment, PatientAdvance, 
 
 from .forms import FrontDeskPatientForm
 from .models import ClinicMember, QueueEntry
+from .schedule import appointments_on, day_context, parse_day
 
-TABS = [('overview', 'Overview', 'overview'), ('queue', 'Queue', 'queue'), ('patients', 'Patients', 'patients'),
+TABS = [('overview', 'Overview', 'overview'), ('queue', 'Queue', 'queue'), ('schedule', 'Schedule', 'schedule'), ('patients', 'Patients', 'patients'),
         ('register', 'Register patient', 'register'), ('session', 'Record treatment', 'record_session'), ('billing', 'Billing', 'billing'), ('team', 'Team', 'team')]
 
 
@@ -90,11 +91,34 @@ def desk(request, member):
         context['form'] = FrontDeskPatientForm()
     elif tab == 'billing':
         context.update(_billing_context(request, member))
+    elif tab == 'schedule':
+        context.update(_schedule_context(request, member))
     elif tab == 'session':
         context.update(_session_context(request, member))
     elif tab == 'team':
         context['members'] = clinic.members.filter(status=ClinicMember.ACTIVE).select_related('physio')
     return render(request, 'clinics/desk.html', context)
+
+
+def _schedule_context(request, member):
+    """The clinic's appointments for a day. A department's sign-in sees only its own department; a therapy assistant starts with the
+    appointments that are with them; everyone else sees the whole clinic and can narrow it to a department."""
+    clinic = member.clinic
+    day = parse_day(request.GET.get('date'))
+    owner = clinic.calendar_owner
+    filters = {'professional': owner}
+    departments = [] if member.department_id else list(owner.departments.all())
+    chosen = ''
+    if member.department_id:
+        filters['department_id'] = member.department_id
+    elif request.GET.get('dept') in {str(d.pk) for d in departments}:
+        chosen = request.GET['dept']
+        filters['department_id'] = int(chosen)
+    mine = member.role == ClinicMember.ASSISTANT and request.GET.get('all') != '1'
+    if mine:
+        filters['practitioner'] = member
+    return {**day_context(day), 'appointments': appointments_on(day, **filters), 'departments': departments, 'dept': chosen, 'mine': mine,
+            'own_department': member.department if member.department_id else None}
 
 
 def billing_owner(clinic):

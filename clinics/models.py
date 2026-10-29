@@ -133,6 +133,11 @@ class Clinic(models.Model):
         sub = ClinicSubscription.objects.filter(professional_id=self.owner_id).first()
         return bool(sub and sub.is_active)
 
+    @property
+    def calendar_owner(self):
+        """The workspace whose calendar holds the clinic's appointments: its own login when it has one, otherwise the owning physiotherapist."""
+        return self.workspace or self.owner
+
     def has_module(self, key):
         return key in (self.modules or [])
 
@@ -166,8 +171,9 @@ class Clinic(models.Model):
 
 class ClinicMember(models.Model):
     """A physio (a verified professional, joins by accepting an invitation) or a staff member (a record without a login)."""
-    PHYSIO, MANAGER, RECEPTIONIST, ASSISTANT, OTHER = 'physio', 'manager', 'receptionist', 'assistant', 'other'
-    ROLE_CHOICES = [(PHYSIO, 'Physiotherapist'), (MANAGER, 'Manager'), (RECEPTIONIST, 'Receptionist'), (ASSISTANT, 'Therapy assistant'), (OTHER, 'Other staff')]
+    PHYSIO, MANAGER, RECEPTIONIST, ASSISTANT, OTHER, DEPARTMENT = 'physio', 'manager', 'receptionist', 'assistant', 'other', 'department'
+    ROLE_CHOICES = [(PHYSIO, 'Physiotherapist'), (MANAGER, 'Manager'), (RECEPTIONIST, 'Receptionist'), (ASSISTANT, 'Therapy assistant'), (OTHER, 'Other staff'),
+                    (DEPARTMENT, 'Department login')]
     STAFF_ROLES = ROLE_CHOICES[1:]  # everything except physio
     INVITED, ACTIVE, DECLINED, LEFT = 'invited', 'active', 'declined', 'left'
     STATUS_CHOICES = [(INVITED, 'Invited'), (ACTIVE, 'Active'), (DECLINED, 'Declined'), (LEFT, 'Left / removed')]
@@ -177,6 +183,8 @@ class ClinicMember(models.Model):
     physio = models.ForeignKey('accounts.ProfessionalProfile', null=True, blank=True, on_delete=models.CASCADE, related_name='clinic_memberships')
     user = models.OneToOneField('auth.User', null=True, blank=True, on_delete=models.SET_NULL, related_name='clinic_staff',
                                 help_text='Staff only: the sign-in the owner gave this person.')
+    department = models.ForeignKey('accounts.Department', null=True, blank=True, on_delete=models.SET_NULL, related_name='logins',
+                                   help_text='Department login only: the department whose schedule this sign-in shows.')
     name = models.CharField(max_length=150, blank=True, help_text='Staff only; physios use their profile name.')
     phone = models.CharField(max_length=20, blank=True)
     email = models.EmailField(blank=True)
@@ -201,10 +209,11 @@ class ClinicMember(models.Model):
 
     # what each staff role may do at the front desk (clinical records are never part of it)
     PERMISSIONS = {
-        MANAGER: {'overview', 'patients', 'contact', 'register', 'queue', 'queue_manage', 'billing', 'team'},
-        RECEPTIONIST: {'patients', 'contact', 'register', 'queue', 'queue_manage', 'billing'},
-        ASSISTANT: {'patients', 'queue', 'queue_manage', 'record_session'},
+        MANAGER: {'overview', 'patients', 'contact', 'register', 'queue', 'queue_manage', 'billing', 'team', 'schedule'},
+        RECEPTIONIST: {'patients', 'contact', 'register', 'queue', 'queue_manage', 'billing', 'schedule'},
+        ASSISTANT: {'patients', 'queue', 'queue_manage', 'record_session', 'schedule'},
         OTHER: {'queue'},
+        DEPARTMENT: {'schedule'},  # a department's screen shows its own appointments and nothing else
     }
 
     def can(self, permission):

@@ -88,6 +88,27 @@
   <script>SajhyaUI.patientPicker(document.getElementById('queueSearch'), document.getElementById('queuePatient'), { url: "{% url 'clinics:desk-patient-search' %}", hint: document.getElementById('queueChosen') });</script>
   {% endif %}
 
+{% elif tab == 'schedule' %}
+  <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:14px">
+    <a class="secondary-btn" href="?tab=schedule&date={{ prev_day|date:'Y-m-d' }}{% if dept %}&dept={{ dept }}{% endif %}{% if not mine and member.role == 'assistant' %}&all=1{% endif %}" style="text-decoration:none">&lsaquo;</a>
+    <form method="get" style="margin:0;display:flex;gap:8px"><input type="hidden" name="tab" value="schedule"><input type="date" name="date" value="{{ day|date:'Y-m-d' }}" onchange="this.form.submit()" style="height:36px;border:1px solid var(--line);border-radius:8px;padding:0 10px">
+      {% if departments %}<select name="dept" onchange="this.form.submit()" style="height:36px;border:1px solid var(--line);border-radius:8px;padding:0 8px"><option value="">All departments</option>{% for d in departments %}<option value="{{ d.pk }}" {% if dept == d.pk|stringformat:'s' %}selected{% endif %}>{{ d.name }}</option>{% endfor %}</select>{% endif %}
+    </form>
+    <a class="secondary-btn" href="?tab=schedule&date={{ next_day|date:'Y-m-d' }}{% if dept %}&dept={{ dept }}{% endif %}{% if not mine and member.role == 'assistant' %}&all=1{% endif %}" style="text-decoration:none">&rsaquo;</a>
+    <a class="secondary-btn" href="?tab=schedule" style="text-decoration:none">Today</a>
+    {% if member.role == 'assistant' %}{% if mine %}<a class="secondary-btn" href="?tab=schedule&date={{ day|date:'Y-m-d' }}&all=1" style="text-decoration:none">Show everyone</a>{% else %}<a class="secondary-btn" href="?tab=schedule&date={{ day|date:'Y-m-d' }}" style="text-decoration:none">Only mine</a>{% endif %}{% endif %}
+  </div>
+  <p class="hint" style="margin-top:0">{% if own_department %}Appointments in <b>{{ own_department.name }}</b>{% elif mine %}Appointments booked with you{% else %}All appointments{% endif %} on {{ day|date:"l, j M Y" }}.</p>
+  <table><thead><tr><th>TIME</th><th>PATIENT</th>{% if not own_department %}<th>DEPARTMENT</th>{% endif %}<th>WITH</th><th>STATUS</th></tr></thead><tbody>
+  {% for a in appointments %}<tr>
+    <td><b>{{ a.start|time:"g:i A" }}</b><div class="hint">to {{ a.end|time:"g:i A" }}</div></td>
+    <td><b>{{ a.patient.name }}</b><div class="hint">{{ a.patient.patient_code }} &middot; {{ a.get_session_type_display }}{% if can_contact and a.patient.phone %} &middot; {{ a.patient.phone }}{% endif %}</div></td>
+    {% if not own_department %}<td>{{ a.department.name|default:"-" }}</td>{% endif %}
+    <td>{{ a.practitioner.display_name|default:"-" }}</td>
+    <td>{{ a.get_status_display }}</td>
+  </tr>{% empty %}<tr><td colspan="5" class="hint">No appointments on this day.</td></tr>{% endfor %}
+  </tbody></table>
+
 {% elif tab == 'patients' %}
   <form method="get" style="display:flex;gap:8px;margin-bottom:14px"><input type="hidden" name="tab" value="patients">
     <input type="search" name="q" value="{{ q }}" placeholder="Search name{% if can_contact %}, phone{% endif %} or ID" style="height:38px;border:1px solid var(--line);border-radius:8px;padding:0 10px;min-width:260px">

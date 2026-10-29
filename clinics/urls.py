@@ -7,6 +7,7 @@ app_name = 'clinics'
 urlpatterns = [
     path('', views.hub, name='hub'),
     path('desk/', desk.desk, name='desk'),
+    path('my-schedule/', views.my_schedule, name='my-schedule'),
     path('desk/register/', desk.register_patient, name='desk-register'),
     path('desk/treatment/save/', desk.session_create, name='desk-session-create'),
     path('desk/treatment/search/', desk.treatment_search, name='desk-treatment-search'),

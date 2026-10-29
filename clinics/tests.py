@@ -1047,3 +1047,111 @@ class ClinicModulesTests(Base):
         from .admin import ClinicAdminForm
         form = ClinicAdminForm(instance=clinic)
         self.assertIn('billing', [key for key, _ in form.fields['modules'].choices])
+
+
+class SchedulesTests(Base):
+    """Each department and each therapist has their own page onto the clinic's appointments."""
+    CREDS = StaffLoginTests.CREDS
+    add_staff = StaffLoginTests.add_staff
+    setup_desk = FrontDeskRegisteredByAndBillingTests.setup_desk
+
+    def prepare(self):
+        from accounts.models import Appointment, Department
+        clinic = self.setup_desk()
+        self.workspace = clinic.workspace
+        self.pt = Department.objects.create(professional=self.workspace, name='Physical Therapy')
+        self.ot = Department.objects.create(professional=self.workspace, name='Occupational Therapy')
+        self.physio_user, self.physio = make_professional('therapist', first_name='Tara', last_name='Gurung')
+        self.member = ClinicMember.objects.create(clinic=clinic, physio=self.physio, role='physio', status='active')
+        self.asha = ClinicMember.objects.get(name='Asha')
+        self.a = make_patient(self.owner, 'Patient A')
+        self.c = make_patient(self.owner, 'Patient C')
+        self.when = timezone.make_aware(datetime.datetime.combine(timezone.localdate(), datetime.time(13, 30)))
+        end = self.when + datetime.timedelta(minutes=30)
+        self.appt_a = Appointment.objects.create(professional=self.workspace, patient=self.a, start=self.when, end=end, department=self.pt, practitioner=self.member)
+        self.appt_c = Appointment.objects.create(professional=self.workspace, patient=self.c, start=self.when, end=end, department=self.ot, practitioner=self.asha)
+        return clinic
+
+    def test_a_department_login_sees_only_its_own_departments_appointments_and_may_use_a_simple_password(self):
+        clinic = self.prepare()
+        self.as_user('owner')
+        self.client.post(reverse('clinics:staff-add', args=[clinic.pk]), {'role': 'department', 'department': self.ot.pk, 'name': ''})
+        member = ClinicMember.objects.get(role='department')
+        self.assertEqual((member.name, member.department), ('Occupational Therapy', self.ot))
+        url = reverse('clinics:staff-login', args=[clinic.pk, member.pk])
+        self.client.post(url, {'username': 'ot-room', 'password1': 'abc', 'password2': 'abc'})  # too short
+        member.refresh_from_db()
+        self.assertIsNone(member.user)
+        self.client.post(url, {'username': 'ot-room', 'password1': 'ot-room', 'password2': 'ot-room'})  # same as the username
+        member.refresh_from_db()
+        self.assertIsNone(member.user)
+        self.client.post(url, {'username': 'ot-room', 'password1': '1234', 'password2': '1234'})  # simple is allowed
+        member.refresh_from_db()
+        self.assertIsNotNone(member.user)
+        self.client.post(url, {'username': 'ot-room', 'password1': '5678', 'password2': '5678'})  # changing only the password keeps the username
+        self.assertTrue(self.client.login(username='ot-room', password='5678'))
+        page = self.client.get(reverse('clinics:desk'))
+        self.assertEqual(page.context['tab'], 'schedule')
+        self.assertEqual([t[0] for t in page.context['tabs']], ['schedule'])
+        self.assertEqual([a.patient.name for a in page.context['appointments']], ['Patient C'])
+        self.assertNotContains(page, 'Patient A')
+        self.assertNotContains(page, '9841')  # no phone numbers
+        self.assertEqual(self.client.get(reverse('clinics:desk'), {'tab': 'patients'}).context['tab'], 'schedule')  # nothing else is open to it
+        for url in ('billing:billing', 'accounts:patients', 'accounts:appointments'):  # not a workspace login: the other pages stay closed
+            self.assertIn(self.client.get(reverse(url)).status_code, (302, 403, 404), url)
+
+    def test_other_staff_see_the_whole_clinic_and_can_narrow_to_a_department(self):
+        self.prepare()
+        self.as_user('ram-desk')
+        page = self.client.get(reverse('clinics:desk'), {'tab': 'schedule'})
+        self.assertEqual(sorted(a.patient.name for a in page.context['appointments']), ['Patient A', 'Patient C'])
+        self.assertContains(page, 'Occupational Therapy')
+        narrowed = self.client.get(reverse('clinics:desk'), {'tab': 'schedule', 'dept': self.pt.pk})
+        self.assertEqual([a.patient.name for a in narrowed.context['appointments']], ['Patient A'])
+        tomorrow = self.client.get(reverse('clinics:desk'), {'tab': 'schedule', 'date': (timezone.localdate() + datetime.timedelta(days=1)).isoformat()})
+        self.assertEqual(tomorrow.context['appointments'], [])
+
+    def test_a_therapy_assistant_starts_with_the_appointments_booked_with_them(self):
+        self.prepare()
+        self.as_user('asha')
+        mine = self.client.get(reverse('clinics:desk'), {'tab': 'schedule'})
+        self.assertEqual([a.patient.name for a in mine.context['appointments']], ['Patient C'])
+        everyone = self.client.get(reverse('clinics:desk'), {'tab': 'schedule', 'all': 1})
+        self.assertEqual(len(everyone.context['appointments']), 2)
+
+    def test_a_therapist_has_their_own_page_across_clinics(self):
+        self.prepare()
+        self.client.force_login(self.physio_user)
+        page = self.client.get(reverse('clinics:my-schedule'))
+        self.assertEqual([a.patient.name for a in page.context['appointments']], ['Patient A'])
+        self.assertContains(page, 'My schedule')
+        self.assertContains(page, 'Physical Therapy')
+        self.assertNotContains(page, 'Patient C')
+        stranger_user, _ = make_professional('nobody')
+        self.client.force_login(stranger_user)
+        empty = self.client.get(reverse('clinics:my-schedule'))
+        self.assertContains(empty, 'not on a clinic team yet')
+        self.assertNotContains(self.client.get(reverse('accounts:patients')), 'My schedule')
+
+    def test_booking_with_a_therapist_on_the_clinics_calendar(self):
+        from accounts.models import Appointment
+        clinic = self.prepare()
+        self.as_user('himal-clinic')
+        patient = make_patient(self.workspace, 'Walk In')
+        day = (timezone.localdate() + datetime.timedelta(days=2)).isoformat()
+        base = {'patient': patient.pk, 'date': day, 'start_time': '10:00', 'duration': 30, 'session_type': 'treatment', 'notes': '', 'department': self.pt.pk}
+        self.client.post(reverse('accounts:appointment-create'), {**base, 'practitioner': self.member.pk})
+        appt = Appointment.objects.get(patient=patient)
+        self.assertEqual((appt.department, appt.practitioner), (self.pt, self.member))
+        page = self.client.get(reverse('accounts:appointments'), {'date': day, 'days': 1})
+        self.assertContains(page, 'Tara Gurung')
+        outsider = ClinicMember.objects.create(clinic=Clinic.objects.create(owner=self.owner, name='Other', phone='01555'), physio=self.physio, role='physio')
+        self.client.post(reverse('accounts:appointment-create'), {**base, 'start_time': '11:00', 'practitioner': outsider.pk})  # not this clinic's team
+        self.assertEqual(Appointment.objects.filter(patient=patient).count(), 1)
+        edit = {'date': day, 'start_time': '10:30', 'end_time': '11:00', 'session_type': 'treatment', 'notes': '', 'department': self.pt.pk}
+        self.client.post(reverse('accounts:appointment-edit', args=[appt.pk]), {**edit, 'practitioner': self.asha.pk})
+        appt.refresh_from_db()
+        self.assertEqual(appt.practitioner, self.asha)
+        self.client.post(reverse('accounts:appointment-edit', args=[appt.pk]), {**edit, 'practitioner': outsider.pk})
+        appt.refresh_from_db()
+        self.assertIsNone(appt.practitioner)  # never attached to someone outside the clinic

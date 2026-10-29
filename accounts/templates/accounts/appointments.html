@@ -167,8 +167,8 @@
           {% for e in col.events %}
           <div class="ev ev-{{ e.css }} {{ e.status }}{% if e.tint != '' %} dept-{{ e.tint }}{% endif %}" style="top:{{ e.top }}px;height:{{ e.height }}px;left:calc({{ e.left }}% + 2px);width:calc({{ e.width }}% - 4px)"
                data-id="{{ e.id }}" data-kind="{{ e.kind }}" data-status="{{ e.status }}" data-title="{{ e.title }}" data-time="{{ e.time_label }}"
-               data-links='{{ e.links_json }}' data-type="{{ e.type_label }}" data-date="{{ e.date }}" data-start="{{ e.start_hm }}" data-end="{{ e.end_hm }}" data-session="{{ e.session_type }}" data-raw-title="{{ e.raw_title }}" data-patient-url="{{ e.patient_url }}" data-code="{{ e.patient_code }}" data-notes="{{ e.notes }}" data-department="{{ e.department }}" data-department-id="{{ e.department_id }}">
-            <b>{{ e.title }}</b>{{ e.time_label }}{% if e.department and e.height > 40 %}<span class="dept">{{ e.department }}</span>{% endif %}{% if e.height > 52 %}<div class="tag">{{ e.type_label }}</div>{% endif %}
+               data-links='{{ e.links_json }}' data-type="{{ e.type_label }}" data-date="{{ e.date }}" data-start="{{ e.start_hm }}" data-end="{{ e.end_hm }}" data-session="{{ e.session_type }}" data-raw-title="{{ e.raw_title }}" data-patient-url="{{ e.patient_url }}" data-code="{{ e.patient_code }}" data-notes="{{ e.notes }}" data-department="{{ e.department }}" data-department-id="{{ e.department_id }}" data-practitioner="{{ e.practitioner }}" data-practitioner-id="{{ e.practitioner_id }}">
+            <b>{{ e.title }}</b>{{ e.time_label }}{% if e.department and e.height > 40 %}<span class="dept">{{ e.department }}</span>{% endif %}{% if e.practitioner and e.height > 66 %}<span class="tag">with {{ e.practitioner }}</span>{% endif %}{% if e.height > 52 %}<div class="tag">{{ e.type_label }}</div>{% endif %}
           </div>
           {% endfor %}
         </div>
@@ -196,6 +196,7 @@
       <div class="two"><label>Date {{ appointment_form.date }}</label><label>Start time {{ appointment_form.start_time }}</label></div>
       <div class="two"><label>Duration {{ appointment_form.duration }}</label><label>Type {{ appointment_form.session_type }}</label></div>
       <label>Department {{ appointment_form.department }}{% if not departments %}<span class="hint">None set up yet. <a href="{% url 'accounts:departments' %}">Add departments</a> to book Physical Therapy, Occupational Therapy and so on.</span>{% endif %}</label>
+      {% if practitioners %}<label>Book with {{ appointment_form.practitioner }}</label>{% endif %}
       <label>Notes {{ appointment_form.notes }}</label>
       <div class="pf-actions" style="padding:10px 0 0"><button type="button" class="secondary-btn" data-close>Cancel</button><button type="submit" class="primary-btn">Book appointment</button></div>
     </form>
@@ -249,6 +250,7 @@
       <div class="two"><label>End time <input type="time" name="end_time" id="e_end" required></label>
         <label id="e_type_wrap">Type <select name="session_type" id="e_type">{% for value, label in session_choices %}<option value="{{ value }}">{{ label }}</option>{% endfor %}</select></label></div>
       <label id="e_dept_wrap">Department <select name="department" id="e_dept"><option value="">No department</option>{% for d in departments %}<option value="{{ d.id }}">{{ d.name }}</option>{% endfor %}</select></label>
+      {% if practitioners %}<label id="e_who_wrap">Book with <select name="practitioner" id="e_who"><option value="">Anyone / not set</option>{% for p in practitioners %}<option value="{{ p.id }}">{{ p.name }}</option>{% endfor %}</select></label>{% endif %}
       <label id="e_label_wrap">Label <input type="text" name="title" id="e_label" maxlength="150"></label>
       <label id="e_notes_wrap">Notes <textarea name="notes" id="e_notes" rows="2"></textarea></label>
       <div class="pf-actions" style="padding:10px 0 0"><button type="button" class="secondary-btn" data-close>Cancel</button><button type="submit" class="primary-btn">Save changes</button></div>
@@ -307,7 +309,7 @@
       var d = ev.dataset, isAppt = d.kind === 'appointment';
       $('dTitle').textContent = d.title;
       $('dTime').textContent = d.time + (isAppt ? ' · ' + d.status : '');
-      $('dType').textContent = d.type + (d.department ? ' · ' + d.department : '') + (d.code ? ' · ' + d.code : '');
+      $('dType').textContent = d.type + (d.department ? ' · ' + d.department : '') + (d.practitioner ? ' · with ' + d.practitioner : '') + (d.code ? ' · ' + d.code : '');
       $('dNotes').textContent = d.notes || '';
       $('actionForm').action = $('actionForm').dataset.url.replace('/0/', '/' + d.id + '/');
       $('dOpen').style.display = isAppt ? '' : 'none';
@@ -334,6 +336,7 @@
         $('e_date').value = d.date; $('e_start').value = d.start; $('e_end').value = d.end;
         $('e_type').value = d.session; $('e_label').value = d.rawTitle; $('e_notes').value = d.notes || '';
         $('e_dept').value = d.departmentId || '';
+        if ($('e_who')) { $('e_who').value = d.practitionerId || ''; $('e_who_wrap').hidden = !isAppt; }
         $('e_type_wrap').hidden = $('e_notes_wrap').hidden = $('e_dept_wrap').hidden = !isAppt;
         $('e_label_wrap').hidden = isAppt;
         openModal('editModal');

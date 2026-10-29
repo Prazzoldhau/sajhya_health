@@ -363,11 +363,17 @@ class AppointmentForm(forms.Form):
     duration = forms.TypedChoiceField(choices=DURATION_CHOICES, coerce=int, initial=30)
     session_type = forms.ChoiceField(choices=Visit.SESSION_CHOICES, initial=Visit.TREATMENT)
     department = forms.ModelChoiceField(queryset=Department.objects.none(), required=False, empty_label='No department')
+    practitioner = forms.ModelChoiceField(queryset=None, required=False, empty_label='Anyone / not set')
     notes = forms.CharField(required=False, widget=forms.Textarea(attrs={'rows': 2, 'placeholder': 'Optional'}))
 
     def __init__(self, *args, profile, **kwargs):
         super().__init__(*args, **kwargs)
         self.fields['department'].queryset = profile.departments.all()  # only this practice's own departments
+        from clinics.models import ClinicMember
+        clinic = getattr(profile, 'clinic_workspace', None)
+        self.fields['practitioner'].queryset = (clinic.members.filter(status=ClinicMember.ACTIVE, role__in=[ClinicMember.PHYSIO, ClinicMember.ASSISTANT]).select_related('physio')
+                                                if clinic else ClinicMember.objects.none())  # only a clinic's own team
+        self.fields['practitioner'].label_from_instance = lambda m: f'{m.display_name} ({m.get_role_display()})'
         self.fields['patient'].queryset = profile.workspace_patients().exclude(status=Patient.DISCHARGED).order_by('name')
 
 
@@ -379,6 +385,7 @@ class RescheduleForm(forms.Form):
     session_type = forms.ChoiceField(choices=Visit.SESSION_CHOICES, required=False)
     title = forms.CharField(max_length=150, required=False)
     department = forms.CharField(required=False)  # an id; checked against the practice's own departments by the view
+    practitioner = forms.CharField(required=False)  # an id; checked against the clinic's team by the view
     notes = forms.CharField(required=False)
 
     def clean(self):

@@ -378,6 +378,8 @@ class Appointment(models.Model):
 
     professional = models.ForeignKey(ProfessionalProfile, on_delete=models.CASCADE, related_name='appointments')
     department = models.ForeignKey(Department, null=True, blank=True, on_delete=models.SET_NULL, related_name='appointments')
+    practitioner = models.ForeignKey('clinics.ClinicMember', null=True, blank=True, on_delete=models.SET_NULL, related_name='appointments',
+                                     help_text='Clinic calendars only: the therapist (or assistant) this appointment is with.')
     kind = models.CharField(max_length=20, choices=KIND_CHOICES, default=APPOINTMENT)
     patient = models.ForeignKey(Patient, null=True, blank=True, on_delete=models.CASCADE, related_name='appointments')
     title = models.CharField(max_length=150, blank=True)  # label for blocks

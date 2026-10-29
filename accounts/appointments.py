@@ -144,7 +144,7 @@ def appointments(request):
         shown.filter(
             start__gte=aware(day_list[0], datetime.time.min),
             start__lt=aware(day_list[-1] + datetime.timedelta(days=1), datetime.time.min),
-        ).exclude(status=Appointment.CANCELLED).select_related('patient', 'professional', 'department'))
+        ).exclude(status=Appointment.CANCELLED).select_related('patient', 'professional', 'department', 'practitioner__physio'))
 
     first_hour, last_hour = DEFAULT_FIRST_HOUR, DEFAULT_LAST_HOUR
     for ev in events:
@@ -176,6 +176,7 @@ def appointments(request):
                 'links': {k: appointment_links(profile, ev, k) for k in ('booked', 'reminder', 'rescheduled')} if ev.kind == Appointment.APPOINTMENT and ev.patient and ev.status == Appointment.SCHEDULED else {},
                 'notes': ev.notes, 'raw_title': ev.title, 'session_type': ev.session_type,
                 'department': ev.department.name if ev.department_id else '', 'department_id': ev.department_id or '',
+                'practitioner': ev.practitioner.display_name if ev.practitioner_id else '', 'practitioner_id': ev.practitioner_id or '',
                 'tint': tints.get(ev.department_id, '') if ev.department_id and ev.kind == Appointment.APPOINTMENT else '',
                 'date': s.date().isoformat(), 'start_hm': s.strftime('%H:%M'), 'end_hm': e.strftime('%H:%M'),
             })
@@ -213,6 +214,7 @@ def appointments(request):
         'range_label': f"{day_list[0]:%d %b}" + (f" - {day_list[-1]:%d %b %Y}" if days > 1 else f" {day_list[0]:%Y}"),
         'weeks': weeks, 'month_label': f'{month_first:%B %Y}', 'prev_month': prev_month, 'next_month': next_month,
         'departments': [{'id': d.pk, 'name': d.name, 'tint': tints[d.pk]} for d in departments], 'dept': chosen,
+        'practitioners': [{'id': m.pk, 'name': f'{m.display_name} ({m.get_role_display()})'} for m in team_of(profile)],
         'tasks': tasks, 'open_count': sum(not t.done for t in tasks), 'done_count': sum(t.done for t in tasks),
         'panel': request.GET.get('panel', 'calendar'),
         'appointment_form': AppointmentForm(profile=profile, initial={'date': today, 'duration': profile.default_session_minutes}),
@@ -222,6 +224,15 @@ def appointments(request):
         'duration_default': profile.default_session_minutes,
     })
     return render(request, 'accounts/appointments.html', context)
+
+
+def team_of(profile):
+    """The clinic team an appointment can be booked with (empty for a personal workspace)."""
+    from clinics.models import ClinicMember
+    clinic = getattr(profile, 'clinic_workspace', None)
+    if clinic is None:
+        return ClinicMember.objects.none()
+    return clinic.members.filter(status=ClinicMember.ACTIVE, role__in=[ClinicMember.PHYSIO, ClinicMember.ASSISTANT]).select_related('physio')
 
 
 def _back(date, days, booked=None, kind='booked'):
@@ -243,7 +254,7 @@ def appointment_create(request):
     start = aware(d['date'], d['start_time'])
     appt = Appointment.objects.create(
         professional=profile, patient=d['patient'], start=start,
-        end=start + datetime.timedelta(minutes=d['duration']), session_type=d['session_type'], notes=d['notes'], department=d['department'])
+        end=start + datetime.timedelta(minutes=d['duration']), session_type=d['session_type'], notes=d['notes'], department=d['department'], practitioner=d['practitioner'])
     sync_next_appointment(d['patient'])
     messages.success(request, f"Appointment booked for {d['patient'].name}.")
     return _back(d['date'], days, booked=appt.pk)
@@ -290,6 +301,7 @@ def appointment_edit(request, pk):
         appt.session_type = d['session_type'] or appt.session_type
         appt.notes = d['notes']
         appt.department = profile.departments.filter(pk=int(d['department'])).first() if d['department'].isdigit() else None
+        appt.practitioner = team_of(profile).filter(pk=int(d['practitioner'])).first() if d['practitioner'].isdigit() else None
     else:
         appt.title = d['title']
     appt.save()

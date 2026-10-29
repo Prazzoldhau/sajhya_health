@@ -108,7 +108,7 @@
         {% for m in members %}
         <tr>
           <td><b>{{ m.display_name }}</b>{% if m.physio %}<div class="hint">{{ m.physio.title }} · verified</div>{% endif %}</td>
-          <td>{{ m.get_role_display }}</td>
+          <td>{{ m.get_role_display }}{% if m.department %}<div class="hint">{{ m.department.name }}</div>{% endif %}</td>
           <td>{% if m.status == 'invited' %}<span class="tone warn">Invitation sent</span>{% else %}<span class="tone good">Active</span>{% endif %}</td>
           <td>{% if m.physio %}{{ m.physio.mobile }}{% else %}{{ m.phone }}{% if m.email %}<div class="hint">{{ m.email }}</div>{% endif %}{% endif %}</td>
           <td>{% if clinic.owner_id == profile.pk and not m.physio_id %}<button type="button" class="text-link" data-staff-login="{{ m.pk }}" data-name="{{ m.name }}" data-username="{{ m.user.username }}" data-role="{{ m.get_role_display }}">{% if m.user_id %}🔑 Login: {{ m.user.username }}{% else %}🔑 Give a login{% endif %}</button>{% endif %}
@@ -137,7 +137,7 @@
         <div data-teampane="staff" hidden>
             <p class="hint" style="margin-top:0">Add receptionists, assistants and managers here, then use <b>Give a login</b> on their row so they can sign in with limited access.</p>
       <form method="post" action="{% url 'clinics:staff-add' clinic.pk %}" class="cl-form">{% csrf_token %}
-        <label>Name{{ staff_form.name }}</label><label>Role{{ staff_form.role }}</label><label>Phone{{ staff_form.phone }}</label><label>Email{{ staff_form.email }}</label>
+        <label>Name{{ staff_form.name }}</label><label>Role{{ staff_form.role }}</label><label>Department{{ staff_form.department }}</label><label>Phone{{ staff_form.phone }}</label><label>Email{{ staff_form.email }}</label>
         <button class="primary-btn" type="submit" style="width:fit-content">Add staff member</button>
       </form>
         </div>
@@ -163,7 +163,8 @@
       Manager: 'A manager sees the clinic overview, team, patients (with phone numbers) and the queue, and can register patients and run the queue.',
       Receptionist: 'A receptionist sees patients (with phone numbers) and the queue, and can register patients and run the queue.',
       'Therapy assistant': 'A therapy assistant sees patient names and the queue, can call patients and mark them complete, and records the treatment given and the exercises supervised. No phone numbers, no billing.',
-      'Other staff': 'Other staff can see today\'s queue only.'
+      'Other staff': 'Other staff can see today\'s queue only.',
+      'Department login': 'A department login shows only that department\'s appointments (patient, time, who it is with). No phone numbers and no clinical records. A short, simple password of 4 or more characters is fine here.'
     };
     document.querySelectorAll('[data-staff-login]').forEach(function (b) {
       b.addEventListener('click', function () {
