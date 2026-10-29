@@ -166,3 +166,7 @@ Appointments on a clinic's calendar can be booked **with** a therapist or assist
 ### Visiting doctors and therapists who are not on Sajhya
 
 Add them under Team, Add team, Staff with the role **Doctor / therapist** and a specialty (for example Ortho). They are bookable ("Book with") and shown as *Dr Sailendra Maharjan (Ortho)*. With *Give a login* they sign in to the front desk: Schedule opens on their own appointments, and like a therapy assistant they can call patients and record the treatment given and exercises supervised, stamped with their name and the role *Doctor / therapist*. No phone numbers and no billing. If they later join Sajhya they can be invited as a physiotherapist; their earlier appointments stay on the staff record (they are not moved across automatically).
+
+### Reception runs the appointment book
+
+Receptionists and managers (not assistants, doctors or department logins) can **book, change and cancel** the clinic's appointments from the front desk: Schedule tab, *Book an appointment*. They pick one of the clinic's own patients, the date, time and length, and optionally a department and the therapist it is with. After booking, changing or cancelling they get the same WhatsApp / Viber / SMS message buttons as the clinic login. Reception does not mark an appointment attended, because that records a clinical session. Needs the Appointments module and an active Clinic plan.

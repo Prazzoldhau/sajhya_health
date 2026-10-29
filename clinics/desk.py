@@ -13,7 +13,9 @@ from django.utils import timezone
 from django.views.decorators.http import require_GET, require_POST
 
 from accounts.access import first_error
-from accounts.models import Patient, Visit
+from accounts.appointments import apply_edit, aware, booked_prompt, sync_next_appointment, team_of
+from accounts.forms import DURATION_CHOICES, AppointmentForm, RescheduleForm
+from accounts.models import Appointment, Patient, Visit
 from billing import catalog, exports
 from billing import invoice as inv
 from billing.forms import EntryPaymentForm, PatientBillForm
@@ -117,8 +119,67 @@ def _schedule_context(request, member):
     mine = member.books_own_schedule and request.GET.get('all') != '1'
     if mine:
         filters['practitioner'] = member
+    can_book = member.can('appointments') and clinic.is_usable
     return {**day_context(day), 'appointments': appointments_on(day, **filters), 'departments': departments, 'dept': chosen, 'mine': mine,
-            'own_department': member.department if member.department_id else None}
+            'own_department': member.department if member.department_id else None, 'can_book': can_book,
+            'prompt': booked_prompt(request, owner) if member.can('appointments') else None,
+            'book_departments': list(owner.departments.all()) if can_book else [], 'book_team': [(m.pk, m.choice_label) for m in team_of(owner)] if can_book else [],
+            'session_types': Visit.SESSION_CHOICES, 'durations': DURATION_CHOICES, 'default_minutes': owner.default_session_minutes}
+
+
+def _appt_back(day, booked=None, kind='booked'):
+    extra = f'&booked={booked}&kind={kind}' if booked else ''
+    return redirect(f"{reverse('clinics:desk')}?tab=schedule&date={day}{extra}")
+
+
+def _clinic_appointment(member, pk):
+    """A scheduled appointment of this clinic's calendar, else 404."""
+    return get_object_or_404(Appointment, pk=pk, professional=member.clinic.calendar_owner, kind=Appointment.APPOINTMENT, status=Appointment.SCHEDULED)
+
+
+@desk_view('appointments')
+@require_POST
+def appt_create(request, member):
+    """Reception books a clinic patient into the clinic's appointment book (a department and a therapist if wanted)."""
+    clinic = member.clinic
+    if not _usable(request, member):
+        return _back('schedule')
+    owner = clinic.calendar_owner
+    form = AppointmentForm(request.POST, profile=owner)
+    if not form.is_valid() or form.cleaned_data['patient'].clinic_id != clinic.pk:
+        messages.error(request, first_error(form) if form.errors else 'Search and pick one of the clinic\'s patients.')
+        return _back('schedule')
+    d = form.cleaned_data
+    start = aware(d['date'], d['start_time'])
+    appt = Appointment.objects.create(professional=owner, patient=d['patient'], start=start, end=start + datetime.timedelta(minutes=d['duration']),
+                                      session_type=d['session_type'], notes=d['notes'], department=d['department'], practitioner=d['practitioner'])
+    sync_next_appointment(d['patient'])
+    messages.success(request, f"Appointment booked for {d['patient'].name}.")
+    return _appt_back(d['date'], appt.pk)
+
+
+@desk_view('appointments')
+@require_POST
+def appt_edit(request, member, appt_id):
+    appt = _clinic_appointment(member, appt_id)
+    form = RescheduleForm(request.POST)
+    if not form.is_valid():
+        messages.error(request, first_error(form))
+        return _appt_back(timezone.localtime(appt.start).date())
+    apply_edit(member.clinic.calendar_owner, appt, form.cleaned_data)
+    messages.success(request, 'Appointment rescheduled.')
+    return _appt_back(form.cleaned_data['date'], appt.pk, 'rescheduled')
+
+
+@desk_view('appointments')
+@require_POST
+def appt_cancel(request, member, appt_id):
+    appt = _clinic_appointment(member, appt_id)
+    appt.status = Appointment.CANCELLED
+    appt.save(update_fields=['status'])
+    sync_next_appointment(appt.patient)
+    messages.success(request, 'Appointment cancelled.')
+    return _appt_back(timezone.localtime(appt.start).date(), appt.pk, 'cancelled')
 
 
 def billing_owner(clinic):

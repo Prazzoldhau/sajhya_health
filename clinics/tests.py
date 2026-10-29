@@ -1298,3 +1298,76 @@ class SeedQaClinicTests(TestCase):
         self.assertTrue(User.objects.filter(username='real-physio').exists())
         self.run_command()  # and it can be built again
         self.assertTrue(Clinic.objects.filter(name='Bhaktapur Speech and Hearing Center').exists())
+
+
+class ReceptionRunsTheAppointmentBookTests(Base):
+    """Reception (and the manager) book, change and cancel the clinic's appointments from the front desk."""
+    CREDS = StaffLoginTests.CREDS
+    add_staff = StaffLoginTests.add_staff
+    setup_desk = FrontDeskRegisteredByAndBillingTests.setup_desk
+    prepare = SchedulesTests.prepare
+
+    def booking(self, **extra):
+        return {'patient': self.c.pk, 'date': timezone.localdate().isoformat(), 'start_time': '09:30', 'duration': 30, 'session_type': 'treatment',
+                'department': self.ot.pk, 'practitioner': self.member.pk, 'notes': 'First visit', **extra}
+
+    def test_reception_books_a_clinic_patient_with_a_department_and_a_therapist(self):
+        from accounts.models import Appointment
+        clinic = self.prepare()
+        for patient in (self.a, self.c):  # the QA patients belong to the clinic
+            patient.clinic = clinic
+            patient.professional = self.workspace
+            patient.save()
+        self.as_user('ram-desk')
+        page = self.client.get(reverse('clinics:desk'), {'tab': 'schedule'})
+        self.assertContains(page, 'Book an appointment')
+        r = self.client.post(reverse('clinics:desk-appt-create'), self.booking())
+        appt = Appointment.objects.get(patient=self.c, notes='First visit')
+        self.assertEqual((appt.professional, appt.department, appt.practitioner), (self.workspace, self.ot, self.member))
+        self.assertRedirects(r, f"{reverse('clinics:desk')}?tab=schedule&date={timezone.localdate().isoformat()}&booked={appt.pk}&kind=booked", fetch_redirect_response=False)
+        after = self.client.get(r['Location'])
+        self.assertContains(after, 'Booked: Patient C')  # the message to the patient is offered straight away
+        self.assertContains(after, 'WhatsApp')
+        # it appears on the therapist's page and on the clinic's calendar
+        self.client.force_login(self.physio_user)
+        self.assertIn(appt, self.client.get(reverse('clinics:my-schedule')).context['appointments'])
+        self.as_user('himal-clinic')
+        self.assertContains(self.client.get(reverse('accounts:appointments')), 'Patient C')
+
+    def test_reception_can_change_and_cancel_it(self):
+        clinic = self.prepare()
+        self.as_user('mani')  # the manager can too
+        self.a.clinic = clinic
+        self.a.save()
+        edit = reverse('clinics:desk-appt-edit', args=[self.appt_a.pk])
+        day = timezone.localdate().isoformat()
+        self.client.post(edit, {'date': day, 'start_time': '16:00', 'end_time': '16:30', 'department': self.ot.pk, 'practitioner': self.asha.pk, 'session_type': 'treatment', 'notes': ''})
+        self.appt_a.refresh_from_db()
+        self.assertEqual((timezone.localtime(self.appt_a.start).strftime('%H:%M'), self.appt_a.department, self.appt_a.practitioner), ('16:00', self.ot, self.asha))
+        self.client.post(edit, {'date': day, 'start_time': '17:00', 'end_time': '16:30'})  # ends before it starts: refused
+        self.appt_a.refresh_from_db()
+        self.assertEqual(timezone.localtime(self.appt_a.start).strftime('%H:%M'), '16:00')
+        r = self.client.post(reverse('clinics:desk-appt-cancel', args=[self.appt_a.pk]))
+        self.appt_a.refresh_from_db()
+        self.assertEqual(self.appt_a.status, 'cancelled')
+        self.assertIn('kind=cancelled', r['Location'])
+        self.assertEqual(self.client.post(reverse('clinics:desk-appt-cancel', args=[self.appt_a.pk])).status_code, 404)  # no longer scheduled
+
+    def test_only_the_patients_of_this_clinic_and_only_the_right_roles(self):
+        from accounts.models import Appointment
+        clinic = self.prepare()
+        stranger_user, stranger = make_professional('far-physio')
+        elsewhere = make_patient(stranger, 'Elsewhere')
+        self.as_user('ram-desk')
+        before = Appointment.objects.count()
+        self.client.post(reverse('clinics:desk-appt-create'), self.booking(patient=elsewhere.pk))
+        self.client.post(reverse('clinics:desk-appt-create'), self.booking(patient=self.c.pk))  # not registered under the clinic
+        self.assertEqual(Appointment.objects.count(), before)
+        for who in ('asha', 'owner'):  # an assistant and the owner's personal sign-in cannot use the desk's booking
+            self.as_user(who)
+            self.assertEqual(self.client.post(reverse('clinics:desk-appt-create'), self.booking()).status_code, 404, who)
+            self.assertEqual(self.client.post(reverse('clinics:desk-appt-cancel', args=[self.appt_a.pk])).status_code, 404, who)
+        clinic.modules = ['billing']
+        clinic.save()
+        self.as_user('ram-desk')
+        self.assertEqual(self.client.post(reverse('clinics:desk-appt-create'), self.booking()).status_code, 404)  # Appointments is off in the plan

@@ -235,6 +235,22 @@ def team_of(profile):
     return clinic.members.filter(status=ClinicMember.ACTIVE, role__in=ClinicMember.BOOKABLE_ROLES).select_related('physio')
 
 
+def apply_edit(profile, appt, d):
+    """Move an appointment (or block) and change its details from a validated RescheduleForm; the department and the person it is with
+    must belong to this practice, otherwise they are cleared."""
+    appt.start, appt.end = aware(d['date'], d['start_time']), aware(d['date'], d['end_time'])
+    if appt.kind == Appointment.APPOINTMENT:
+        appt.session_type = d['session_type'] or appt.session_type
+        appt.notes = d['notes']
+        appt.department = profile.departments.filter(pk=int(d['department'])).first() if d['department'].isdigit() else None
+        appt.practitioner = team_of(profile).filter(pk=int(d['practitioner'])).first() if d['practitioner'].isdigit() else None
+    else:
+        appt.title = d['title']
+    appt.save()
+    if appt.patient:
+        sync_next_appointment(appt.patient)
+
+
 def _back(date, days, booked=None, kind='booked'):
     extra = f'&booked={booked}&kind={kind}' if booked else ''
     return redirect(f"{reverse('accounts:appointments')}?date={date}&days={days}{extra}")
@@ -296,17 +312,7 @@ def appointment_edit(request, pk):
         messages.error(request, first_error(form))
         return _back(timezone.localtime(appt.start).date(), days)
     d = form.cleaned_data
-    appt.start, appt.end = aware(d['date'], d['start_time']), aware(d['date'], d['end_time'])
-    if appt.kind == Appointment.APPOINTMENT:
-        appt.session_type = d['session_type'] or appt.session_type
-        appt.notes = d['notes']
-        appt.department = profile.departments.filter(pk=int(d['department'])).first() if d['department'].isdigit() else None
-        appt.practitioner = team_of(profile).filter(pk=int(d['practitioner'])).first() if d['practitioner'].isdigit() else None
-    else:
-        appt.title = d['title']
-    appt.save()
-    if appt.patient:
-        sync_next_appointment(appt.patient)
+    apply_edit(profile, appt, d)
     messages.success(request, 'Appointment rescheduled.' if appt.kind == Appointment.APPOINTMENT else 'Calendar updated.')
     return _back(d['date'], days, booked=appt.pk if appt.kind == Appointment.APPOINTMENT else None, kind='rescheduled')
 
