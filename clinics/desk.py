@@ -14,6 +14,7 @@ from django.views.decorators.http import require_GET, require_POST
 
 from accounts.access import first_error
 from accounts.models import Patient
+from billing import exports
 from billing import invoice as inv
 from billing.forms import EntryPaymentForm, PatientBillForm
 from billing.models import ADVANCE, BillingEntry, EntryPayment, PatientAdvance, advance_balance
@@ -182,6 +183,17 @@ def bill_pdf(request, member, entry_id):
     entry = get_object_or_404(BillingEntry, pk=entry_id, patient__clinic=member.clinic)
     response = HttpResponse(inv.build_pdf(entry), content_type='application/pdf')
     response['Content-Disposition'] = f'attachment; filename="{entry.invoice_number}.pdf"'
+    response['Cache-Control'] = 'private, no-store'
+    return response
+
+
+@desk_view('billing')
+def bill_export(request, member):
+    """Excel of the clinic's bills for the chosen dates (managers and receptionists; phone numbers only where their role may see them)."""
+    f = exports.Filters.from_query(request.GET)
+    content = exports.build_workbook(exports.clinic_scope(member.clinic, member.can('contact')), f)
+    response = HttpResponse(content, content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
+    response['Content-Disposition'] = f'attachment; filename="billing_{f.start:%Y%m%d}_{f.end:%Y%m%d}.xlsx"'
     response['Cache-Control'] = 'private, no-store'
     return response
 

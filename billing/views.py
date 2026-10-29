@@ -17,6 +17,7 @@ from accounts.access import actor_of, can_see_contact, first_error, own_patient,
 
 from accounts.messaging import channel_links
 
+from . import exports
 from . import invoice as inv
 from .forms import AdvanceForm, BillCorrectionForm, BillingEntryForm, EntryPaymentForm, PackagePaymentForm, PatientBillForm, PatientPackageForm
 from .models import ADVANCE, BillingEntry, EntryPayment, PackagePayment, PatientAdvance, PatientPackage, advance_balance, lock_patient
@@ -561,3 +562,52 @@ def invoice_email(request, pk):
         return back
     messages.success(request, f'Invoice {entry.invoice_number} e-mailed to {address}.')
     return back
+
+
+# ---------------------------------------------------------------------------
+# The billing sheet and downloads
+# ---------------------------------------------------------------------------
+
+@login_required
+def sheet(request):
+    """All bills as a spreadsheet-style table (filter, sort, totals) with the Excel / CSV download one click away."""
+    profile = workspace_profile(request)
+    if profile is None:
+        return redirect('accounts:welcome')
+    f = exports.Filters.from_query(request.GET)
+    scope = exports.profile_scope(profile)
+    rows = exports.sheet_rows(scope, f, limit=exports.MAX_SHEET_ROWS + 1)
+    truncated = len(rows) > exports.MAX_SHEET_ROWS
+    rows = rows[:exports.MAX_SHEET_ROWS]
+    context = workspace_context(request.user, profile)
+    context.update({'active': 'billing', 'billing_tab': 'sheet', 'f': f, 'qs': f.querystring(), 'rows': rows, 'totals': exports.totals(rows), 'truncated': truncated,
+                    'shown': len(rows), 'statuses': exports.STATUSES, 'modes': exports.MODES, 'columns': [(h, key) for h, _, key in exports.BILL_COLUMNS],
+                    'numeric': exports.NUMERIC,
+                    'advance_held_total': PatientAdvance.objects.filter(professional=profile).aggregate(t=Sum('amount'))['t'] or 0})
+    return render(request, 'billing/sheet.html', context)
+
+
+def _download(content, filename, content_type):
+    response = HttpResponse(content, content_type=content_type)
+    response['Content-Disposition'] = f'attachment; filename="{filename}"'
+    response['Cache-Control'] = 'private, no-store'
+    return response
+
+
+@login_required
+def export_xlsx(request):
+    profile = workspace_profile(request)
+    if profile is None:
+        raise Http404
+    f = exports.Filters.from_query(request.GET)
+    return _download(exports.build_workbook(exports.profile_scope(profile), f), f'billing_{f.start:%Y%m%d}_{f.end:%Y%m%d}.xlsx',
+                     'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
+
+
+@login_required
+def export_csv(request):
+    profile = workspace_profile(request)
+    if profile is None:
+        raise Http404
+    f = exports.Filters.from_query(request.GET)
+    return _download(exports.build_csv(exports.profile_scope(profile), f), f'billing_{f.start:%Y%m%d}_{f.end:%Y%m%d}.csv', 'text/csv; charset=utf-8')

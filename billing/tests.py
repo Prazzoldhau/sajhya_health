@@ -893,3 +893,123 @@ class MoneySafetyTests(BillingBase):
         with self.assertRaises(CommandError):
             call_command('check_money', stdout=out, stderr=StringIO())
         self.assertIn(entry.invoice_number, out.getvalue())
+
+
+class BillingSheetTests(BillingBase):
+    def bill(self, name=None, rate='500', status='paid', day=None, **extra):
+        data = {'entry_date': (day or self.today).isoformat(), 'service': 'Therapy', 'rate': rate, 'payment_mode': 'cash', 'payment_status': status, **extra}
+        if name:
+            self.client.post(reverse('billing:entry-create'), {**data, 'patient_name': name})
+        else:
+            self.client.post(reverse('billing:patient-bill', args=[self.patient.pk]), data)
+        return BillingEntry.objects.latest('id')
+
+    def workbook(self, **params):
+        import io
+
+        from openpyxl import load_workbook
+        r = self.client.get(reverse('billing:export-xlsx'), params)
+        self.assertEqual((r.status_code, r['Content-Type']), (200, 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'))
+        self.assertIn('attachment', r['Content-Disposition'])
+        return load_workbook(io.BytesIO(r.content))
+
+    def test_the_sheet_shows_bills_with_totals_and_filters(self):
+        self.bill(rate='500')
+        self.bill(rate='700', status='due')
+        self.bill(name='Walk In Ram', rate='300', status='partial', amount_received='100')
+        old = self.bill(rate='900', day=self.today - datetime.timedelta(days=60))
+        page = self.client.get(reverse('billing:sheet'))
+        self.assertEqual(page.status_code, 200)
+        self.assertEqual(page.context['totals']['count'], 3)  # this month only by default: the old bill is outside
+        self.assertEqual((page.context['totals']['amount'], page.context['totals']['received'], page.context['totals']['due']), (1500, 600, 900))
+        self.assertContains(page, 'Download Excel')
+        self.assertEqual(len(self.client.get(reverse('billing:sheet'), {'from': (self.today - datetime.timedelta(days=90)).isoformat()}).context['rows']), 4)
+        self.assertEqual(len(self.client.get(reverse('billing:sheet'), {'status': 'due'}).context['rows']), 1)
+        self.assertEqual(len(self.client.get(reverse('billing:sheet'), {'status': 'unpaid'}).context['rows']), 2)
+        self.assertEqual([r['patient'] for r in self.client.get(reverse('billing:sheet'), {'q': 'ram'}).context['rows']], ['Walk In Ram'])
+        self.assertEqual(len(self.client.get(reverse('billing:sheet'), {'from': 'junk', 'to': 'junk', 'status': 'bogus', 'mode': 'bogus'}).context['rows']), 3)  # bad input falls back to the defaults
+        self.assertContains(self.client.get(reverse('billing:billing')), reverse('billing:sheet'))  # the tab
+
+    def test_the_excel_file_has_the_sheets_the_rows_and_the_summary(self):
+        self.bill(rate='500')
+        self.bill(rate='700', status='due')
+        self.client.post(reverse('billing:advance-add', args=[self.patient.pk]), {'amount': '1000', 'payment_mode': 'online'})
+        wb = self.workbook()
+        self.assertEqual(wb.sheetnames, ['Summary', 'Bills', 'Payments received', 'Advances', 'Packages'])
+        bills = wb['Bills']
+        self.assertEqual([c.value for c in bills[1]][:9], ['Date', 'Invoice', 'Patient', 'Patient ID', 'Phone', 'Service', 'Amount (NPR)', 'Received (NPR)', 'Due (NPR)'])
+        self.assertEqual((bills['A2'].value.date() if hasattr(bills['A2'].value, 'date') else bills['A2'].value), self.today)
+        self.assertEqual([bills.cell(row=r, column=7).value for r in (2, 3)], [500, 700])
+        self.assertEqual(bills.cell(row=3, column=9).value, 700)
+        self.assertEqual(bills.cell(row=4, column=7).value, '=SUBTOTAL(109,G2:G3)')  # a total that follows the filter you apply inside Excel
+        self.assertEqual(bills.freeze_panes, 'A2')
+        summary = {row[0].value: row[1].value for row in wb['Summary'].iter_rows(min_row=4, max_row=8)}
+        self.assertEqual((summary['Bills'], summary['Billed (NPR)'], summary['Received on these bills (NPR)']), (2, 1200, 500))
+        flat = [c.value for row in wb['Summary'].iter_rows() for c in row]
+        self.assertIn('Total received', flat)
+        self.assertEqual(len(list(wb['Payments received'].iter_rows(min_row=2))), 1)
+        self.assertEqual([c.value for c in wb['Advances'][2]][3:5], ['Advance taken', 1000])
+        self.assertEqual(self.client.get(reverse('billing:export-xlsx'), {'status': 'due'}).status_code, 200)
+
+    def test_text_that_looks_like_a_formula_stays_text_in_excel_and_csv(self):
+        self.bill(name='=HYPERLINK("http://evil","x")', rate='100')
+        self.bill(name='+cmd|calc', rate='100')
+        wb = self.workbook()
+        cell = wb['Bills'].cell(row=2, column=3)
+        self.assertEqual(cell.data_type, 's')  # stored as text, never as a formula
+        r = self.client.get(reverse('billing:export-csv'))
+        text = r.content.decode('utf-8-sig')
+        self.assertEqual(r['Content-Type'], 'text/csv; charset=utf-8')
+        self.assertIn("'=HYPERLINK", text)
+        self.assertIn("'+cmd|calc", text)
+        self.assertTrue(r.content.startswith(b'\xef\xbb\xbf'))  # the byte-order mark Excel needs for Nepali text
+        self.assertIn('Invoice', text.splitlines()[0])
+
+    def test_nepali_names_and_cancelled_bills_export(self):
+        entry = self.bill(name='सीता गुरुङ', rate='500')
+        self.client.post(reverse('billing:entry-cancel', args=[entry.pk]), {'reason': 'x'})
+        self.bill(rate='300')
+        wb = self.workbook()
+        names = [wb['Bills'].cell(row=r, column=3).value for r in (2, 3)]
+        self.assertIn('सीता गुरुङ', names)
+        statuses = [wb['Bills'].cell(row=r, column=10).value for r in (2, 3)]
+        self.assertIn('Cancelled', statuses)
+        summary = {row[0].value: row[1].value for row in wb['Summary'].iter_rows(min_row=4, max_row=8)}
+        self.assertEqual(summary['Billed (NPR)'], 300)  # a cancelled bill is listed but not counted
+        page = self.client.get(reverse('billing:sheet'))
+        self.assertContains(page, 'सीता गुरुङ')
+        self.assertEqual(page.context['totals']['amount'], 300)
+
+    def test_the_sheet_and_downloads_are_private_and_need_an_approved_workspace(self):
+        self.bill(rate='500')
+        stranger, _ = make_professional('stranger')
+        other = self.client_class()
+        other.force_login(stranger)
+        self.assertEqual(other.get(reverse('billing:sheet')).context['totals']['count'], 0)
+        import io
+
+        from openpyxl import load_workbook
+        wb = load_workbook(io.BytesIO(other.get(reverse('billing:export-xlsx')).content))
+        self.assertEqual(wb['Bills'].max_row, 1)  # headers only: another professional's bills are never in it
+        make_professional('waiting', status='submitted')
+        waiting = self.client_class()
+        waiting.login(username='waiting', password='Gr33n!Health-99')
+        self.assertEqual(waiting.get(reverse('billing:export-xlsx')).status_code, 302)
+        self.client.logout()
+        self.assertEqual(self.client.get(reverse('billing:sheet')).status_code, 302)
+        self.assertEqual(self.client.get(reverse('billing:export-csv')).status_code, 302)
+
+    def test_a_long_sheet_is_cut_in_the_browser_but_not_in_the_download(self):
+        from . import exports
+        old = exports.MAX_SHEET_ROWS
+        exports.MAX_SHEET_ROWS = 2
+        try:
+            for _ in range(3):
+                self.bill(rate='100')
+            page = self.client.get(reverse('billing:sheet'))
+            self.assertTrue(page.context['truncated'])
+            self.assertEqual(len(page.context['rows']), 2)
+            self.assertContains(page, 'Showing the first 2 rows')
+        finally:
+            exports.MAX_SHEET_ROWS = old
+        self.assertEqual(self.workbook()['Bills'].max_row, 1 + 3 + 1)  # header, three bills and the total row

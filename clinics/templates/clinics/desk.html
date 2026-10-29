@@ -109,7 +109,9 @@
     <form method="get" style="margin:0"><input type="hidden" name="tab" value="billing"><input type="date" name="date" value="{{ selected|date:'Y-m-d' }}" onchange="this.form.submit()" style="height:36px;border:1px solid var(--line);border-radius:8px;padding:0 10px"></form>
     <a class="secondary-btn" href="?tab=billing&date={{ next_date|date:'Y-m-d' }}" style="text-decoration:none">›</a>
     <a class="secondary-btn" href="?tab=billing" style="text-decoration:none">Today</a>
-    {% if can_bill %}<button type="button" class="primary-btn" style="margin-left:auto" onclick="var f=document.getElementById('deskBill');f.hidden=!f.hidden;if(!f.hidden)document.getElementById('billSearch').focus()">＋ New bill</button>{% endif %}
+    <a class="secondary-btn" href="{% url 'clinics:desk-bill-export' %}?from={{ selected|date:'Y-m-d' }}&to={{ selected|date:'Y-m-d' }}" style="text-decoration:none;margin-left:auto" title="Excel of the bills on this day">⬇ Excel (this day)</a>
+    <a class="secondary-btn" href="{% url 'clinics:desk-bill-export' %}?from={{ selected|date:'Y-m-01' }}&to={{ selected|date:'Y-m-d' }}" style="text-decoration:none" title="Excel from the 1st of this month to this day">⬇ Excel (month so far)</a>
+    {% if can_bill %}<button type="button" class="primary-btn" onclick="var f=document.getElementById('deskBill');f.hidden=!f.hidden;if(!f.hidden)document.getElementById('billSearch').focus()">＋ New bill</button>{% endif %}
   </div>
   <div class="kpis" style="margin-bottom:16px">
     <div class="kpi"><div class="k">Billed on {{ selected|date:"M j" }}</div><div class="v">NPR {{ billed }}</div></div>

@@ -1,0 +1,108 @@
+{% extends 'accounts/pro_base.html' %}
+{% block title %}Billing sheet | Sajhya Health{% endblock %}
+{% block extra_css %}
+  .sh-bar { display: flex; gap: 10px; flex-wrap: wrap; align-items: end; background: #fff; border: 1px solid var(--line); border-radius: 12px; padding: 12px 14px; margin-bottom: 12px; }
+  .sh-bar label { display: grid; gap: 3px; font-size: 10.5px; font-weight: 800; color: var(--muted); text-transform: uppercase; letter-spacing: .04em; }
+  .sh-bar select, .sh-bar input { height: 36px; border: 1px solid var(--line); border-radius: 8px; padding: 0 9px; background: #fff; }
+  .sh-bar .dl { margin-left: auto; display: flex; gap: 8px; flex-wrap: wrap; }
+  .sheet-wrap { background: #fff; border: 1px solid var(--line); border-radius: 12px; overflow: auto; max-height: calc(100vh - 330px); min-height: 220px; }
+  table.sheet { border-collapse: separate; border-spacing: 0; width: max-content; min-width: 100%; font-size: 12.5px; }
+  table.sheet th { position: sticky; top: 0; z-index: 2; background: #116b43; color: #fff; text-align: left; padding: 9px 12px; font-size: 11px; letter-spacing: .03em; white-space: nowrap; cursor: pointer; user-select: none; border-right: 1px solid #2c8a5f; }
+  table.sheet th.num, table.sheet td.num { text-align: right; font-variant-numeric: tabular-nums; }
+  table.sheet th .arr { opacity: .6; margin-left: 4px; font-size: 9px; }
+  table.sheet td { padding: 7px 12px; border-bottom: 1px solid #edf2ee; border-right: 1px solid #f3f6f4; white-space: nowrap; max-width: 280px; overflow: hidden; text-overflow: ellipsis; }
+  table.sheet tbody tr:nth-child(even) td { background: #f8fbf9; } table.sheet tbody tr:hover td { background: #e9f7ef; }
+  table.sheet tr.cancelled td { color: #9aa8a0; text-decoration: line-through; }
+  table.sheet td.st-paid { color: #16834f; font-weight: 700; } table.sheet td.st-due, table.sheet td.st-part { color: #a97510; font-weight: 700; } table.sheet td.st-cancelled { color: #b83b3b; }
+  table.sheet tfoot td { position: sticky; bottom: 0; background: #e9f7ef; font-weight: 800; border-top: 2px solid #116b43; }
+  .sh-sum { display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 12px; }
+  .sh-sum div { background: #fff; border: 1px solid var(--line); border-radius: 10px; padding: 9px 14px; min-width: 150px; } .sh-sum .k { font-size: 10px; text-transform: uppercase; color: var(--muted); font-weight: 800; } .sh-sum .v { font-weight: 800; font-size: 17px; margin-top: 2px; }
+  .sh-find { height: 34px; border: 1px solid var(--line); border-radius: 18px; padding: 0 14px; min-width: 240px; }
+  @media print { .no-print { display: none !important; } .sheet-wrap { max-height: none; overflow: visible; } }
+{% endblock %}
+
+{% block main %}
+{% include 'billing/_tabs.html' %}
+<div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:10px"><h1 style="margin:0;font-size:24px">Billing sheet</h1>
+  <span class="patient-id" style="display:inline">Every bill as a row, like a spreadsheet. Filter, sort by any column, then download it as Excel.</span></div>
+
+<form method="get" class="sh-bar no-print">
+  <label>From<input type="date" name="from" value="{{ f.start|date:'Y-m-d' }}"></label>
+  <label>To<input type="date" name="to" value="{{ f.end|date:'Y-m-d' }}"></label>
+  <label>Status<select name="status">{% for k, label in statuses %}<option value="{{ k }}" {% if k == f.status %}selected{% endif %}>{{ label }}</option>{% endfor %}</select></label>
+  <label>Payment mode<select name="mode">{% for k, label in modes %}<option value="{{ k }}" {% if k == f.mode %}selected{% endif %}>{{ label }}</option>{% endfor %}</select></label>
+  <label>Search<input type="search" name="q" value="{{ f.q }}" placeholder="Patient, invoice, phone, service..." style="min-width:220px"></label>
+  <button class="primary-btn" type="submit" style="height:36px">Show</button>
+  <a class="secondary-btn" href="{% url 'billing:sheet' %}" style="text-decoration:none;display:inline-flex;align-items:center;height:36px">This month</a>
+  <span class="dl">
+    <a class="primary-btn" href="{% url 'billing:export-xlsx' %}?{{ qs }}" style="text-decoration:none;display:inline-flex;align-items:center;height:36px;background:#1d6f42" title="Excel file with Bills, Payments received, Advances, Packages and a Summary sheet">⬇ Download Excel</a>
+    <a class="secondary-btn" href="{% url 'billing:export-csv' %}?{{ qs }}" style="text-decoration:none;display:inline-flex;align-items:center;height:36px" title="Plain CSV of the bills below">CSV</a>
+    <button type="button" class="secondary-btn" style="height:36px" onclick="window.print()">Print</button>
+  </span>
+</form>
+
+<div class="sh-sum">
+  <div><div class="k">Bills</div><div class="v">{{ totals.count }}</div></div>
+  <div><div class="k">Billed</div><div class="v">NPR {{ totals.amount }}</div></div>
+  <div><div class="k">Received</div><div class="v" style="color:#16834f">NPR {{ totals.received }}</div></div>
+  <div><div class="k">Still due</div><div class="v" style="color:#b78317">NPR {{ totals.due }}</div></div>
+  <div><div class="k">Kept as advance</div><div class="v">NPR {{ totals.carried }}</div></div>
+</div>
+{% if truncated %}<div class="no-print" style="background:#fff8e6;border:1px solid #f0d58a;color:#7a5a10;border-radius:10px;padding:8px 12px;margin-bottom:10px;font-size:12.5px">Showing the first {{ shown }} rows only. Narrow the dates, or download the Excel file for every row.</div>{% endif %}
+
+<div class="no-print" style="margin-bottom:8px"><input type="search" class="sh-find" id="shFind" placeholder="Filter these rows as you type..." autocomplete="off"> <span class="patient-id" id="shCount" style="display:inline"></span></div>
+<div class="sheet-wrap">
+  <table class="sheet" id="sheet">
+    <thead><tr>{% for h, key in columns %}<th data-key="{{ key }}" class="{% if key in numeric %}num{% endif %}">{{ h }}<span class="arr"></span></th>{% endfor %}</tr></thead>
+    <tbody>
+    {% for r in rows %}
+      <tr class="{% if r.status == 'Cancelled' %}cancelled{% endif %}">
+        <td data-v="{{ r.date|date:'Y-m-d' }}">{{ r.date|date:"Y-m-d" }}</td><td>{{ r.invoice }}</td><td>{{ r.patient }}</td><td>{{ r.code }}</td><td>{{ r.phone }}</td><td title="{{ r.service }}">{{ r.service }}</td>
+        <td class="num" data-v="{{ r.amount }}">{{ r.amount }}</td><td class="num" data-v="{{ r.received }}">{{ r.received }}</td><td class="num" data-v="{{ r.due }}">{{ r.due }}</td>
+        <td class="st-{% if r.status == 'Paid' %}paid{% elif r.status == 'Part paid' %}part{% elif r.status == 'Due' %}due{% else %}cancelled{% endif %}">{{ r.status }}</td><td>{{ r.mode }}</td>
+        <td class="num" data-v="{{ r.carried }}">{{ r.carried }}</td><td>{{ r.billed_by }}</td><td title="{{ r.notes }}">{{ r.notes }}</td>
+      </tr>
+    {% empty %}
+      <tr><td colspan="{{ columns|length }}" style="padding:30px;text-align:center;color:var(--muted)">No bills match these filters.</td></tr>
+    {% endfor %}
+    </tbody>
+    {% if rows %}<tfoot><tr><td colspan="6" style="text-align:right">Total of the rows shown <span id="shTotalNote"></span></td><td class="num" id="tAmount">{{ totals.amount }}</td><td class="num" id="tReceived">{{ totals.received }}</td><td class="num" id="tDue">{{ totals.due }}</td><td colspan="2"></td><td class="num" id="tCarried">{{ totals.carried }}</td><td colspan="2"></td></tr></tfoot>{% endif %}
+  </table>
+</div>
+<script>
+(function () {
+  var table = document.getElementById('sheet'), body = table.tBodies[0], heads = table.tHead.rows[0].cells, dir = {};
+  function cellValue(tr, i) { var c = tr.cells[i]; return c.dataset.v !== undefined ? c.dataset.v : c.textContent.trim(); }
+  Array.prototype.forEach.call(heads, function (th, i) {
+    th.addEventListener('click', function () {
+      var numeric = th.classList.contains('num'), asc = dir[i] !== 'asc'; dir = {}; dir[i] = asc ? 'asc' : 'desc';
+      var rows = Array.prototype.slice.call(body.rows).filter(function (r) { return r.cells.length > 1; });
+      rows.sort(function (a, b) {
+        var x = cellValue(a, i), y = cellValue(b, i);
+        if (numeric) { x = parseFloat(x) || 0; y = parseFloat(y) || 0; return asc ? x - y : y - x; }
+        return asc ? x.localeCompare(y, undefined, { numeric: true }) : y.localeCompare(x, undefined, { numeric: true });
+      });
+      rows.forEach(function (r) { body.appendChild(r); });
+      Array.prototype.forEach.call(heads, function (h) { h.querySelector('.arr').textContent = ''; });
+      th.querySelector('.arr').textContent = asc ? '▲' : '▼';
+    });
+  });
+  // quick filter + totals of what is left visible
+  var find = document.getElementById('shFind'), count = document.getElementById('shCount');
+  function sum(col, tr) { return parseFloat(tr.cells[col].dataset.v) || 0; }
+  function refresh() {
+    var q = find.value.trim().toLowerCase(), shown = 0, t = { 6: 0, 7: 0, 8: 0, 11: 0 };
+    Array.prototype.forEach.call(body.rows, function (tr) {
+      if (tr.cells.length < 2) return;
+      var ok = !q || tr.textContent.toLowerCase().indexOf(q) !== -1; tr.hidden = !ok;
+      if (ok) { shown++; if (!tr.classList.contains('cancelled')) Object.keys(t).forEach(function (c) { t[c] += sum(+c, tr); }); }
+    });
+    count.textContent = q ? shown + ' of {{ rows|length }} rows' : '';
+    var ids = { 6: 'tAmount', 7: 'tReceived', 8: 'tDue', 11: 'tCarried' };
+    Object.keys(ids).forEach(function (c) { var el = document.getElementById(ids[c]); if (el) el.textContent = t[c].toFixed(2); });
+    var note = document.getElementById('shTotalNote'); if (note) note.textContent = q ? '(filtered)' : '';
+  }
+  find.addEventListener('input', refresh);
+})();
+</script>
+{% endblock %}

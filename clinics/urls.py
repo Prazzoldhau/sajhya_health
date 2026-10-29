@@ -9,6 +9,7 @@ urlpatterns = [
     path('desk/', desk.desk, name='desk'),
     path('desk/register/', desk.register_patient, name='desk-register'),
     path('desk/billing/new/', desk.bill_create, name='desk-bill-create'),
+    path('desk/billing/export.xlsx', desk.bill_export, name='desk-bill-export'),
     path('desk/billing/<int:entry_id>/payment/', desk.bill_payment, name='desk-bill-payment'),
     path('desk/billing/<int:entry_id>/invoice.pdf', desk.bill_pdf, name='desk-bill-pdf'),
     path('desk/queue/add/', desk.queue_add, name='desk-queue-add'),

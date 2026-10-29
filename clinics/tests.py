@@ -843,3 +843,39 @@ class ClinicLoginBillsFrontDeskPatientTests(Base):
         self.client.post(reverse('billing:package-create'), {'patient': patient.pk, 'duration': '10_day', 'total_sessions': 10, 'total_amount': '5000', 'amount_paid_now': '0', 'start_date': today})
         self.assertEqual(PatientPackage.objects.get().patient, patient)
         self.assertEqual(self.client.get(reverse('accounts:reports'), {'from': today, 'to': today}).status_code, 200)
+
+
+class DeskBillingExportTests(Base):
+    CREDS = StaffLoginTests.CREDS
+    add_staff = StaffLoginTests.add_staff
+    setup_desk = FrontDeskRegisteredByAndBillingTests.setup_desk
+    register = FrontDeskRegisteredByAndBillingTests.register
+
+    def test_reception_and_managers_download_the_clinics_bills_and_others_cannot(self):
+        import io
+
+        from openpyxl import load_workbook
+        clinic = self.setup_desk()
+        self.as_user('ram-desk')
+        self.register()
+        patient = Patient.objects.get(name='Walk In')
+        today = timezone.localdate().isoformat()
+        self.client.post(reverse('clinics:desk-bill-create'), {'patient_id': patient.pk, 'entry_date': today, 'service': 'Therapy', 'rate': '700', 'payment_mode': 'cash', 'payment_status': 'paid'})
+        # a bill of another clinic's patient must never be in this clinic's file
+        outsider_user, outsider = make_professional('other-physio')
+        stranger = make_patient(outsider, 'Elsewhere')
+        BillingEntry.objects.create(professional=outsider, patient=stranger, patient_name='Elsewhere', rate=999, entry_date=timezone.localdate())
+        r = self.client.get(reverse('clinics:desk-bill-export'), {'from': today, 'to': today})
+        self.assertEqual((r.status_code, r['Content-Type']), (200, 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'))
+        wb = load_workbook(io.BytesIO(r.content))
+        bills = wb['Bills']
+        self.assertEqual([bills.cell(row=2, column=c).value for c in (3, 5, 7, 13)], ['Walk In', '9841000111', 700, 'Ram / Receptionist'])  # patient, phone, amount, who billed
+        self.assertEqual(bills.max_row, 3)  # header, the one bill and the total row
+        self.assertEqual(wb['Summary']['A1'].value, clinic.name)
+        self.as_user('mani')
+        self.assertEqual(self.client.get(reverse('clinics:desk-bill-export')).status_code, 200)
+        self.assertContains(self.client.get(reverse('clinics:desk'), {'tab': 'billing'}), 'Excel (this day)')
+        self.as_user('asha')  # an assistant has no billing
+        self.assertEqual(self.client.get(reverse('clinics:desk-bill-export')).status_code, 404)
+        self.as_user('other-physio')
+        self.assertEqual(self.client.get(reverse('clinics:desk-bill-export')).status_code, 404)
