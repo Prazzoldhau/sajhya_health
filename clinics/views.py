@@ -119,7 +119,7 @@ def _detail_context(request, profile, clinic, is_owner, tab, form=None, login_fo
             'patient_total': clinic.patients.count(), 'month_label': f'{month_start:%B %Y}',
             'queue_counts': {s: todays.filter(status=s).count() for s in (QueueEntry.WAITING, QueueEntry.CALLED, QueueEntry.COMPLETED)},
             'activity': [{'name': v['therapist'] or 'Not recorded', 'visits': v['n'], 'patients': v['people']} for v in visits],
-            'month_visits': sum(v['n'] for v in visits), 'percent': percent, 'missing': missing,
+            'month_visits': sum(v['n'] for v in visits), 'percent': percent, 'missing': missing, 'module_rows': clinic.module_rows,
         })
     elif tab == 'team':
         context.update({'members': clinic.members.exclude(status__in=[ClinicMember.LEFT, ClinicMember.DECLINED]).select_related('physio'),

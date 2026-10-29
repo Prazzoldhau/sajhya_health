@@ -140,3 +140,16 @@ A business owner owns and registers clinics but does not treat patients. They si
 - **Onboarding:** Account, **Business** (registered business name, business registration number, PAN / tax number, registering office), **Documents** (owner ID, business registration certificate, PAN / tax certificate), then Review. There is no licence, degree or practice step.
 - **Verification:** staff review it on the same applications page, which shows the business details and both certificates. The files are private, like the other credential documents.
 - **After approval:** the owner lands on Clinic Connect (no dashboard, patients, billing or reports of their own) and registers clinics exactly as a physiotherapist does. The Clinic plan is still activated by staff, and each clinic then gets its own login and team.
+
+## Modules per clinic
+
+Staff choose which parts of the workspace each clinic has: **Appointments**, **Billing & accounts**, **Assessments & SOAP notes**, **Treatment plans & exercises**, **Messages & notices**, **Reports** (`clinics/modules.py`). Patients, queue, team and settings are always included.
+
+- **Where:** Django admin, Clinics, open the clinic, tick the modules (`Clinic.modules`). New clinics start with every module on.
+- **Effect on the clinic's own login:** a module that is off disappears from the menu and its pages redirect to the clinic with a message (forms and scripts get a 403). Enforced in `accounts/middleware.py`.
+- **Effect on the front desk:** with Billing off the Billing tab and its actions disappear for every role (`ClinicMember.can`).
+- **Not affected:** an owning physiotherapist's personal workspace. The clinic owner sees what is on and off in the clinic Overview.
+
+## Departments on appointments
+
+A practice or clinic workspace can list departments (Physical Therapy, Occupational Therapy...) under Appointments, Manage (`/accounts/appointments/departments/`). Each appointment can be booked into one; the calendar shows it on the appointment, colours it, and can filter by department, so patients at the same time in different departments sit side by side. Removing a department keeps its appointments, only the label goes.

@@ -1,0 +1,27 @@
+{% extends 'accounts/pro_base.html' %}
+{% block title %}Departments | Sajhya Health{% endblock %}
+{% block extra_css %}
+  .dp-wrap { max-width: 640px; } .dp-wrap h1 { margin: 0 0 4px; font-size: 24px; } .dp-card { background: #fff; border: 1px solid var(--line); border-radius: 12px; padding: 16px 18px; margin-bottom: 14px; }
+  .dp-row { display: flex; align-items: center; gap: 10px; padding: 9px 0; border-bottom: 1px solid var(--line); } .dp-row:last-child { border-bottom: 0; } .dp-row b { flex: 1; }
+  .dp-add { display: flex; gap: 8px; } .dp-add input { flex: 1; height: 38px; border: 1px solid #b9dcc9; border-radius: 8px; padding: 0 12px; }
+{% endblock %}
+
+{% block main %}
+<div class="dp-wrap">
+  <h1>Departments</h1>
+  <p style="color:var(--muted);margin:0 0 14px">Book each appointment into a department, so the calendar shows who is seen where at the same time, for example 1:30 pm: Patient A in Physical Therapy and Patient C in Occupational Therapy.</p>
+  <div class="dp-card">
+    <form method="post" class="dp-add">{% csrf_token %}<input name="name" maxlength="80" placeholder="Department name, e.g. Physical Therapy" aria-label="Department name"><button class="primary-btn" type="submit">Add</button></form>
+    {% if not departments %}
+    <form method="post" style="margin-top:10px">{% csrf_token %}<button class="secondary-btn" name="action" value="suggest" type="submit">Add the suggested departments ({{ suggested|join:", " }})</button></form>
+    {% endif %}
+  </div>
+  <div class="dp-card">
+    {% for d in departments %}
+    <div class="dp-row"><b>{{ d.name }}</b><span style="color:var(--muted);font-size:12px">{{ d.booked }} appointment{{ d.booked|pluralize }}</span>
+      <form method="post" action="{% url 'accounts:department-delete' d.pk %}" onsubmit="return confirm('Remove {{ d.name|escapejs }}? Its appointments stay on the calendar without a department.')">{% csrf_token %}<button class="secondary-btn" type="submit">Remove</button></form></div>
+    {% empty %}<p style="margin:0;color:var(--muted)">No departments yet.</p>{% endfor %}
+  </div>
+  <a class="pill" href="{% url 'accounts:appointments' %}">&larr; Back to appointments</a>
+</div>
+{% endblock %}

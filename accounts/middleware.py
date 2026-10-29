@@ -12,6 +12,8 @@ from django.contrib import messages
 from django.http import JsonResponse
 from django.shortcuts import redirect
 
+from clinics.modules import PREFIXES as MODULE_PREFIXES, NAMES as MODULE_NAMES, module_for_path
+
 from .models import ProfessionalProfile
 
 LOCKED_MESSAGE = 'Your credentials have not been verified yet, so the workspace is closed. We will open it as soon as they are approved.'
@@ -35,4 +37,21 @@ class VerifiedWorkspaceMiddleware:
                     return JsonResponse({'ok': False, 'error': LOCKED_MESSAGE}, status=403)
                 messages.info(request, LOCKED_MESSAGE)
                 return redirect('accounts:welcome')
+        if user is not None and user.is_authenticated and request.path.startswith(MODULE_PREFIXES):
+            denied = self.module_denied(request, user)
+            if denied is not None:
+                return denied
         return self.get_response(request)
+
+    def module_denied(self, request, user):
+        """A clinic's own login cannot open a part of the workspace that is not in the clinic's plan."""
+        profile = getattr(getattr(user, 'account', None), 'profile', None)
+        clinic = getattr(profile, 'clinic_workspace', None) if profile is not None else None
+        key = module_for_path(request.path)
+        if clinic is None or key is None or clinic.has_module(key):
+            return None
+        message = f"{MODULE_NAMES[key]} is not part of this clinic's plan. Contact us to add it."
+        if wants_json(request):
+            return JsonResponse({'ok': False, 'error': message}, status=403)
+        messages.info(request, message)
+        return redirect('clinics:detail', pk=clinic.pk)

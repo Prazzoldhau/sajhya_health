@@ -353,6 +353,23 @@ class Icd10Code(models.Model):
         return f'{self.code} - {self.title}'
 
 
+class Department(models.Model):
+    """A department of the practice or clinic (Physical Therapy, Occupational Therapy...) that appointments are booked into, so the calendar can
+    show who is seen in which department at the same time."""
+    SUGGESTED = ['Physical Therapy', 'Occupational Therapy', 'Speech Therapy', 'Pediatric Therapy', 'Sports Rehabilitation', 'Neuro Rehabilitation']
+
+    professional = models.ForeignKey(ProfessionalProfile, on_delete=models.CASCADE, related_name='departments')
+    name = models.CharField(max_length=80)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['id']
+        unique_together = [('professional', 'name')]
+
+    def __str__(self):
+        return self.name
+
+
 class Appointment(models.Model):
     APPOINTMENT, UNAVAILABLE, AVAILABLE = 'appointment', 'unavailable', 'available'
     KIND_CHOICES = [(APPOINTMENT, 'Appointment'), (UNAVAILABLE, 'Unavailable block'), (AVAILABLE, 'One-off availability')]
@@ -360,6 +377,7 @@ class Appointment(models.Model):
     STATUS_CHOICES = [(SCHEDULED, 'Scheduled'), (ATTENDED, 'Attended'), (CANCELLED, 'Cancelled')]
 
     professional = models.ForeignKey(ProfessionalProfile, on_delete=models.CASCADE, related_name='appointments')
+    department = models.ForeignKey(Department, null=True, blank=True, on_delete=models.SET_NULL, related_name='appointments')
     kind = models.CharField(max_length=20, choices=KIND_CHOICES, default=APPOINTMENT)
     patient = models.ForeignKey(Patient, null=True, blank=True, on_delete=models.CASCADE, related_name='appointments')
     title = models.CharField(max_length=150, blank=True)  # label for blocks

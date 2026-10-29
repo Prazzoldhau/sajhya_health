@@ -9,7 +9,7 @@ from django.utils import timezone
 
 from .images import normalize_photo
 from .widgets import date_widget, datetime_widget, time_widget
-from .models import Account, ClinicType, EnterpriseType, Appointment, Patient, ProfessionalProfile, Profession, Task, Visit
+from .models import Account, ClinicType, Department, EnterpriseType, Appointment, Patient, ProfessionalProfile, Profession, Task, Visit
 
 User = get_user_model()
 
@@ -362,10 +362,12 @@ class AppointmentForm(forms.Form):
     start_time = forms.TimeField(widget=time_widget())
     duration = forms.TypedChoiceField(choices=DURATION_CHOICES, coerce=int, initial=30)
     session_type = forms.ChoiceField(choices=Visit.SESSION_CHOICES, initial=Visit.TREATMENT)
+    department = forms.ModelChoiceField(queryset=Department.objects.none(), required=False, empty_label='No department')
     notes = forms.CharField(required=False, widget=forms.Textarea(attrs={'rows': 2, 'placeholder': 'Optional'}))
 
     def __init__(self, *args, profile, **kwargs):
         super().__init__(*args, **kwargs)
+        self.fields['department'].queryset = profile.departments.all()  # only this practice's own departments
         self.fields['patient'].queryset = profile.workspace_patients().exclude(status=Patient.DISCHARGED).order_by('name')
 
 
@@ -376,6 +378,7 @@ class RescheduleForm(forms.Form):
     end_time = forms.TimeField(widget=time_widget())
     session_type = forms.ChoiceField(choices=Visit.SESSION_CHOICES, required=False)
     title = forms.CharField(max_length=150, required=False)
+    department = forms.CharField(required=False)  # an id; checked against the practice's own departments by the view
     notes = forms.CharField(required=False)
 
     def clean(self):

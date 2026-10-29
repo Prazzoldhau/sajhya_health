@@ -990,3 +990,60 @@ class ClinicLoginSeesAssistantsTreatmentsTests(Base):
             self.assertContains(page, 'Therapy assistant')
             self.assertContains(page, 'Bridging')
             self.assertEqual(self.client.get(reverse('accounts:dashboard')).context['stats']['treated_today'], 1, who)
+
+
+class ClinicModulesTests(Base):
+    """Staff switch parts of the workspace on or off for each clinic; the clinic's own login and front desk respect it."""
+    CREDS = StaffLoginTests.CREDS
+    add_staff = StaffLoginTests.add_staff
+    setup_desk = FrontDeskRegisteredByAndBillingTests.setup_desk
+
+    def test_a_new_clinic_has_every_module_and_everything_works_as_before(self):
+        from .modules import KEYS
+        clinic = self.setup_desk()
+        self.assertEqual(clinic.modules, KEYS)
+        self.as_user('himal-clinic')
+        for url in ('accounts:appointments', 'billing:billing', 'accounts:plans', 'accounts:messages', 'accounts:reports'):
+            self.assertEqual(self.client.get(reverse(url)).status_code, 200, url)
+
+    def test_a_module_that_is_off_disappears_from_the_menu_and_its_pages_are_closed(self):
+        clinic = self.setup_desk()
+        clinic.modules = ['appointments', 'reports']
+        clinic.save()
+        self.as_user('himal-clinic')
+        page = self.client.get(reverse('accounts:dashboard'))
+        self.assertContains(page, f'href="{reverse("accounts:appointments")}"')
+        self.assertContains(page, f'href="{reverse("accounts:reports")}"')
+        for gone in ('billing:billing', 'accounts:plans', 'exercises:library', 'accounts:messages'):
+            self.assertNotContains(page, f'class="nav " href="{reverse(gone)}"', msg_prefix=gone)
+        for url in ('billing:billing', 'accounts:plans', 'accounts:messages'):
+            r = self.client.get(reverse(url))
+            self.assertRedirects(r, reverse('clinics:detail', args=[clinic.pk]), fetch_redirect_response=False)
+        self.assertEqual(self.client.get(reverse('accounts:appointments')).status_code, 200)
+        self.assertEqual(self.client.post(reverse('billing:billing')).status_code, 403)  # forms and scripts get a plain refusal
+        # the owner sees which parts the clinic has
+        self.as_user('owner')
+        overview = self.client.get(reverse('clinics:detail', args=[clinic.pk]))
+        self.assertContains(overview, 'Not in your plan')
+        self.assertEqual([(n, on) for n, _, on in overview.context['module_rows']][:3], [('Appointments', True), ('Billing & accounts', False), ('Assessments & SOAP notes', False)])
+
+    def test_the_front_desk_loses_the_billing_tab_when_billing_is_off(self):
+        clinic = self.setup_desk()
+        self.as_user('ram-desk')
+        self.assertContains(self.client.get(reverse('clinics:desk')), 'tab=billing')
+        clinic.modules = ['appointments']
+        clinic.save()
+        self.assertNotContains(self.client.get(reverse('clinics:desk')), 'tab=billing')
+        self.assertEqual(self.client.post(reverse('clinics:desk-bill-create'), {}).status_code, 404)
+        self.assertNotEqual(self.client.get(reverse('clinics:desk'), {'tab': 'billing'}).context['tab'], 'billing')
+
+    def test_a_physiotherapists_own_workspace_is_never_restricted_and_staff_can_set_modules_in_the_admin(self):
+        clinic = self.setup_desk()
+        clinic.modules = []
+        clinic.save()
+        self.as_user('owner')
+        self.assertEqual(self.client.get(reverse('billing:billing')).status_code, 200)
+        self.assertEqual(self.client.get(reverse('accounts:appointments')).status_code, 200)
+        from .admin import ClinicAdminForm
+        form = ClinicAdminForm(instance=clinic)
+        self.assertIn('billing', [key for key, _ in form.fields['modules'].choices])

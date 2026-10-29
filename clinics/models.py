@@ -13,6 +13,8 @@ from django.conf import settings
 from django.db import models
 from django.utils import timezone
 
+from .modules import MODULES, PERMISSION_MODULES, default_modules
+
 
 def default_cap():
     return settings.CLINIC_MONTHLY_PATIENT_CAP
@@ -108,6 +110,9 @@ class Clinic(models.Model):
     # 5. Amenities
     amenities = models.JSONField(default=list, blank=True)
 
+    # 6. Plan: the parts of the workspace this clinic has switched on (set by staff in the admin)
+    modules = models.JSONField(default=default_modules, blank=True, help_text='Parts of the workspace this clinic can use.')
+
     class Meta:
         ordering = ['name']
 
@@ -127,6 +132,14 @@ class Clinic(models.Model):
         """Team, queue and patient tagging work once the owner's Clinic plan is active (staff activate it)."""
         sub = ClinicSubscription.objects.filter(professional_id=self.owner_id).first()
         return bool(sub and sub.is_active)
+
+    def has_module(self, key):
+        return key in (self.modules or [])
+
+    @property
+    def module_rows(self):
+        """(name, what it gives, switched on) for every module, for the owner's overview."""
+        return [(name, what, key in (self.modules or [])) for key, name, what, _ in MODULES]
 
     @property
     def hours_rows(self):
@@ -195,6 +208,9 @@ class ClinicMember(models.Model):
     }
 
     def can(self, permission):
+        module = PERMISSION_MODULES.get(permission)
+        if module and not self.clinic.has_module(module):
+            return False  # that part is not in the clinic's plan
         return permission in self.PERMISSIONS.get(self.role, ())
 
 

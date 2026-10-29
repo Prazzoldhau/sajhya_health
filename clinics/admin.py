@@ -3,6 +3,9 @@ import datetime
 from django.contrib import admin, messages
 from django.utils import timezone
 
+from django import forms
+
+from .modules import MODULES
 from .models import Clinic, ClinicMember, ClinicMonthlyUsage, ClinicSubscription, QueueEntry
 
 
@@ -37,8 +40,18 @@ class MemberInline(admin.TabularInline):
     extra = 0
 
 
+class ClinicAdminForm(forms.ModelForm):
+    modules = forms.MultipleChoiceField(choices=[(key, f'{name} - {what}') for key, name, what, _ in MODULES], widget=forms.CheckboxSelectMultiple, required=False,
+                                        help_text='Tick the parts of the workspace this clinic has in its plan. Patients, queue, team and settings are always included.')
+
+    class Meta:
+        model = Clinic
+        fields = '__all__'
+
+
 @admin.register(Clinic)
 class ClinicAdmin(admin.ModelAdmin):
+    form = ClinicAdminForm
     list_display = ('name', 'code', 'owner', 'phone', 'is_active', 'created_at')
     list_filter = ('is_active',)
     search_fields = ('name', 'code', 'pan_number')

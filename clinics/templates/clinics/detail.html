@@ -62,6 +62,11 @@
     </tbody></table>
     {% endif %}
   </section>
+  <section class="panel cl-box" style="margin-bottom:14px"><b>Your plan: parts of the workspace</b>
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));gap:8px;margin-top:8px">
+    {% for name, what, on in module_rows %}<div style="border:1px solid var(--line);border-radius:9px;padding:9px 12px;{% if not on %}opacity:.6{% endif %}"><b>{{ name }}</b> {% if on %}<span class="tone good">On</span>{% else %}<span class="tone warn">Not in your plan</span>{% endif %}<div class="hint">{{ what }}</div></div>{% endfor %}
+    </div>
+    <span class="hint">Patients, queue, team and settings are always included. To add a part, contact us.</span></section>
   <div class="kpis">
     <div class="kpi"><div class="k">Team members</div><div class="v">{{ team_count }}</div></div>
     <div class="kpi"><div class="k">Patients registered here (all physios)</div><div class="v">{{ patient_total }}</div></div>

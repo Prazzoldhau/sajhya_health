@@ -87,6 +87,7 @@ def workspace_context(user, profile):
     display_name = profile.full_name or user.get_username()
     initials = ''.join(p[0] for p in (profile.first_name, profile.last_name) if p).upper() or user.get_username()[:2].upper()
     from clinics.models import ClinicMember
-    return {'workspace_clinic': getattr(profile, 'clinic_workspace', None), 'profile': profile, 'display_name': display_name, 'first_name': profile.first_name,
+    from clinics.modules import disabled_for
+    return {'disabled_modules': disabled_for(profile), 'workspace_clinic': getattr(profile, 'clinic_workspace', None), 'profile': profile, 'display_name': display_name, 'first_name': profile.first_name,
             'initials': initials, 'role': profile.account.profession or profile.title,
             'clinic_invites': ClinicMember.objects.filter(physio=profile, status=ClinicMember.INVITED).count()}

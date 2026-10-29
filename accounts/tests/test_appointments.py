@@ -406,3 +406,74 @@ class TreatedTodayTests(TestCase):
         self.assertEqual(waiting.get(reverse('accounts:treated')).status_code, 302)
         self.client.logout()
         self.assertEqual(self.client.get(reverse('accounts:treated')).status_code, 302)
+
+
+class DepartmentTests(TestCase):
+    """Appointments are booked into departments, so one time slot can hold Physical Therapy and Occupational Therapy side by side."""
+    def setUp(self):
+        self.user, self.profile = make_professional()
+        self.client.force_login(self.user)
+        self.day = timezone.localdate() + datetime.timedelta(days=1)
+
+    def book(self, patient, department=None, **extra):
+        return self.client.post(reverse('accounts:appointment-create'), {'patient': patient.pk, 'date': self.day.isoformat(), 'start_time': '13:30', 'duration': 30,
+                                                                         'session_type': 'treatment', 'department': department.pk if department else '', 'notes': '', **extra})
+
+    def test_manage_departments(self):
+        from accounts.models import Department
+        page = self.client.get(reverse('accounts:departments'))
+        self.assertContains(page, 'Add the suggested departments')
+        self.client.post(reverse('accounts:departments'), {'action': 'suggest'})
+        self.assertEqual(self.profile.departments.count(), len(Department.SUGGESTED))
+        self.client.post(reverse('accounts:departments'), {'name': ' Cardio  Rehab '})
+        self.assertTrue(self.profile.departments.filter(name='Cardio Rehab').exists())
+        self.client.post(reverse('accounts:departments'), {'name': 'cardio rehab'})  # same name, any case
+        self.assertEqual(self.profile.departments.filter(name__iexact='cardio rehab').count(), 1)
+        self.client.post(reverse('accounts:departments'), {'name': '  '})
+        stranger, other = make_professional('stranger')
+        theirs = Department.objects.create(professional=other, name='Theirs')
+        self.assertEqual(self.client.post(reverse('accounts:department-delete', args=[theirs.pk])).status_code, 404)
+        mine = self.profile.departments.get(name='Cardio Rehab')
+        self.client.post(reverse('accounts:department-delete', args=[mine.pk]))
+        self.assertFalse(self.profile.departments.filter(name='Cardio Rehab').exists())
+
+    def test_two_patients_at_the_same_time_in_different_departments(self):
+        from accounts.models import Appointment, Department
+        pt = Department.objects.create(professional=self.profile, name='Physical Therapy')
+        ot = Department.objects.create(professional=self.profile, name='Occupational Therapy')
+        a, c = make_patient(self.profile, 'Patient A'), make_patient(self.profile, 'Patient C')
+        self.book(a, pt)
+        self.book(c, ot)
+        self.assertEqual({x.patient.name: x.department.name for x in Appointment.objects.all()}, {'Patient A': 'Physical Therapy', 'Patient C': 'Occupational Therapy'})
+        page = self.client.get(reverse('accounts:appointments'), {'date': self.day.isoformat(), 'days': 1})
+        events = page.context['columns'][0]['events']
+        self.assertEqual(sorted((e['title'], e['department']) for e in events), [('Patient A', 'Physical Therapy'), ('Patient C', 'Occupational Therapy')])
+        self.assertEqual({e['lane'] for e in events}, {0, 1})  # side by side
+        self.assertContains(page, 'Physical Therapy')
+        only_ot = self.client.get(reverse('accounts:appointments'), {'date': self.day.isoformat(), 'days': 1, 'dept': ot.pk})
+        self.assertEqual([e['title'] for e in only_ot.context['columns'][0]['events']], ['Patient C'])
+        none = self.client.get(reverse('accounts:appointments'), {'date': self.day.isoformat(), 'days': 1, 'dept': 'none'})
+        self.assertEqual(none.context['columns'][0]['events'], [])
+
+    def test_a_department_of_another_practice_cannot_be_used_and_it_can_be_changed_later(self):
+        from accounts.models import Appointment, Department
+        stranger, other = make_professional('stranger')
+        foreign = Department.objects.create(professional=other, name='Foreign')
+        mine = Department.objects.create(professional=self.profile, name='Speech Therapy')
+        patient = make_patient(self.profile, 'Patient A')
+        self.book(patient, foreign)
+        self.assertEqual(Appointment.objects.count(), 0)  # refused
+        self.book(patient)
+        appt = Appointment.objects.get()
+        self.assertIsNone(appt.department)
+        edit = {'date': self.day.isoformat(), 'start_time': '14:00', 'end_time': '14:30', 'session_type': 'treatment', 'notes': ''}
+        self.client.post(reverse('accounts:appointment-edit', args=[appt.pk]), {**edit, 'department': mine.pk})
+        appt.refresh_from_db()
+        self.assertEqual(appt.department, mine)
+        self.client.post(reverse('accounts:appointment-edit', args=[appt.pk]), {**edit, 'department': foreign.pk})
+        appt.refresh_from_db()
+        self.assertIsNone(appt.department)  # not theirs: cleared, never attached
+        self.client.post(reverse('accounts:appointment-edit', args=[appt.pk]), {**edit, 'department': mine.pk})
+        mine.delete()
+        appt.refresh_from_db()
+        self.assertIsNone(appt.department)  # the appointment stays

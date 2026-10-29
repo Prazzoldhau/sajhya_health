@@ -4,19 +4,20 @@ import json
 
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
-from django.db.models import Q
+from django.db.models import Count, Q
 from django.http import Http404, JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
 from django.utils import timezone
 
 from .forms import AppointmentForm, BlockForm, RescheduleForm, TaskForm
-from .models import Appointment, Task, Visit
+from .models import Appointment, Department, Task, Visit
 from .services import record_visit
 from .access import can_see_contact, first_error, workspace_context, workspace_profile
 
 PX_PER_MIN = 1.5
 DEFAULT_FIRST_HOUR, DEFAULT_LAST_HOUR = 8, 18
+DEPARTMENT_TINTS = 6  # colours the calendar cycles through for departments
 TYPE_CLASS = {Visit.INITIAL: 'initial', Visit.TREATMENT: 'treatment', Visit.FOLLOW_UP: 'followup'}
 
 
@@ -130,11 +131,20 @@ def appointments(request):
     days = int(request.GET['days']) if request.GET.get('days') in ('1', '3', '7') else 3
     day_list = [start_date + datetime.timedelta(days=i) for i in range(days)]
 
+    departments = list(profile.departments.all())
+    tints = {d.pk: i % DEPARTMENT_TINTS for i, d in enumerate(departments)}
+    dept = request.GET.get('dept', '')
+    chosen = dept if dept == 'none' or dept in {str(d.pk) for d in departments} else ''  # show one department, or only appointments without one
+    shown = profile.appointments.all()
+    if chosen == 'none':
+        shown = shown.filter(department__isnull=True)
+    elif chosen:
+        shown = shown.filter(department_id=int(chosen))
     events = list(
-        profile.appointments.filter(
+        shown.filter(
             start__gte=aware(day_list[0], datetime.time.min),
             start__lt=aware(day_list[-1] + datetime.timedelta(days=1), datetime.time.min),
-        ).exclude(status=Appointment.CANCELLED).select_related('patient', 'professional'))
+        ).exclude(status=Appointment.CANCELLED).select_related('patient', 'professional', 'department'))
 
     first_hour, last_hour = DEFAULT_FIRST_HOUR, DEFAULT_LAST_HOUR
     for ev in events:
@@ -165,6 +175,8 @@ def appointments(request):
                 'wa': {k: appointment_whatsapp(profile, ev, k) for k in ('booked', 'reminder', 'rescheduled')} if ev.kind == Appointment.APPOINTMENT and ev.patient and ev.status == Appointment.SCHEDULED else {},
                 'links': {k: appointment_links(profile, ev, k) for k in ('booked', 'reminder', 'rescheduled')} if ev.kind == Appointment.APPOINTMENT and ev.patient and ev.status == Appointment.SCHEDULED else {},
                 'notes': ev.notes, 'raw_title': ev.title, 'session_type': ev.session_type,
+                'department': ev.department.name if ev.department_id else '', 'department_id': ev.department_id or '',
+                'tint': tints.get(ev.department_id, '') if ev.department_id and ev.kind == Appointment.APPOINTMENT else '',
                 'date': s.date().isoformat(), 'start_hm': s.strftime('%H:%M'), 'end_hm': e.strftime('%H:%M'),
             })
         _layout_lanes(items)
@@ -200,6 +212,7 @@ def appointments(request):
         'next_date': start_date + datetime.timedelta(days=days),
         'range_label': f"{day_list[0]:%d %b}" + (f" - {day_list[-1]:%d %b %Y}" if days > 1 else f" {day_list[0]:%Y}"),
         'weeks': weeks, 'month_label': f'{month_first:%B %Y}', 'prev_month': prev_month, 'next_month': next_month,
+        'departments': [{'id': d.pk, 'name': d.name, 'tint': tints[d.pk]} for d in departments], 'dept': chosen,
         'tasks': tasks, 'open_count': sum(not t.done for t in tasks), 'done_count': sum(t.done for t in tasks),
         'panel': request.GET.get('panel', 'calendar'),
         'appointment_form': AppointmentForm(profile=profile, initial={'date': today, 'duration': profile.default_session_minutes}),
@@ -230,7 +243,7 @@ def appointment_create(request):
     start = aware(d['date'], d['start_time'])
     appt = Appointment.objects.create(
         professional=profile, patient=d['patient'], start=start,
-        end=start + datetime.timedelta(minutes=d['duration']), session_type=d['session_type'], notes=d['notes'])
+        end=start + datetime.timedelta(minutes=d['duration']), session_type=d['session_type'], notes=d['notes'], department=d['department'])
     sync_next_appointment(d['patient'])
     messages.success(request, f"Appointment booked for {d['patient'].name}.")
     return _back(d['date'], days, booked=appt.pk)
@@ -276,6 +289,7 @@ def appointment_edit(request, pk):
     if appt.kind == Appointment.APPOINTMENT:
         appt.session_type = d['session_type'] or appt.session_type
         appt.notes = d['notes']
+        appt.department = profile.departments.filter(pk=int(d['department'])).first() if d['department'].isdigit() else None
     else:
         appt.title = d['title']
     appt.save()
@@ -360,3 +374,42 @@ def patient_search(request):
     return JsonResponse({'results': [
         {'id': p.pk, 'name': p.name, 'code': p.patient_code, 'phone': p.phone if can_see_contact(profile, p) else '', 'age': p.age, 'gender': p.gender}
         for p in patients.order_by('name')[:10]]})
+
+
+@login_required
+def departments_page(request):
+    """The practice's departments (Physical Therapy, Occupational Therapy...): add, remove, or start from the suggested list."""
+    profile = workspace_profile(request)
+    if profile is None:
+        return redirect('accounts:welcome')
+    if request.method == 'POST':
+        if request.POST.get('action') == 'suggest':
+            for name in Department.SUGGESTED:
+                Department.objects.get_or_create(professional=profile, name=name)
+            messages.success(request, 'Suggested departments added. Remove the ones you do not use.')
+        else:
+            name = ' '.join(request.POST.get('name', '').split())[:80]
+            if not name:
+                messages.error(request, 'Type the department name.')
+            elif profile.departments.filter(name__iexact=name).exists():
+                messages.error(request, f'{name} is already a department.')
+            else:
+                Department.objects.create(professional=profile, name=name)
+                messages.success(request, f'{name} added.')
+        return redirect('accounts:departments')
+    context = workspace_context(request.user, profile)
+    context.update({'active': 'appointments', 'departments': profile.departments.annotate(booked=Count('appointments')), 'suggested': Department.SUGGESTED})
+    return render(request, 'accounts/departments.html', context)
+
+
+@login_required
+def department_delete(request, pk):
+    profile = workspace_profile(request)
+    if profile is None:
+        raise Http404
+    department = get_object_or_404(Department, pk=pk, professional=profile)
+    if request.method == 'POST':
+        name = department.name
+        department.delete()  # appointments already booked keep their time and patient, they just lose the label
+        messages.success(request, f'{name} removed. Its appointments stay on the calendar without a department.')
+    return redirect('accounts:departments')
