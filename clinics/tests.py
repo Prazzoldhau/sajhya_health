@@ -1244,15 +1244,18 @@ class SeedQaClinicTests(TestCase):
         text, passwords = self.run_command()
         clinic = Clinic.objects.get(name='Bhaktapur Speech and Hearing Center')
         self.assertTrue(clinic.is_usable)
-        self.assertEqual(set(passwords), {'qa-bshc-owner', 'qa-bshc-clinic', 'qa-bshc-reception', 'qa-bshc-ot', 'qa-bshc-speech', 'qa-bshc-physio', 'qa-bshc-behaviour'})
+        therapists = {f'qa-bshc-{prefix}{suffix}' for prefix in ('ot', 'speech', 'physio') for suffix in ('', '2', '3', '4')} | {'qa-bshc-behaviour'}
+        self.assertEqual(set(passwords), {'qa-bshc-owner', 'qa-bshc-clinic', 'qa-bshc-reception'} | therapists)
+        self.assertEqual(clinic.members.filter(role='physio').count(), 13)
         self.assertEqual(sorted(clinic.calendar_owner.departments.values_list('name', flat=True)),
                          ['Behaviour Therapy', 'Occupational Therapy', 'Physiotherapy', 'Speech Therapy'])
         professions = {m.physio.account.profession.name for m in clinic.members.filter(role='physio')}
         self.assertEqual(professions, {'occupational therapist', 'speech therapist', 'physiotherapist', 'behaviour therapist'})
         # one time slot shared by the four departments
         shared = Appointment.objects.filter(professional=clinic.workspace, start__hour=13, start__minute=30, start__date=timezone.localdate())
-        self.assertEqual(sorted(a.department.name for a in shared), ['Behaviour Therapy', 'Occupational Therapy', 'Physiotherapy', 'Speech Therapy'])
-        for suffix, department in (('ot', 'Occupational Therapy'), ('speech', 'Speech Therapy'), ('physio', 'Physiotherapy'), ('behaviour', 'Behaviour Therapy')):
+        self.assertEqual(sorted(a.department.name for a in shared), ['Behaviour Therapy'] + ['Occupational Therapy'] * 2 + ['Physiotherapy'] * 2 + ['Speech Therapy'] * 2)
+        logins = [(f'{p}{n}', d) for p, d in (('ot', 'Occupational Therapy'), ('speech', 'Speech Therapy'), ('physio', 'Physiotherapy')) for n in ('', '2', '3', '4')] + [('behaviour', 'Behaviour Therapy')]
+        for suffix, department in logins:
             self.assertTrue(self.client.login(username=f'qa-bshc-{suffix}', password=passwords[f'qa-bshc-{suffix}']), suffix)
             page = self.client.get(reverse('clinics:my-schedule'))
             rows = page.context['appointments']

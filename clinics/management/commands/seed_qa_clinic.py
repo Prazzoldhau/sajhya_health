@@ -25,14 +25,19 @@ CLINIC_NAME = 'Bhaktapur Speech and Hearing Center'
 PREFIX = 'qa-bshc-'
 MARK = 'QA seed'
 
-# username suffix, profession, title, last name shown, department they work in
-THERAPISTS = [
-    ('ot', 'occupational therapist', 'OT', 'Occupational Therapist', 'Occupational Therapy'),
-    ('speech', 'speech therapist', 'SLP', 'Speech Therapist', 'Speech Therapy'),
-    ('physio', 'physiotherapist', 'PT', 'Physiotherapist', 'Physiotherapy'),
-    ('behaviour', 'behaviour therapist', 'BT', 'Behaviour Therapist', 'Behaviour Therapy'),
+# department, profession, title, name shown, username prefix, how many therapists. The first of each keeps the plain username (qa-bshc-ot), the rest are ot2, ot3...
+TEAMS = [
+    ('Occupational Therapy', 'occupational therapist', 'OT', 'Occupational Therapist', 'ot', 4),
+    ('Speech Therapy', 'speech therapist', 'SLP', 'Speech Therapist', 'speech', 4),
+    ('Physiotherapy', 'physiotherapist', 'PT', 'Physiotherapist', 'physio', 4),
+    ('Behaviour Therapy', 'behaviour therapist', 'BT', 'Behaviour Therapist', 'behaviour', 1),
 ]
-PATIENTS = ['QA Patient Aarav', 'QA Patient Bina', 'QA Patient Chiran', 'QA Patient Dipa', 'QA Patient Eshan', 'QA Patient Fulmaya', 'QA Patient Gita', 'QA Patient Hari']
+# (username suffix, profession, title, name shown, department)
+THERAPISTS = [(prefix if i == 0 else f'{prefix}{i + 1}', profession, title, name if i == 0 else f'{name} {i + 1}', department)
+              for department, profession, title, name, prefix, count in TEAMS for i in range(count)]
+DEPARTMENTS = [team[0] for team in TEAMS]
+PATIENTS = ['QA Patient Aarav', 'QA Patient Bina', 'QA Patient Chiran', 'QA Patient Dipa', 'QA Patient Eshan', 'QA Patient Fulmaya', 'QA Patient Gita', 'QA Patient Hari',
+            'QA Patient Ishan', 'QA Patient Jamuna', 'QA Patient Kiran', 'QA Patient Laxmi']
 
 
 def new_password():
@@ -44,7 +49,7 @@ def new_password():
 
 
 class Command(BaseCommand):
-    help = 'Create (or remove) the mock QA clinic: Bhaktapur Speech and Hearing Center, with four therapists, a clinic login, a receptionist and sample appointments.'
+    help = 'Create (or remove) the mock QA clinic: Bhaktapur Speech and Hearing Center, with 13 therapists (4 occupational, 4 speech, 4 physiotherapy, 1 behaviour), a clinic login, a receptionist and sample appointments.'
 
     def add_arguments(self, parser):
         parser.add_argument('--remove', action='store_true', help='Delete everything this command created.')
@@ -60,10 +65,11 @@ class Command(BaseCommand):
             clinic = self.clinic(owner)
             self.clinic_login(clinic)
             workspace = clinic.workspace
-            departments = {name: Department.objects.get_or_create(professional=workspace, name=name)[0] for *_, name in THERAPISTS}
+            departments = {name: Department.objects.get_or_create(professional=workspace, name=name)[0] for name in DEPARTMENTS}
             members = self.therapists(clinic)
-            for name, member in members.items():  # each therapist works in their own department
-                member.departments.set([departments[name]])
+            for name, team in members.items():  # each therapist works in their own department
+                for member in team:
+                    member.departments.set([departments[name]])
             for department in departments.values():  # and each department has its own services to bill from (starting prices, editable)
                 catalog.seed_suggested(workspace, department)
             self.receptionist(clinic)
@@ -124,17 +130,17 @@ class Command(BaseCommand):
         self.passwords[username] = (label, password)
 
     def therapists(self, clinic):
-        """The four verified therapists, each a member of the clinic with a login of their own. Returns {department name: ClinicMember}."""
-        members = {}
-        for suffix, profession_name, title, role_name, department in THERAPISTS:
+        """The verified therapists, each a member of the clinic with a login of their own. Returns {department name: [ClinicMember, ...]}."""
+        members = {name: [] for name in DEPARTMENTS}
+        for number, (suffix, profession_name, title, role_name, department) in enumerate(THERAPISTS, start=1):
             user, _ = self.user(suffix, f'{role_name} (verified therapist)')
             profession = Profession.objects.get_or_create(name=profession_name)[0]
-            profile = self.profile(user, profession, 'QA', role_name, title, '98000002' + str(len(members) + 1).zfill(2))
+            profile = self.profile(user, profession, 'QA', role_name, title, '98000002' + str(number).zfill(2))
             member, _ = ClinicMember.objects.get_or_create(clinic=clinic, physio=profile, defaults={'role': ClinicMember.PHYSIO, 'status': ClinicMember.ACTIVE, 'joined_at': timezone.now()})
             if member.status != ClinicMember.ACTIVE:
                 member.status = ClinicMember.ACTIVE
                 member.save(update_fields=['status'])
-            members[department] = member
+            members[department].append(member)
         return members
 
     def receptionist(self, clinic):
@@ -159,17 +165,26 @@ class Command(BaseCommand):
         return patients
 
     def appointments(self, workspace, patients, departments, members):
-        """Today and tomorrow, two or three per therapist, and one time (1:30 pm) shared by all four departments."""
+        """Today and tomorrow for every therapist, plus 1:30 pm today shared by the first two of each department (and every department at once)."""
         Appointment.objects.filter(professional=workspace, notes=MARK).delete()
         today = timezone.localdate()
-        order = [d for *_, d in THERAPISTS]
-        slots = [(0, '13:30', 0), (0, '13:30', 1), (0, '13:30', 2), (0, '13:30', 3), (0, '10:00', 0), (0, '11:00', 1), (0, '15:00', 2), (0, '16:00', 3),
-                 (1, '10:30', 0), (1, '11:30', 1), (1, '12:00', 2), (1, '14:00', 3)]
-        for n, (day_offset, hhmm, who) in enumerate(slots):
-            department = order[who]
-            start = timezone.make_aware(datetime.datetime.combine(today + datetime.timedelta(days=day_offset), datetime.time.fromisoformat(hhmm)))
+        n = 0
+
+        def book(day_offset, hour, minute, department, member):
+            nonlocal n
+            start = timezone.make_aware(datetime.datetime.combine(today + datetime.timedelta(days=day_offset), datetime.time(hour, minute)))
             Appointment.objects.create(professional=workspace, patient=patients[n % len(patients)], start=start, end=start + datetime.timedelta(minutes=45),
-                                       department=departments[department], practitioner=members[department], session_type='treatment', notes=MARK)
+                                       department=departments[department], practitioner=member, session_type='treatment', notes=MARK)
+            n += 1
+
+        for department, team in members.items():
+            for j, member in enumerate(team):
+                first = 9 * 60 + 75 * j  # 9:00, 10:15, 11:30, 12:45
+                book(0, first // 60, first % 60, department, member)
+                later = 10 * 60 + 60 * j  # tomorrow 10:00, 11:00, 12:00, 13:00
+                book(1, later // 60, later % 60, department, member)
+                if j < 2:
+                    book(0, 13, 30, department, member)
 
     # ------------------------------------------------------------ output
     def report(self, clinic):
@@ -181,7 +196,7 @@ class Command(BaseCommand):
         for username, (label, password) in sorted(self.passwords.items()):
             out(f'  {username:<22} {password or "(unchanged: use --reset-passwords for a new one)":<16} {label}')
         out('')
-        out('Each therapist opens "My schedule" for the appointments booked with them (today and tomorrow).')
+        out('13 therapists: 4 occupational, 4 speech, 4 physiotherapy and 1 behaviour. Each opens "My schedule" for the appointments booked with them (today and tomorrow).')
         out('The clinic login opens Appointments to book, edit and see all four departments.')
         out(f'Remove everything later with:  python manage.py seed_qa_clinic --remove')
 

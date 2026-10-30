@@ -143,7 +143,7 @@ and hosted (Supabase) links are stored as URLs and played from there.
 
 ## Mock clinic for QA
 
-`python manage.py seed_qa_clinic` builds **Bhaktapur Speech and Hearing Center** with an owner, the clinic's own login, a receptionist and four verified therapists (occupational, speech, physiotherapy, behaviour), their departments, eight "QA Patient" records and appointments for today and tomorrow (four departments share the 1:30 pm slot). It prints each username (all start `qa-bshc-`) with a generated password, once.
+`python manage.py seed_qa_clinic` builds **Bhaktapur Speech and Hearing Center** with an owner, the clinic's own login, a receptionist and 13 verified therapists (4 occupational `qa-bshc-ot`, `ot2` to `ot4`; 4 speech `qa-bshc-speech`, `speech2` to `speech4`; 4 physiotherapy `qa-bshc-physio`, `physio2` to `physio4`; 1 behaviour), their departments, eight "QA Patient" records and appointments for today and tomorrow (four departments share the 1:30 pm slot). It prints each username (all start `qa-bshc-`) with a generated password, once.
 
 - Sign in as a therapist: **My schedule** lists only the appointments booked with them. Sign in as `qa-bshc-clinic`: **Appointments** to book and edit.
 - Run it again: nothing is duplicated, passwords are kept, the sample appointments move to today and tomorrow. `--reset-passwords` gives new passwords.
