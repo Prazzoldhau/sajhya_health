@@ -405,8 +405,11 @@ def patient_detail(request, pk):
     if tab == 'soap':
         context['soap_notes'] = patient.soap_notes.all()
     if tab == 'assessments':
+        from assessments import disciplines
         from assessments.services import patient_summary
-        context['summary'] = patient_summary(patient)
+        context['summary'] = patient_summary(patient, disciplines.visible_filter(disciplines.allowed(profile)))
+        context['disciplines'] = disciplines.LABELS
+        context['show_discipline'] = len(disciplines.allowed(profile)) > 1
     if tab == 'profile':
         from profiles.views import profile_context
         context.update(profile_context(patient, request.GET.get('section'), request.GET.get('therapy', 'physio')))

@@ -8,6 +8,8 @@ See docs/ASSESSMENTS.md.
 from django.db import models
 from django.utils import timezone
 
+from .disciplines import DISCIPLINE_CHOICES
+
 
 class AssessmentScale(models.Model):
     SUM, PERCENT, SINGLE = 'sum', 'percent', 'single'
@@ -26,6 +28,8 @@ class AssessmentScale(models.Model):
     name = models.CharField(max_length=150)
     abbreviation = models.CharField(max_length=20, blank=True)
     category = models.CharField(max_length=20, choices=CATEGORY_CHOICES, default='other')
+    discipline = models.CharField(max_length=10, choices=DISCIPLINE_CHOICES, default='physio',
+                                  help_text='Who sees it: physiotherapists see physiotherapy and general ones, occupational therapists occupational therapy and general ones, and so on.')
     description = models.TextField(blank=True, help_text='What it measures and when to use it.')
     instructions = models.TextField(blank=True, help_text='How to administer / score. Shown above the questions.')
     scoring = models.CharField(max_length=10, choices=SCORING_CHOICES, default=SUM)
@@ -103,6 +107,7 @@ class AssessmentForm(models.Model):
     """A ready-made bundle of scales, e.g. "Stroke - initial assessment". Choosing a form pre-selects its scales."""
     name = models.CharField(max_length=150)
     category = models.CharField(max_length=20, choices=AssessmentScale.CATEGORY_CHOICES, default='other')
+    discipline = models.CharField(max_length=10, choices=DISCIPLINE_CHOICES, default='physio')
     description = models.CharField(max_length=300, blank=True)
     scales = models.ManyToManyField(AssessmentScale, through='FormScale', related_name='forms')
     is_active = models.BooleanField(default=True)
@@ -129,6 +134,7 @@ class AssessmentSession(models.Model):
     patient = models.ForeignKey('accounts.Patient', on_delete=models.CASCADE, related_name='assessment_sessions')
     form = models.ForeignKey(AssessmentForm, null=True, blank=True, on_delete=models.SET_NULL, related_name='sessions')
     form_name = models.CharField(max_length=150, blank=True)
+    discipline = models.CharField(max_length=10, choices=DISCIPLINE_CHOICES, default='physio')
     assessed_on = models.DateField(default=timezone.localdate)
     assessor = models.CharField(max_length=200, blank=True)
     notes = models.TextField(blank=True)
@@ -172,3 +178,42 @@ class AssessmentResult(models.Model):
         if self.max_score is not None and self.unit != '%':
             text += f' / {self.max_score.normalize():f}'
         return f'{text} {self.unit}'.strip() if self.unit and self.unit != 'points' else text
+
+
+class ClinicalForm(models.Model):
+    """A history-and-examination style form (sections of text, tick boxes and tables) such as the paediatric occupational therapy assessment.
+    The questions live in `definition`; see assessments/clinical_forms.py for the format."""
+    code = models.SlugField(max_length=40, unique=True)
+    name = models.CharField(max_length=150)
+    discipline = models.CharField(max_length=10, choices=DISCIPLINE_CHOICES, default='ot')
+    description = models.CharField(max_length=300, blank=True)
+    definition = models.JSONField(default=dict)
+    version = models.PositiveSmallIntegerField(default=1)
+    is_active = models.BooleanField(default=True, help_text='Untick to retire a form: hidden from new assessments, history kept.')
+
+    class Meta:
+        ordering = ['discipline', 'name']
+
+    def __str__(self):
+        return self.name
+
+
+class ClinicalRecord(models.Model):
+    """One filled-in clinical form for a patient. It keeps a copy of the questions it was filled with, so it still reads correctly if the form is edited later."""
+    patient = models.ForeignKey('accounts.Patient', on_delete=models.CASCADE, related_name='clinical_records')
+    form = models.ForeignKey(ClinicalForm, null=True, blank=True, on_delete=models.SET_NULL, related_name='records')
+    form_code = models.CharField(max_length=40, blank=True)
+    form_name = models.CharField(max_length=150)
+    form_version = models.PositiveSmallIntegerField(default=1)
+    discipline = models.CharField(max_length=10, choices=DISCIPLINE_CHOICES, default='ot')
+    definition = models.JSONField(default=dict)
+    answers = models.JSONField(default=dict)
+    assessed_on = models.DateField(default=timezone.localdate)
+    assessor = models.CharField(max_length=200, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['-assessed_on', '-id']
+
+    def __str__(self):
+        return f'{self.patient} - {self.form_name} - {self.assessed_on}'

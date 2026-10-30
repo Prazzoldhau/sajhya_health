@@ -7,7 +7,7 @@ from django.urls import reverse
 
 from accounts.tests.helpers import PASSWORD, make_patient, make_professional
 
-from .models import AssessmentForm, AssessmentResult, AssessmentScale, AssessmentSession, ScaleItem
+from .models import AssessmentForm, AssessmentResult, AssessmentScale, AssessmentSession, ClinicalForm, ClinicalRecord, ScaleItem
 from .scoring import change, parse_options, score_answers
 
 
@@ -184,3 +184,149 @@ class PrivacyAndGateTests(Base):
         make_professional('waiting', status='submitted')
         self.client.login(username='waiting', password=PASSWORD)
         self.assertRedirects(self.client.get(reverse('assessments:choose', args=[self.patient.pk])), reverse('accounts:welcome'), fetch_redirect_response=False)
+
+
+class DisciplineSeparationTests(TestCase):
+    """The paediatric occupational therapy assessment belongs to occupational therapy; physiotherapy assessments stay with physiotherapy."""
+    def setUp(self):
+        from accounts.models import Account, Profession
+        call_command('load_scales', verbosity=0)
+        self.physio_user, self.physio = make_professional('physio-asha')  # the first profession is physiotherapist
+        ot_profession = Profession.objects.get_or_create(name='occupational therapist')[0]
+        self.ot_user, self.ot = make_professional('ot-bina')
+        Account.objects.filter(pk=self.ot.account_id).update(profession=ot_profession)
+        self.ot.refresh_from_db()
+        self.form = ClinicalForm.objects.get(code='ot-pediatric')
+        self.berg = AssessmentScale.objects.get(code='berg')
+
+    def login(self, user):
+        self.client.logout()
+        self.client.force_login(user)
+
+    def test_the_paediatric_form_is_shipped_for_occupational_therapy(self):
+        self.assertEqual((self.form.discipline, self.form.is_active), ('ot', True))
+        titles = [s['title'] for s in self.form.definition['sections']]
+        for expected in ('Demographic data', 'Pre-natal history', 'Peri-natal history', 'Developmental history', 'Activities of daily living', 'Problem identification, goals and approaches'):
+            self.assertIn(expected, titles)
+        self.assertTrue(all(s.discipline == 'physio' for s in AssessmentScale.objects.all()))  # everything that existed stays physiotherapy
+        call_command('load_clinical_forms', verbosity=0)  # safe to run again
+        self.assertEqual(ClinicalForm.objects.count(), 1)
+        self.assertEqual(ClinicalForm.objects.get().version, 1)
+
+    def test_each_discipline_is_offered_only_its_own_assessments(self):
+        patient_ot = make_patient(self.ot, 'Child A')
+        patient_pt = make_patient(self.physio, 'Adult B')
+        self.login(self.ot_user)
+        page = self.client.get(reverse('assessments:choose', args=[patient_ot.pk]))
+        self.assertContains(page, 'Paediatric occupational therapy assessment')
+        self.assertNotContains(page, 'Berg')
+        self.assertNotContains(page, 'Barthel')
+        self.assertEqual(page.context['switcher'], [])  # a specific discipline has no switcher
+        self.login(self.physio_user)
+        page = self.client.get(reverse('assessments:choose', args=[patient_pt.pk]))
+        self.assertNotContains(page, 'Paediatric occupational therapy assessment')
+        self.assertContains(page, 'Berg')
+        # and the server refuses what the page does not offer
+        self.assertEqual(self.client.get(reverse('assessments:clinical-fill', args=[patient_pt.pk, self.form.pk])).status_code, 404)
+        self.login(self.ot_user)
+        r = self.client.get(reverse('assessments:fill', args=[patient_ot.pk]), {'scales': str(self.berg.pk)})  # a physiotherapy scale
+        self.assertRedirects(r, reverse('assessments:choose', args=[patient_ot.pk]), fetch_redirect_response=False)
+
+    def fill(self, patient, **extra):
+        data = {'assessed_on': datetime.date.today().isoformat(), 'assessor': 'Bina', 'f_chief_complaints': 'Poor handwriting', 'f_marriage': 'Non-consanguineous',
+                'f_abortion': 'No', 'f_abortion__detail': '', 'f_chronic_disease': ['Diabetes', 'Not a real option'], 'f_chronic_disease__other': 'Asthma',
+                'f_delivery': ['Normal'], 'g_motor_dev__0__status': 'Attained', 'g_motor_dev__0__age': '3 months', 'g_motor_dev__3__status': 'Not attained',
+                'g_adl__2__level': 'No helper', 'g_in_hand__0__stabilization': ['With stabilization', 'Without stabilization'],
+                'g_vestibular__1__status': 'Present', 'g_vestibular__1__comments': 'Hypersensitive', 'f_problems': 'Sensory seeking', **extra}
+        return self.client.post(reverse('assessments:clinical-fill', args=[patient.pk, self.form.pk]), data)
+
+    def test_filling_the_paediatric_form_keeps_and_shows_only_what_was_answered(self):
+        patient = make_patient(self.ot, 'Child A', diagnosis='Autism spectrum disorder')
+        self.login(self.ot_user)
+        page = self.client.get(reverse('assessments:clinical-fill', args=[patient.pk, self.form.pk]))
+        self.assertContains(page, 'value="Child A"')  # filled from the patient record
+        self.assertContains(page, 'Autism spectrum disorder')
+        r = self.fill(patient)
+        record = ClinicalRecord.objects.get()
+        self.assertRedirects(r, reverse('assessments:clinical-detail', args=[record.pk]), fetch_redirect_response=False)
+        self.assertEqual((record.discipline, record.form_code, record.assessor), ('ot', 'ot-pediatric', 'Bina'))
+        a = record.answers
+        self.assertEqual(a['marriage'], 'Non-consanguineous')
+        self.assertEqual(a['chronic_disease'], {'values': ['Diabetes'], 'other': 'Asthma'})  # an option that does not exist is dropped
+        self.assertEqual(a['abortion'], {'value': 'No', 'detail': ''})
+        self.assertEqual(a['motor_dev'], [{'row': 'Head control', 'status': 'Attained', 'age': '3 months'}, {'row': 'Sitting', 'status': 'Not attained'}])
+        self.assertEqual(a['in_hand'], [{'row': 'Translation: finger to palm', 'stabilization': ['With stabilization', 'Without stabilization']}])
+        self.assertEqual(a['vestibular'][0]['comments'], 'Hypersensitive')
+        detail = self.client.get(reverse('assessments:clinical-detail', args=[record.pk]))
+        self.assertContains(detail, 'Poor handwriting')
+        self.assertContains(detail, 'Head control')
+        self.assertContains(detail, 'Asthma')
+        self.assertNotContains(detail, 'Birth weight')  # not answered: not shown
+        self.assertEqual(record.definition, self.form.definition)  # the questions it was filled with are kept
+        tab = self.client.get(reverse('accounts:patient-detail', args=[patient.pk]), {'tab': 'assessments'})
+        self.assertContains(tab, 'Paediatric occupational therapy assessment')
+
+    def test_a_blank_or_future_dated_form_is_refused(self):
+        patient = make_patient(self.ot, 'Child A')
+        self.login(self.ot_user)
+        blank = self.client.post(reverse('assessments:clinical-fill', args=[patient.pk, self.form.pk]), {'assessed_on': datetime.date.today().isoformat(), 'f_name': 'Child A', 'f_age': '6'})
+        self.assertEqual(blank.status_code, 200)  # only the boxes filled from the record: nothing answered
+        self.assertContains(blank, 'Fill in at least one answer')
+        future = self.fill(patient, assessed_on=(datetime.date.today() + datetime.timedelta(days=2)).isoformat())
+        self.assertContains(future, 'cannot be in the future')
+        self.assertEqual(ClinicalRecord.objects.count(), 0)
+
+    def test_one_discipline_never_sees_the_others_records(self):
+        child = make_patient(self.ot, 'Child A')
+        self.login(self.ot_user)
+        self.fill(child)
+        record = ClinicalRecord.objects.get()
+        # a physiotherapy assessment on the same patient
+        session = AssessmentSession.objects.create(patient=child, form_name='Berg', discipline='physio', assessor='Asha')
+        # the clinic: both therapists belong to it, and the patient is the clinic's
+        from clinics.models import Clinic, ClinicMember
+        clinic = Clinic.objects.create(owner=self.ot, name='Shared', phone='01555')
+        from clinics.models import ClinicSubscription
+        ClinicSubscription.objects.create(professional=self.ot, status='active')
+        child.clinic = clinic
+        child.save()
+        ClinicMember.objects.create(clinic=clinic, physio=self.physio, role='physio', status='active')
+        self.login(self.physio_user)
+        self.assertEqual(self.client.get(reverse('assessments:clinical-detail', args=[record.pk])).status_code, 404)
+        self.assertEqual(self.client.post(reverse('assessments:clinical-delete', args=[record.pk])).status_code, 404)
+        tab = self.client.get(reverse('accounts:patient-detail', args=[child.pk]), {'tab': 'assessments'})
+        self.assertNotContains(tab, 'Paediatric occupational therapy assessment')
+        self.assertContains(tab, 'Berg')
+        self.assertEqual(self.client.get(reverse('assessments:detail', args=[session.pk])).status_code, 200)
+        self.login(self.ot_user)
+        tab = self.client.get(reverse('accounts:patient-detail', args=[child.pk]), {'tab': 'assessments'})
+        self.assertContains(tab, 'Paediatric occupational therapy assessment')
+        self.assertNotContains(tab, 'Berg')  # the physiotherapist's assessment is not in the OT view
+        self.assertEqual(self.client.get(reverse('assessments:detail', args=[session.pk])).status_code, 404)
+
+    def test_scale_assessments_are_filed_under_the_discipline_that_made_them(self):
+        patient = make_patient(self.physio, 'Adult B')
+        self.login(self.physio_user)
+        items = {f'i_{i.pk}': '0' for i in self.berg.items.all()}
+        self.client.post(reverse('assessments:fill', args=[patient.pk]), {'scales': str(self.berg.pk), 'assessed_on': datetime.date.today().isoformat(), **items})
+        self.assertEqual(AssessmentSession.objects.get().discipline, 'physio')
+
+    def test_the_clinic_login_works_across_disciplines_with_a_switcher(self):
+        from clinics.models import Clinic
+        from clinics.login import set_clinic_login
+        clinic = Clinic.objects.create(owner=self.physio, name='Mixed', phone='01555')
+        from clinics.models import ClinicSubscription
+        ClinicSubscription.objects.create(professional=self.physio, status='active')
+        user = set_clinic_login(clinic, 'mixed-clinic', PASSWORD)
+        workspace = clinic.workspace
+        patient = make_patient(workspace, 'Child C')
+        self.login(user)
+        page = self.client.get(reverse('assessments:choose', args=[patient.pk]))
+        self.assertEqual(page.context['current'], 'physio')
+        self.assertEqual([key for key, _, _ in page.context['switcher']], ['physio', 'ot'])
+        ot = self.client.get(reverse('assessments:choose', args=[patient.pk]), {'discipline': 'ot'})
+        self.assertContains(ot, 'Paediatric occupational therapy assessment')
+        self.assertNotContains(ot, 'Berg')
+        self.client.post(reverse('assessments:clinical-fill', args=[patient.pk, self.form.pk]), {'assessed_on': datetime.date.today().isoformat(), 'f_chief_complaints': 'x'})
+        tab = self.client.get(reverse('accounts:patient-detail', args=[patient.pk]), {'tab': 'assessments'})
+        self.assertContains(tab, 'Occupational therapy')  # with a label saying which discipline

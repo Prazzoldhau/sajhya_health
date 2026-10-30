@@ -92,3 +92,28 @@ to overwrite them with the file's version. Categories: functional, balance, coor
 - Per-muscle or per-side scales (Ashworth, MRC, grip): record one assessment per muscle/side and name it in the scale's notes.
 - Access: only the owning professional can open, add or delete a patient's assessments; unapproved professionals are locked out
   like everywhere else.
+
+## Disciplines: who sees which assessment
+
+Every scale, scale form, clinical form and recorded assessment belongs to a **discipline** (physiotherapy, occupational therapy, speech therapy,
+behaviour therapy, or general). People see only their own discipline's items plus the general ones, taken from their profession: a physiotherapist
+never sees occupational therapy assessments (in the list to choose from, on the patient's Assessments tab, or by opening one), and an
+occupational therapist never sees the physiotherapy ones. Someone who is not one specific discipline (the clinic's own login, a doctor) can work in
+any, and switches between them with the chips at the top of *New assessment*; their history shows a label saying which discipline each belongs to.
+Everything that existed before is physiotherapy. To share a scale with every discipline, set its *Discipline* to General in the admin
+(Assessments, Assessment scales).
+
+## Clinical forms (history and examination forms)
+
+Some assessments are not scored scales but a long form of text boxes, tick boxes and tables. These are **clinical forms** (`ClinicalForm`), filled
+once per patient and kept as a **ClinicalRecord** with a copy of the questions it was filled with.
+
+- **Shipped:** *Paediatric occupational therapy assessment* (`ot-pediatric`, occupational therapy): demographic data; pre-natal, peri-natal and post-natal
+  history; medical, family, educational and socio-economic history; motor and oral-motor development; observation and examination; gross and fine
+  motor skills and in-hand manipulation; proximal senses (vestibular, proprioceptive, gravitational, tactile, dyspraxia); distal senses (vision, visual
+  perception, auditory, olfactory, gustatory, reflexes); activities of daily living; pre-handwriting skills; behaviour; play; problem identification,
+  short and long term goals, approaches and techniques. Name, age, gender and diagnosis are filled from the patient record.
+- **Where:** patient, *Assessments*, *New assessment*, *Clinical assessment forms*. A saved form opens read-only (only what was answered is shown) and prints.
+- **Adding or changing one:** the questions are data in `assessments/clinical_forms.py` (field types are described at the top of that file).
+  `python manage.py migrate` adds new forms; `python manage.py load_clinical_forms` brings a changed form up to date and raises its version.
+  Records already filled keep the questions they were filled with.

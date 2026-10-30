@@ -20,13 +20,22 @@
   </table></div>
   {% endif %}
 
+  {% if summary.records %}
+  <div class="as-group">Clinical forms</div>
+  {% for r in summary.records %}
+  <a href="{% url 'assessments:clinical-detail' r.pk %}" class="as-card" style="text-decoration:none;color:inherit;margin-bottom:10px">
+    <h3>{{ r.form_name }} <span class="sub">· {{ r.assessed_on|date:"M j, Y" }}{% if r.assessor %} · {{ r.assessor }}{% endif %}</span>{% if show_discipline %} <span class="as-chip">{{ r.get_discipline_display }}</span>{% endif %}</h3>
+  </a>
+  {% endfor %}
+  {% endif %}
+
   <div class="as-group">History</div>
   {% for s in summary.sessions %}
   <a href="{% url 'assessments:detail' s.pk %}" class="as-card" style="text-decoration:none;color:inherit;margin-bottom:10px">
-    <h3>{{ s.form_name|default:"Assessment" }} <span class="sub">· {{ s.assessed_on|date:"M j, Y" }}{% if s.assessor %} · {{ s.assessor }}{% endif %}</span></h3>
+    <h3>{{ s.form_name|default:"Assessment" }} <span class="sub">· {{ s.assessed_on|date:"M j, Y" }}{% if s.assessor %} · {{ s.assessor }}{% endif %}</span>{% if show_discipline %} <span class="as-chip">{{ s.get_discipline_display }}</span>{% endif %}</h3>
     <div class="as-chips">{% for r in s.results.all %}<span class="as-chip">{{ r.scale_name }}: {{ r.score_display }}</span>{% endfor %}</div>
   </a>
-  {% empty %}
-  <div style="padding:26px;text-align:center;color:var(--muted)">No assessments yet. Click <b>New assessment</b> to choose scales (Barthel, Berg, FIM, NIHSS, ODI and more) and record the scores.</div>
+  {% empty %}{% if not summary.records %}
+  <div style="padding:26px;text-align:center;color:var(--muted)">No assessments yet. Click <b>New assessment</b> to choose scales (Barthel, Berg, FIM, NIHSS, ODI and more) and record the scores.</div>{% endif %}
   {% endfor %}
 </div>

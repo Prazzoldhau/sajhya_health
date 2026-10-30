@@ -12,7 +12,7 @@
 
 <form method="post" action="{% url 'assessments:fill' patient.pk %}">
   {% csrf_token %}
-  <input type="hidden" name="scales" value="{{ scale_ids }}">
+  <input type="hidden" name="scales" value="{{ scale_ids }}"><input type="hidden" name="discipline" value="{{ discipline }}">
   {% if form_obj %}<input type="hidden" name="form" value="{{ form_obj.pk }}">{% endif %}
   <div class="as-meta">
     <label>Date<input type="date" name="assessed_on" value="{{ assessed_on }}" max="{{ today }}" required></label>

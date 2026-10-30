@@ -1,6 +1,6 @@
 from django.contrib import admin
 
-from .models import AssessmentForm, AssessmentResult, AssessmentScale, AssessmentSession, FormScale, ScaleItem, ScoreBand
+from .models import AssessmentForm, AssessmentResult, AssessmentScale, AssessmentSession, ClinicalForm, ClinicalRecord, FormScale, ScaleItem, ScoreBand
 
 
 class ItemInline(admin.StackedInline):
@@ -16,8 +16,8 @@ class BandInline(admin.TabularInline):
 
 @admin.register(AssessmentScale)
 class ScaleAdmin(admin.ModelAdmin):
-    list_display = ('name', 'abbreviation', 'category', 'scoring', 'version', 'is_active')
-    list_filter = ('category', 'scoring', 'is_active')
+    list_display = ('name', 'abbreviation', 'discipline', 'category', 'scoring', 'version', 'is_active')
+    list_filter = ('discipline', 'category', 'scoring', 'is_active')
     search_fields = ('name', 'abbreviation', 'code')
     prepopulated_fields = {'code': ('abbreviation',)}
     inlines = [BandInline, ItemInline]
@@ -30,7 +30,8 @@ class FormScaleInline(admin.TabularInline):
 
 @admin.register(AssessmentForm)
 class FormAdmin(admin.ModelAdmin):
-    list_display = ('name', 'category', 'is_active')
+    list_display = ('name', 'discipline', 'category', 'is_active')
+    list_filter = ('discipline', 'is_active')
     inlines = [FormScaleInline]
 
 
@@ -44,6 +45,21 @@ class ResultInline(admin.TabularInline):
 
 @admin.register(AssessmentSession)
 class SessionAdmin(admin.ModelAdmin):
-    list_display = ('patient', 'form_name', 'assessed_on', 'assessor')
+    list_display = ('patient', 'form_name', 'discipline', 'assessed_on', 'assessor')
+    list_filter = ('discipline',)
     date_hierarchy = 'assessed_on'
     inlines = [ResultInline]
+
+
+@admin.register(ClinicalForm)
+class ClinicalFormAdmin(admin.ModelAdmin):
+    list_display = ('name', 'code', 'discipline', 'version', 'is_active')
+    list_filter = ('discipline', 'is_active')
+
+
+@admin.register(ClinicalRecord)
+class ClinicalRecordAdmin(admin.ModelAdmin):
+    list_display = ('patient', 'form_name', 'discipline', 'assessed_on', 'assessor')
+    list_filter = ('discipline',)
+    date_hierarchy = 'assessed_on'
+    readonly_fields = ('definition', 'answers')

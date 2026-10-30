@@ -1,7 +1,7 @@
 """Reading helpers: what the patient's Assessments tab and the detail page show."""
 from collections import OrderedDict
 
-from .models import AssessmentResult, AssessmentSession
+from .models import AssessmentResult, AssessmentSession, ClinicalRecord
 from .scoring import change
 
 
@@ -15,10 +15,15 @@ def sparkline(points, width=90, height=24, pad=3):
     return ' '.join(f'{pad + i * step:.1f},{height - pad - (v - low) / span * (height - 2 * pad):.1f}' for i, v in enumerate(points))
 
 
-def patient_summary(patient):
-    """Sessions (newest first) and one progress row per scale: first, latest and the change between them."""
-    sessions = list(AssessmentSession.objects.filter(patient=patient).prefetch_related('results'))
-    results = (AssessmentResult.objects.filter(session__patient=patient, score__isnull=False)
+def patient_summary(patient, visible=None):
+    """Sessions (newest first), filled clinical forms and one progress row per scale: first, latest and the change between them. `visible` limits them
+    to the viewer's disciplines (plus general ones): an occupational therapist's assessments are not shown to a physiotherapist, and the other way round."""
+    sessions = AssessmentSession.objects.filter(patient=patient)
+    records = ClinicalRecord.objects.filter(patient=patient)
+    if visible is not None:
+        sessions, records = sessions.filter(discipline__in=visible), records.filter(discipline__in=visible)
+    sessions = list(sessions.prefetch_related('results'))
+    results = (AssessmentResult.objects.filter(session__in=sessions, score__isnull=False)
                .select_related('session').order_by('session__assessed_on', 'session_id', 'id'))
     by_scale = OrderedDict()
     for r in results:
@@ -32,4 +37,4 @@ def patient_summary(patient):
                          'change': text, 'tone': tone, 'since_last': since_last, 'since_last_tone': since_tone,
                          'spark': sparkline([float(x.score) for x in rows])})
     progress.sort(key=lambda p: p['latest'].session.assessed_on, reverse=True)
-    return {'sessions': sessions, 'progress': progress}
+    return {'sessions': sessions, 'progress': progress, 'records': list(records)}

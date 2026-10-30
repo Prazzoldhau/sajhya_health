@@ -6,21 +6,36 @@
 {% endblock %}
 {% block main %}
 <p style="margin:0 0 4px"><a class="text-link" href="{% url 'accounts:patient-detail' patient.pk %}?tab=assessments" style="text-decoration:none">← {{ patient.name }}</a></p>
-<h1 style="font-size:20px;margin:0 0 4px">New assessment</h1>
-<p class="hint" style="margin:0 0 12px">Pick a ready-made form, or tick the scales you want to use. You can mix scales from different forms.</p>
+<h1 style="font-size:20px;margin:0 0 4px">New assessment <span class="as-chip" style="vertical-align:middle">{{ current_label }}</span></h1>
+<p class="hint" style="margin:0 0 12px">Pick a ready-made form, or tick the scales you want to use. You can mix scales from different forms. Only {{ current_label|lower }} assessments are listed here.</p>
+{% if switcher|length > 1 %}
+<div style="display:flex;gap:6px;flex-wrap:wrap;margin:0 0 12px">{% for key, label, on in switcher %}<a href="?discipline={{ key }}" class="pill {% if on %}solid{% endif %}" style="text-decoration:none">{{ label }}</a>{% endfor %}</div>
+{% endif %}
 
-<div class="as-group" style="margin-top:0">Ready-made forms</div>
+{% if clinical_forms %}
+<div class="as-group" style="margin-top:0">Clinical assessment forms</div>
+<div class="as-grid" style="margin-bottom:6px">
+  {% for cf in clinical_forms %}
+  <a class="as-card" href="{% url 'assessments:clinical-fill' patient.pk cf.pk %}" style="text-decoration:none;color:inherit">
+    <h3>{{ cf.name }}</h3><div class="sub">{{ cf.description }}</div>
+    <div class="as-chips"><span class="as-chip">{{ cf.get_discipline_display }}</span></div>
+  </a>
+  {% endfor %}
+</div>
+{% endif %}
+
+<div class="as-group">Ready-made scale forms</div>
 <div class="as-grid">
   {% for card in form_cards %}
-  <a class="as-card" href="{% url 'assessments:fill' patient.pk %}?form={{ card.form.pk }}&scales={{ card.scale_ids }}" style="text-decoration:none;color:inherit">
+  <a class="as-card" href="{% url 'assessments:fill' patient.pk %}?form={{ card.form.pk }}&scales={{ card.scale_ids }}&discipline={{ current }}" style="text-decoration:none;color:inherit">
     <h3>{{ card.form.name }}</h3><div class="sub">{{ card.form.description }}</div>
     <div class="as-chips">{% for n in card.names %}<span class="as-chip">{{ n }}</span>{% endfor %}</div>
   </a>
-  {% empty %}<p class="hint">No forms yet. Run <code>python manage.py load_scales</code> or add them in the admin.</p>{% endfor %}
+  {% empty %}<p class="hint">No scale forms for {{ current_label|lower }} yet.</p>{% endfor %}
 </div>
 
 <form method="get" action="{% url 'assessments:fill' patient.pk %}" id="pickForm">
-  <input type="hidden" name="scales" id="scalesField">
+  <input type="hidden" name="scales" id="scalesField"><input type="hidden" name="discipline" value="{{ current }}">
   <div class="as-group" style="display:flex;align-items:center;gap:12px">Or choose individual scales
     <input type="search" id="scaleSearch" placeholder="Search scales..." style="height:32px;border:1px solid var(--line);border-radius:8px;padding:0 10px;text-transform:none;letter-spacing:0;font-weight:400"></div>
   {% for group, scales in groups.items %}

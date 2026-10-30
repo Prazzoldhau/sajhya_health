@@ -1,0 +1,42 @@
+{% extends 'accounts/pro_base.html' %}
+{% block title %}{{ record.form_name }} | Sajhya Health{% endblock %}
+{% block extra_css %}
+  main { padding-top: 18px; }
+{% include 'assessments/_styles.html' %}
+  .cd-section { border: 1px solid var(--line); border-radius: 11px; background: #fff; margin-bottom: 14px; overflow: hidden; break-inside: avoid; }
+  .cd-section > h2 { margin: 0; padding: 10px 16px; background: #f6fbf8; border-bottom: 1px solid var(--line); font-size: 14px; }
+  .cd-row { display: grid; grid-template-columns: minmax(180px, 280px) 1fr; gap: 12px; padding: 8px 16px; border-bottom: 1px solid #eef3ef; font-size: 13px; }
+  .cd-row:last-child { border-bottom: 0; } .cd-row .k { color: var(--muted); font-weight: 600; } .cd-row .v { white-space: pre-wrap; }
+  .cd-grid { width: 100%; border-collapse: collapse; font-size: 12.5px; }
+  .cd-grid th { text-align: left; font-size: 10.5px; color: var(--muted); padding: 6px 10px; border-bottom: 1px solid var(--line); }
+  .cd-grid td { padding: 6px 10px; border-bottom: 1px solid #eef3ef; }
+  @media (max-width: 700px) { .cd-row { grid-template-columns: 1fr; gap: 2px; } }
+{% endblock %}
+{% block main %}
+<p class="no-print" style="margin:0 0 4px"><a class="text-link" href="{% url 'accounts:patient-detail' patient.pk %}?tab=assessments" style="text-decoration:none">← {{ patient.name }}</a></p>
+<div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:12px">
+  <h1 style="font-size:20px;margin:0">{{ record.form_name }}</h1>
+  <span class="as-chip">{{ discipline_label }}</span>
+  <span class="hint">{{ patient.name }} ({{ patient.patient_code }}) · {{ record.assessed_on|date:"F j, Y" }}{% if record.assessor %} · {{ record.assessor }}{% endif %}</span>
+  <span class="no-print" style="margin-left:auto;display:flex;gap:8px">
+    <button type="button" class="secondary-btn" onclick="window.print()">Print</button>
+    <form method="post" action="{% url 'assessments:clinical-delete' record.pk %}" onsubmit="return confirm('Remove this whole assessment? This cannot be undone.')" style="margin:0">{% csrf_token %}<button class="secondary-btn" type="submit">Remove</button></form>
+  </span>
+</div>
+
+{% for section in sections %}
+<section class="cd-section">
+  <h2>{{ section.title }}</h2>
+  {% for item in section.items %}
+    {% if item.grid %}
+    <div style="padding:8px 16px"><div class="k" style="color:var(--muted);font-weight:600;font-size:13px;margin-bottom:4px">{{ item.label }}</div>
+      <table class="cd-grid"><thead><tr>{% for h in item.grid.headers %}<th>{{ h }}</th>{% endfor %}</tr></thead>
+        <tbody>{% for row in item.grid.rows %}<tr>{% for c in row %}<td>{{ c }}</td>{% endfor %}</tr>{% endfor %}</tbody></table></div>
+    {% else %}
+    <div class="cd-row"><div class="k">{{ item.label }}</div><div class="v">{{ item.text }}</div></div>
+    {% endif %}
+  {% endfor %}
+</section>
+{% empty %}<p class="hint">Nothing was recorded.</p>{% endfor %}
+<div class="instr" style="padding:0 0 18px;color:var(--muted);font-size:12px">Form version {{ record.form_version }}. Only what was answered is shown.</div>
+{% endblock %}
