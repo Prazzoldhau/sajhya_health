@@ -189,8 +189,8 @@ class LibraryFixtureTests(TestCase):
 
     def test_the_full_live_library_is_loaded_with_links(self):
         output = self.load()
-        self.assertEqual(ExerciseMain.objects.count(), 790)
-        self.assertEqual(SubRegion.objects.count(), 30)
+        self.assertEqual(ExerciseMain.objects.filter(discipline='physio').count(), 790)  # the imported catalogue is the physiotherapy library
+        self.assertEqual(SubRegion.objects.filter(pk__lt=2000).count(), 30)
         self.assertEqual(ExerciseMain.objects.exclude(youtube_url='').count(), 155)
         self.assertEqual(ExerciseMain.objects.exclude(hosted_video_url='').count(), 26)
         self.assertEqual(ExerciseMain.objects.exclude(exercise_description_nepali='').count(), 221)
@@ -216,7 +216,109 @@ class LibraryFixtureTests(TestCase):
         self.load()
         stray = ExerciseMain.objects.create(sub_region_fk=SubRegion.objects.first(), exercise_name='Old library entry', exercise_type='x', difficulty_level=1, default_sets=3, default_reps=10, hold_time_sec=0)
         self.load()
-        self.assertEqual(ExerciseMain.objects.count(), 791)  # a plain load never deletes
+        physio = ExerciseMain.objects.filter(discipline='physio')
+        others = ExerciseMain.objects.exclude(discipline='physio').count()
+        self.assertGreater(others, 0)  # the other departments' starter activities
+        self.assertEqual(physio.count(), 791)  # a plain load never deletes
         self.assertIn('Pruned 1', self.load('--prune'))
-        self.assertEqual(ExerciseMain.objects.count(), 790)
+        self.assertEqual(physio.count(), 790)
+        self.assertEqual(ExerciseMain.objects.exclude(discipline='physio').count(), others)  # pruning never touches them
         self.assertFalse(ExerciseMain.objects.filter(pk=stray.pk).exists())
+
+
+class DepartmentLibraryTests(TestCase):
+    """Each department has its own exercise library: occupational therapy, speech and behaviour are not mixed with physiotherapy."""
+    def setUp(self):
+        from accounts.models import Account, Profession
+        self.pt_user, self.pt = make_professional('pt-asha')  # physiotherapist
+        self.ot_user, self.ot = make_professional('ot-bina')
+        Account.objects.filter(pk=self.ot.account_id).update(profession=Profession.objects.get_or_create(name='occupational therapist')[0])
+        self.speech_user, self.speech = make_professional('slp-chandra')
+        Account.objects.filter(pk=self.speech.account_id).update(profession=Profession.objects.get_or_create(name='speech therapist')[0])
+        region = Region.objects.create(region_name='Lower_Limb')
+        self.knee = SubRegion.objects.create(region_fk=region, sub_region_name='Knee')
+        self.squat = ExerciseMain.objects.create(sub_region_fk=self.knee, exercise_name='Wall Squat', exercise_type='Strengthening', difficulty_level=2, default_sets=3, default_reps=12, hold_time_sec=5)
+
+    def names(self, response):
+        return [e.exercise_name for e in response.context['page_obj']]
+
+    def test_each_department_sees_only_its_own_library(self):
+        self.client.force_login(self.ot_user)
+        ot = self.client.get(reverse('exercises:library'))
+        self.assertIn('Bead threading', self.names(ot))
+        self.assertNotIn('Wall Squat', self.names(ot))
+        self.assertNotIn('Tongue movements', self.names(ot))
+        self.assertEqual(ot.context['current'], 'ot')
+        self.assertEqual(ot.context['switcher'], [])  # a specific discipline has no switcher
+        self.client.force_login(self.speech_user)
+        speech = self.client.get(reverse('exercises:library'))
+        self.assertIn('Tongue movements', self.names(speech))
+        self.assertNotIn('Bead threading', self.names(speech))
+        self.client.force_login(self.pt_user)
+        pt = self.client.get(reverse('exercises:library'))
+        self.assertIn('Wall Squat', self.names(pt))
+        self.assertNotIn('Bead threading', self.names(pt))
+        self.assertNotIn('Tongue movements', self.names(pt))
+        self.assertEqual(pt.context['total'], ExerciseMain.objects.filter(discipline__in=['physio', 'general']).count())
+        # regions listed are only the department's own
+        self.assertEqual({r.region_name for r in ot.context['regions']}, {'Fine motor and hand function', 'Sensory processing', 'Handwriting and self-care'})
+
+    def test_the_server_refuses_another_departments_exercises(self):
+        bead = ExerciseMain.objects.get(exercise_name='Bead threading')
+        self.client.force_login(self.pt_user)
+        self.assertEqual(self.client.get(reverse('exercises:detail', args=[bead.pk])).status_code, 404)
+        self.assertEqual(self.client.get(reverse('exercises:search'), {'q': 'bead'}).json()['results'], [])
+        patient = make_patient(self.pt)
+        r = self.client.post(reverse('exercises:prescribe'), data=json.dumps({'patient_id': patient.pk, 'exercises': [{'id': bead.pk}]}), content_type='application/json')
+        self.assertEqual(r.status_code, 400)
+        self.assertEqual(Prescription.objects.count(), 0)
+        ok = self.client.post(reverse('exercises:prescribe'), data=json.dumps({'patient_id': patient.pk, 'exercises': [{'id': self.squat.pk}, {'id': bead.pk}]}), content_type='application/json')
+        self.assertEqual(ok.status_code, 200)
+        self.assertEqual([i.exercise_name for i in Prescription.objects.get().exercises.all()], ['Wall Squat'])  # the OT exercise is left out
+        self.client.force_login(self.ot_user)
+        self.assertEqual(self.client.get(reverse('exercises:detail', args=[bead.pk])).status_code, 200)
+        self.assertEqual(self.client.get(reverse('exercises:detail', args=[self.squat.pk])).status_code, 404)
+
+    def test_general_exercises_are_in_every_library(self):
+        shared = ExerciseMain.objects.create(sub_region_fk=self.knee, exercise_name='Deep Breathing', exercise_type='Breathing', difficulty_level=1, default_sets=3, default_reps=5,
+                                             hold_time_sec=0, discipline='general')
+        for user in (self.pt_user, self.ot_user, self.speech_user):
+            self.client.force_login(user)
+            self.assertIn('Deep Breathing', self.names(self.client.get(reverse('exercises:library'), {'q': 'Deep'})))
+
+    def test_the_clinic_login_switches_between_the_departments_libraries(self):
+        from clinics.login import set_clinic_login
+        from clinics.models import Clinic, ClinicSubscription
+        clinic = Clinic.objects.create(owner=self.pt, name='Mixed', phone='01555')
+        ClinicSubscription.objects.create(professional=self.pt, status='active')
+        user = set_clinic_login(clinic, 'mixed-clinic', 'Gr33n!Health-99')
+        self.client.force_login(user)
+        page = self.client.get(reverse('exercises:library'))
+        self.assertEqual(page.context['current'], 'physio')
+        self.assertEqual([key for key, _, _ in page.context['switcher']], ['physio', 'ot', 'speech', 'behaviour'])
+        speech = self.client.get(reverse('exercises:library'), {'discipline': 'speech'})
+        self.assertIn('Tongue movements', self.names(speech))
+        self.assertNotIn('Wall Squat', self.names(speech))
+        again = self.client.get(reverse('exercises:library'))  # the choice is remembered
+        self.assertEqual(again.context['current'], 'speech')
+
+    def test_the_session_form_search_uses_the_persons_own_library(self):
+        from accounts.treatments import search_options
+        self.assertEqual([r['name'] for r in search_options('tongue', 'exercise', ['speech', 'general'])], ['Tongue movements'])
+        self.assertEqual(search_options('tongue', 'exercise', ['physio', 'general']), [])
+        self.client.force_login(self.ot_user)
+        found = self.client.get(reverse('accounts:treatment-search'), {'q': 'bead', 'kind': 'exercise'}).json()['results']
+        self.assertEqual([r['name'] for r in found], ['Bead threading'])
+        self.assertEqual(self.client.get(reverse('accounts:treatment-search'), {'q': 'squat', 'kind': 'exercise'}).json()['results'], [])
+
+    def test_starter_sets_exist_and_loading_again_keeps_admin_edits(self):
+        from django.core.management import call_command
+        for discipline in ('ot', 'speech', 'behaviour'):
+            self.assertGreaterEqual(ExerciseMain.objects.filter(discipline=discipline).count(), 6, discipline)
+        bead = ExerciseMain.objects.get(exercise_name='Bead threading')
+        bead.default_reps = 99
+        bead.save()
+        before = ExerciseMain.objects.count()
+        call_command('load_discipline_library', verbosity=0)
+        bead.refresh_from_db()
+        self.assertEqual((ExerciseMain.objects.count(), bead.default_reps), (before, 99))

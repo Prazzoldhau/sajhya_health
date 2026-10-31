@@ -55,10 +55,11 @@ def treatment_search(request):
     """Type-ahead for the session form: clinical / electrotherapy options first, then the exercise library."""
     if workspace_profile(request) is None:
         return JsonResponse({'results': []})
-    return JsonResponse({'results': search_options(request.GET.get('q', ''), request.GET.get('kind', ''))})
+    from assessments import disciplines
+    return JsonResponse({'results': search_options(request.GET.get('q', ''), request.GET.get('kind', ''), disciplines.visible_filter(disciplines.allowed(workspace_profile(request))))})
 
 
-def search_options(query, kind=''):
+def search_options(query, kind='', visible=None):
     """Clinical / electrotherapy options and exercise-library matches for a search text. kind 'clinical' or 'exercise' limits it to one list."""
     q = (query or '').strip().lower()
     if not q:
@@ -68,6 +69,9 @@ def search_options(query, kind=''):
         results += [{'kind': 'clinical', 'name': name, 'dose': dose, 'group': group} for group, name, dose in OPTIONS if q in name.lower() or q in group.lower()][:10]
     if kind != 'clinical' and len(q) >= 2:
         from exercises.models import ExerciseMain
-        for e in ExerciseMain.objects.filter(exercise_name__icontains=q).order_by('exercise_name')[:10]:
+        library = ExerciseMain.objects.filter(exercise_name__icontains=q)
+        if visible is not None:  # only the department's own library
+            library = library.filter(discipline__in=visible)
+        for e in library.order_by('exercise_name')[:10]:
             results.append({'kind': 'exercise', 'name': e.exercise_name, 'dose': e.dose_label, 'group': 'Exercise'})
     return results

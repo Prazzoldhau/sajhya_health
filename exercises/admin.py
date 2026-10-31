@@ -11,8 +11,8 @@ class StepImageInline(admin.TabularInline):
 
 @admin.register(ExerciseMain)
 class ExerciseAdmin(admin.ModelAdmin):
-    list_display = ('exercise_name', 'sub_region_fk', 'exercise_type', 'difficulty_level', 'default_sets', 'default_reps')
-    list_filter = ('sub_region_fk__region_fk', 'sub_region_fk', 'difficulty_level')
+    list_display = ('exercise_name', 'discipline', 'sub_region_fk', 'exercise_type', 'difficulty_level', 'default_sets', 'default_reps')
+    list_filter = ('discipline', 'sub_region_fk__region_fk', 'sub_region_fk', 'difficulty_level')
     search_fields = ('exercise_name', 'exercise_type')
     inlines = [StepImageInline]
 

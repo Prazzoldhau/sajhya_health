@@ -11,10 +11,24 @@ from django.urls import reverse
 from django.utils import timezone
 
 from accounts.access import accessible_patients, own_patient, require_workspace, workspace_context
+from assessments import disciplines
 
 from .models import DifficultyLevel, ExerciseMain, ExerciseStepImage, Prescription, PrescriptionExercise, Region, SubRegion
 
 PAGE_SIZE = 24
+
+
+def _current_discipline(request, profile, remember=True):
+    """The department's library being used: the requested one (kept for the session) when this person may use it, else their own."""
+    requested = request.GET.get('discipline')
+    if remember and requested in disciplines.SPECIFIC:
+        request.session['library_discipline'] = requested
+    return disciplines.chosen(profile, requested or request.session.get('library_discipline'))
+
+
+def _library_filter(profile, current=None):
+    """Which exercises a person may use: their own department's plus the general ones (all their departments when they work across several)."""
+    return disciplines.visible_filter([current] if current else disciplines.allowed(profile))
 
 
 def _exercise_json(e, detail=False):
@@ -40,7 +54,9 @@ def library(request):
     sub_id, region_id = request.GET.get('sub', ''), request.GET.get('region', '')
     q, ex_type, level = request.GET.get('q', '').strip(), request.GET.get('type', ''), request.GET.get('level', '')
 
-    exercises = ExerciseMain.objects.select_related('sub_region_fk__region_fk').prefetch_related(
+    current = _current_discipline(request, profile)
+    visible = _library_filter(profile, current)
+    exercises = ExerciseMain.objects.filter(discipline__in=visible).select_related('sub_region_fk__region_fk').prefetch_related(
         Prefetch('step_images', queryset=ExerciseStepImage.objects.order_by('order')))
     if sub_id.isdigit():
         exercises = exercises.filter(sub_region_fk_id=sub_id)
@@ -57,8 +73,11 @@ def library(request):
     params = request.GET.copy()
     params.pop('page', None)
 
-    regions = list(Region.objects.prefetch_related(
-        Prefetch('subregions', queryset=SubRegion.objects.annotate(n=Count('exercises')).order_by('sub_region_name'))))
+    regions = [r for r in Region.objects.prefetch_related(
+        Prefetch('subregions', queryset=SubRegion.objects.annotate(n=Count('exercises', filter=Q(exercises__discipline__in=visible))).filter(n__gt=0).order_by('sub_region_name')))
+        if r.subregions.all()]  # only the regions that have something in this department's library
+    available = set(ExerciseMain.objects.values_list('discipline', flat=True)) | {'general'}
+    switcher = [(d, disciplines.LABELS[d], d == current) for d in disciplines.allowed(profile) if d in available or d == current] if len(disciplines.allowed(profile)) > 1 else []
 
     patient = prescription = None
     if request.GET.get('patient', '').isdigit():
@@ -69,9 +88,10 @@ def library(request):
 
     context = workspace_context(request.user, profile)
     context.update({
-        'active': 'exercises', 'page_obj': page, 'regions': regions, 'total': ExerciseMain.objects.count(),
+        'active': 'exercises', 'page_obj': page, 'regions': regions, 'total': ExerciseMain.objects.filter(discipline__in=visible).count(),
+        'current': current, 'current_label': disciplines.LABELS[current], 'switcher': switcher,
         'sub': sub_id, 'region': region_id, 'q': q, 'type': ex_type, 'level': level, 'querystring': params.urlencode(),
-        'types': ExerciseMain.objects.order_by('exercise_type').values_list('exercise_type', flat=True).distinct(),
+        'types': ExerciseMain.objects.filter(discipline__in=visible).order_by('exercise_type').values_list('exercise_type', flat=True).distinct(),
         'levels': DifficultyLevel.choices,
         'patient': patient, 'prescription': prescription,
         'patient_json': {'id': patient.pk, 'name': patient.name, 'code': patient.patient_code,
@@ -83,26 +103,26 @@ def library(request):
 
 @login_required
 def exercise_detail(request, pk):
-    require_workspace(request)
-    e = get_object_or_404(ExerciseMain.objects.select_related('sub_region_fk__region_fk'), pk=pk)
+    profile = require_workspace(request)
+    e = get_object_or_404(ExerciseMain.objects.filter(discipline__in=_library_filter(profile)).select_related('sub_region_fk__region_fk'), pk=pk)
     return JsonResponse(_exercise_json(e, detail=True))
 
 
 @login_required
 def exercise_search(request):
     """Type-ahead used by the treatment plan builder's home-exercise rows."""
-    require_workspace(request)
+    profile = require_workspace(request)
     q = request.GET.get('q', '').strip()
     if len(q) < 2:
         return JsonResponse({'results': []})
-    found = ExerciseMain.objects.filter(exercise_name__icontains=q).prefetch_related('step_images').order_by('exercise_name')[:12]
+    found = ExerciseMain.objects.filter(discipline__in=_library_filter(profile, _current_discipline(request, profile, remember=False)), exercise_name__icontains=q).prefetch_related('step_images').order_by('exercise_name')[:12]
     return JsonResponse({'results': [{'id': e.pk, 'name': e.exercise_name, 'dose': e.dose_label, 'cover': e.cover} for e in found]})
 
 
-def _add_exercises(prescription, rows, start_order):
+def _add_exercises(prescription, rows, start_order, visible):
     created = 0
     for offset, row in enumerate(rows):
-        exercise = ExerciseMain.objects.filter(pk=row.get('id')).first()
+        exercise = ExerciseMain.objects.filter(pk=row.get('id'), discipline__in=visible).first()
         if exercise is None:
             continue
 
@@ -139,7 +159,8 @@ def prescribe(request):
     if not rows:
         return JsonResponse({'ok': False, 'error': 'Select at least one exercise.'}, status=400)
 
-    existing = set(ExerciseMain.objects.filter(pk__in=[r.get('id') for r in rows if str(r.get('id', '')).isdigit()]).values_list('pk', flat=True))
+    visible = _library_filter(profile)  # only exercises from the departments this person works in
+    existing = set(ExerciseMain.objects.filter(pk__in=[r.get('id') for r in rows if str(r.get('id', '')).isdigit()], discipline__in=visible).values_list('pk', flat=True))
     rows = [r for r in rows if str(r.get('id', '')).isdigit() and int(r['id']) in existing]
     if not rows:  # checked before anything is created, so a bad request never supersedes the patient's current prescription
         return JsonResponse({'ok': False, 'error': 'None of the selected exercises exist any more.'}, status=400)
@@ -153,7 +174,7 @@ def prescribe(request):
         prescription = Prescription.objects.create(patient=patient, professional=profile,
                                                    condition_label=(data.get('condition_label') or '').strip()[:100])
         start = 0
-    count = _add_exercises(prescription, rows, start)
+    count = _add_exercises(prescription, rows, start, visible)
     messages.success(request, f'Prescribed {count} exercise{"s" if count != 1 else ""} to {patient.name}.')
     return JsonResponse({'ok': True, 'redirect': f"{reverse('accounts:patient-detail', args=[patient.pk])}?tab=exercises"})
 

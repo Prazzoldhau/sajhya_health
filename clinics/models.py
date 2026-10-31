@@ -221,8 +221,16 @@ class ClinicMember(models.Model):
         return f'{self.display_name} ({self.specialty})' if self.specialty else self.display_name
 
     @property
+    def role_label(self):
+        """What this person is: a registered therapist shows their own profession (Occupational therapist, Speech therapist...), staff show their role."""
+        if self.role == self.PHYSIO and self.physio_id:
+            from accounts.access import profession_label
+            return profession_label(self.physio) or self.get_role_display()
+        return self.get_role_display()
+
+    @property
     def choice_label(self):
-        return self.label if self.role == self.CLINICIAN else f'{self.display_name} ({self.get_role_display()})'
+        return self.label if self.role == self.CLINICIAN else f'{self.display_name} ({self.role_label})'
 
     @property
     def books_own_schedule(self):
@@ -234,8 +242,8 @@ class ClinicMember(models.Model):
 
     # what each staff role may do at the front desk (clinical records are never part of it)
     PERMISSIONS = {
-        MANAGER: {'overview', 'patients', 'contact', 'register', 'queue', 'queue_manage', 'billing', 'team', 'schedule', 'appointments'},
-        RECEPTIONIST: {'overview', 'patients', 'contact', 'register', 'queue', 'queue_manage', 'billing', 'schedule', 'appointments'},
+        MANAGER: {'overview', 'patients', 'contact', 'register', 'queue', 'queue_manage', 'billing', 'team', 'schedule', 'appointments', 'assign'},
+        RECEPTIONIST: {'overview', 'patients', 'contact', 'register', 'queue', 'queue_manage', 'billing', 'schedule', 'appointments', 'assign'},
         ASSISTANT: {'patients', 'queue', 'queue_manage', 'record_session', 'schedule'},
         OTHER: {'queue'},
         CLINICIAN: {'patients', 'queue', 'queue_manage', 'record_session', 'schedule'},  # a visiting doctor / therapist who is not on Sajhya

@@ -12,7 +12,7 @@ from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
 from django.utils import timezone
 
-from clinics.access import resolve_clinic
+from clinics.access import resolve_managed_clinic
 from sajhya_health.throttle import too_many
 
 from .access import actor_of, can_see_contact, first_error, own_patient, own_profile, staff_required, workspace_context, workspace_profile
@@ -335,9 +335,9 @@ def patient_add(request):
     if own_clinic is not None:  # signed in as a clinic: every patient is registered under that clinic, and the clinic plan covers them
         clinic_id = own_clinic.pk
     if clinic_id:  # arriving from a clinic page: the clinic is fixed; anything that is not one of my usable clinics is refused
-        clinic = resolve_clinic(profile, clinic_id)
+        clinic = resolve_managed_clinic(profile, clinic_id)
         if clinic is None:
-            messages.error(request, 'That clinic is not available. Patients can only be added inside a clinic that is active and that you belong to.')
+            messages.error(request, 'Patients can only be added to a clinic by its owner or its own login, and only while the clinic is active.')
             return redirect('accounts:patients')
     form = PatientForm(request.POST or None, request.FILES or None)
     from billing.models import PatientAllowance

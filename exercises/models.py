@@ -3,6 +3,8 @@ from urllib.parse import quote
 from django.db import models
 from django.utils import timezone
 
+from assessments.disciplines import DISCIPLINE_CHOICES
+
 
 class Region(models.Model):
     region_name = models.CharField(max_length=100)
@@ -40,6 +42,8 @@ class ExerciseMain(models.Model):
     """The exercise library entry. exercise_type is free text: the imported catalogue uses
     ~60 descriptive types ("Active-Assisted", "Gait Training", ...) rather than a fixed list."""
     sub_region_fk = models.ForeignKey(SubRegion, verbose_name='Sub-region', on_delete=models.CASCADE, related_name='exercises')
+    discipline = models.CharField(max_length=10, choices=DISCIPLINE_CHOICES, default='physio', db_index=True,
+                                  help_text='Which department\'s library this belongs to. Physiotherapists see physiotherapy and general exercises, occupational therapists occupational therapy and general ones, and so on.')
     exercise_name = models.CharField(max_length=100)
     exercise_type = models.CharField(max_length=50, db_index=True)
     difficulty_level = models.IntegerField(choices=DifficultyLevel.choices)

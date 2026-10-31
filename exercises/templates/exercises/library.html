@@ -55,7 +55,7 @@
 {% block main %}
 {% if patient %}<div class="pt-note">Prescribing for <b>{{ patient.name }}</b> ({{ patient.patient_code }}){% if prescription %} — adding to the current prescription{% endif %}. <a href="{% url 'accounts:patient-detail' patient.pk %}?tab=exercises" style="color:inherit">Back to patient</a></div>{% endif %}
 <div class="lib-head">
-  <h1>Exercise Library</h1>
+  <h1>Exercise Library <span class="tag" style="vertical-align:middle">{{ current_label }}</span></h1>
   <form method="get" id="libForm">
     {% if patient %}<input type="hidden" name="patient" value="{{ patient.pk }}">{% endif %}{% if prescription %}<input type="hidden" name="prescription" value="{{ prescription.pk }}">{% endif %}
     {% if sub %}<input type="hidden" name="sub" value="{{ sub }}">{% elif region %}<input type="hidden" name="region" value="{{ region }}">{% endif %}
@@ -66,6 +66,9 @@
   </form>
 </div>
 
+{% if switcher|length > 1 %}
+<div style="display:flex;gap:6px;flex-wrap:wrap;margin:-4px 0 12px">{% for key, label, on in switcher %}<a href="?discipline={{ key }}{% if patient %}&patient={{ patient.pk }}{% endif %}{% if prescription %}&prescription={{ prescription.pk }}{% endif %}" class="pill {% if on %}solid{% endif %}" style="text-decoration:none">{{ label }}</a>{% endfor %}</div>
+{% endif %}
 <div class="lib-layout">
   <aside class="regions">
     <a href="?{% if patient %}patient={{ patient.pk }}{% endif %}" class="{% if not sub and not region %}on{% endif %}">All exercises <small>{{ total }}</small></a>

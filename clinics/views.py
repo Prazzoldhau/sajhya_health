@@ -12,7 +12,7 @@ from django.views.decorators.http import require_GET, require_POST
 from accounts.access import first_error, require_workspace, workspace_context, workspace_profile
 from accounts.models import Patient, ProfessionalProfile, Visit
 
-from .access import clinic_allowance, clinic_for_member, clinic_for_owner
+from .access import clinic_allowance, clinic_for_member, clinic_for_owner, member_patients
 from .forms import ClinicForm, ClinicLoginForm, DepartmentLoginForm, StaffForm, StaffLoginForm
 from .login import close_staff_login, set_clinic_login, set_staff_login
 from .models import Clinic, ClinicMember, ClinicSubscription, QueueEntry
@@ -120,7 +120,8 @@ def _detail_context(request, profile, clinic, is_owner, tab, form=None, login_fo
     context.update({'active': 'clinics', 'clinic': clinic, 'is_owner': is_owner, 'tab': tab, 'usable': clinic.is_usable,
                     'tabs': tabs, 'nav_items': [(key, label, TAB_ICONS[key]) for key, label in tabs], 'switch_clinics': others})
     start, end = _today()
-    todays = clinic.queue_entries.filter(joined_at__gte=start, joined_at__lt=end).select_related('patient', 'patient__professional')
+    scope = clinic.patients.all() if is_owner else member_patients(profile, clinic)  # the owner sees every patient, a team member only theirs
+    todays = clinic.queue_entries.filter(joined_at__gte=start, joined_at__lt=end, patient__in=scope).select_related('patient', 'patient__professional')
     if tab == 'overview':
         month_start = timezone.localdate().replace(day=1)
         visits = (Visit.objects.filter(patient__clinic=clinic, date__gte=month_start)
@@ -130,7 +131,7 @@ def _detail_context(request, profile, clinic, is_owner, tab, form=None, login_fo
         context['usage'] = usage_helpers.summary(clinic)
         context.update({
             'team_count': clinic.members.filter(status=ClinicMember.ACTIVE).count() + 1,
-            'patient_total': clinic.patients.count(), 'month_label': f'{month_start:%B %Y}',
+            'patient_total': scope.count(), 'month_label': f'{month_start:%B %Y}',
             'queue_counts': {s: todays.filter(status=s).count() for s in (QueueEntry.WAITING, QueueEntry.CALLED, QueueEntry.COMPLETED)},
             'activity': [{'name': v['therapist'] or 'Not recorded', 'visits': v['n'], 'patients': v['people']} for v in visits],
             'month_visits': sum(v['n'] for v in visits), 'percent': percent, 'missing': missing, 'module_rows': clinic.module_rows,
@@ -140,10 +141,11 @@ def _detail_context(request, profile, clinic, is_owner, tab, form=None, login_fo
                         'clinic_departments': clinic.calendar_owner.departments.all(),
                         'staff_form': StaffForm(clinic=clinic), 'past': clinic.members.filter(status__in=[ClinicMember.LEFT, ClinicMember.DECLINED]).select_related('physio')})
     elif tab == 'patients':
-        patients = clinic.patients.select_related('professional').order_by('-last_activity', '-id')
+        patients = scope.select_related('professional').prefetch_related('assigned').order_by('-last_activity', '-id')
         if q:
             patients = patients.filter(Q(name__icontains=q) | Q(patient_code__icontains=q))
-        context.update({'patients': patients[:200], 'q': q, 'patient_total': clinic.patients.count()})
+        context.update({'patients': patients[:200], 'q': q, 'patient_total': scope.count(),
+                        'assign_team': clinic.members.filter(status=ClinicMember.ACTIVE, role__in=ClinicMember.BOOKABLE_ROLES).select_related('physio__account__profession')})
     elif tab == 'queue':
         context.update({'entries': todays.exclude(status=QueueEntry.CANCELLED)})
     elif tab == 'settings':
@@ -221,6 +223,19 @@ def member_departments(request, pk, member_id):
     names = ', '.join(d.name for d in chosen)
     messages.success(request, f'{member.display_name} works in {names}.' if names else f'{member.display_name} can be booked into any department.')
     return _back(clinic, 'team')
+
+
+@login_required
+@require_POST
+def patient_assign(request, pk, patient_id):
+    """The owner (or the clinic's own login) chooses which team members a patient is assigned to; only they see the patient."""
+    profile, clinic = clinic_for_owner(request, pk)
+    patient = get_object_or_404(clinic.patients, pk=patient_id)
+    team = clinic.members.filter(status=ClinicMember.ACTIVE, role__in=ClinicMember.BOOKABLE_ROLES, pk__in=[int(i) for i in request.POST.getlist('members') if i.isdigit()])
+    patient.assigned.set(team)
+    names = ', '.join(m.display_name for m in team)
+    messages.success(request, f'{patient.name} is assigned to {names}.' if names else f'{patient.name} is not assigned to anyone.')
+    return _back(clinic, 'patients')
 
 
 def _plan_needed(request, clinic):
@@ -342,9 +357,9 @@ def leave(request, pk):
 @require_GET
 def patient_search(request, pk):
     """Type-ahead for the queue: the clinic's own patients. Names and IDs only - never contact details."""
-    profile, clinic, _ = clinic_for_member(request, pk)
+    profile, clinic, is_owner = clinic_for_member(request, pk)
     q = request.GET.get('q', '').strip()
-    patients = clinic.patients.exclude(status=Patient.DISCHARGED)
+    patients = (clinic.patients.all() if is_owner else member_patients(profile, clinic)).exclude(status=Patient.DISCHARGED)
     if q:
         patients = patients.filter(Q(name__icontains=q) | Q(patient_code__icontains=q))
     return JsonResponse({'results': [{'id': p.pk, 'name': p.name, 'code': p.patient_code, 'phone': '', 'age': p.age, 'gender': p.gender} for p in patients.order_by('name')[:10]]})
@@ -353,10 +368,11 @@ def patient_search(request, pk):
 @login_required
 @require_POST
 def queue_add(request, pk):
-    profile, clinic, _ = clinic_for_member(request, pk)
+    profile, clinic, is_owner = clinic_for_member(request, pk)
     if (blocked := _plan_needed(request, clinic)):
         return blocked
-    patient = clinic.patients.exclude(status=Patient.DISCHARGED).filter(pk=request.POST.get('patient_id') or 0).first()  # the clinic's patients only
+    scope = clinic.patients.all() if is_owner else member_patients(profile, clinic)
+    patient = scope.exclude(status=Patient.DISCHARGED).filter(pk=request.POST.get('patient_id') or 0).first()  # the patients this person may see only
     if patient is None:
         messages.error(request, 'Search and pick one of the clinic\'s patients to add to the queue.')
         return _back(clinic, 'queue')
@@ -372,10 +388,11 @@ def queue_add(request, pk):
 @login_required
 @require_POST
 def queue_action(request, pk, entry_id):
-    profile, clinic, _ = clinic_for_member(request, pk)
+    profile, clinic, is_owner = clinic_for_member(request, pk)
     if (blocked := _plan_needed(request, clinic)):
         return blocked
-    entry = get_object_or_404(QueueEntry, pk=entry_id, clinic=clinic)
+    scope = clinic.patients.all() if is_owner else member_patients(profile, clinic)
+    entry = get_object_or_404(QueueEntry, pk=entry_id, clinic=clinic, patient__in=scope)
     action, now = request.POST.get('action'), timezone.now()
     if action == 'call' and entry.status == QueueEntry.WAITING:
         entry.status, entry.called_at = QueueEntry.CALLED, now

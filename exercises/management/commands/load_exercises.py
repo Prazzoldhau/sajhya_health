@@ -48,7 +48,7 @@ class Command(BaseCommand):
                     defaults={'image_url': s['image_url'], 'label': s['label']})
                 steps += 1
         if options['prune']:
-            stale = ExerciseMain.objects.exclude(pk__in=[e['id'] for e in data['exercises']])
+            stale = ExerciseMain.objects.filter(discipline='physio').exclude(pk__in=[e['id'] for e in data['exercises']])  # the other departments' activities are not in this file
             removed = stale.count()
             stale.delete()
             SubRegion.objects.exclude(pk__in=[x['id'] for x in data['subregions']]).filter(exercises__isnull=True).delete()

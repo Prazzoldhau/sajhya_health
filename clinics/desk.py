@@ -13,7 +13,7 @@ from django.utils import timezone
 from django.views.decorators.http import require_GET, require_POST
 
 from accounts.access import first_error
-from accounts.appointments import PX_PER_MIN, apply_edit, aware, booked_prompt, build_grid, practitioner_options, sync_next_appointment, team_of
+from accounts.appointments import PX_PER_MIN, apply_edit, assign_for_booking, aware, booked_prompt, build_grid, practitioner_options, sync_next_appointment, team_of
 from accounts.forms import DURATION_CHOICES, AppointmentForm, RescheduleForm
 from accounts.models import Appointment, Patient, Visit
 from billing import catalog, exports
@@ -75,7 +75,8 @@ def desk(request, member):
     tab = request.GET.get('tab') if request.GET.get('tab') in dict(tabs) else opens_on
     start, end = _today()
     todays = clinic.queue_entries.filter(joined_at__gte=start, joined_at__lt=end).select_related('patient')
-    context = {'member': member, 'clinic': clinic, 'tabs': tabs, 'tab_keys': [key for key, _ in tabs], 'tab': tab, 'usable': clinic.is_usable,
+    bare = tab == 'schedule' and request.GET.get('bare') == '1'  # the calendar alone, to open in its own browser tab
+    context = {'member': member, 'clinic': clinic, 'tabs': tabs, 'tab_keys': [key for key, _ in tabs], 'tab': tab, 'bare': bare, 'usable': clinic.is_usable,
                'can_contact': member.can('contact'), 'can_manage_queue': member.can('queue_manage') and clinic.is_usable,
                'can_register': member.can('register'), 'can_record': member.can('record_session'),
                'billing_url': reverse('billing:billing') if member.can('billing') and clinic.workspace_id else '?tab=billing'}
@@ -88,10 +89,11 @@ def desk(request, member):
         context['entries'] = todays.exclude(status=QueueEntry.CANCELLED)
     elif tab == 'patients':
         q = request.GET.get('q', '').strip()
-        patients = clinic.patients.order_by('-id')
+        patients = clinic.patients.prefetch_related('assigned').order_by('-id')
         if q:
             patients = patients.filter(Q(name__icontains=q) | Q(patient_code__icontains=q) | (Q(phone__icontains=q) if member.can('contact') else Q(pk__in=[])))
-        context.update({'patients': patients[:200], 'q': q, 'patient_total': clinic.patients.count()})
+        context.update({'patients': patients[:200], 'q': q, 'patient_total': clinic.patients.count(), 'can_assign': member.can('assign') and clinic.is_usable,
+                        'assign_team': clinic.members.filter(status=ClinicMember.ACTIVE, role__in=ClinicMember.BOOKABLE_ROLES).select_related('physio__account__profession')})
     elif tab == 'register':
         context['form'] = FrontDeskPatientForm()
     elif tab == 'billing':
@@ -150,8 +152,9 @@ def _schedule_context(request, member):
         filters['practitioner'] = member
     can_book = member.can('appointments') and clinic.is_usable
     view = request.GET.get('view') if request.GET.get('view') in ('calendar', 'list') else ('calendar' if member.can('appointments') else 'list')
-    days = int(request.GET['days']) if request.GET.get('days') in ('1', '3', '7') else 3
-    keep = (f'&dept={chosen}' if chosen else '') + ('&all=1' if member.books_own_schedule and not mine else '')
+    bare = request.GET.get('bare') == '1'
+    days = int(request.GET['days']) if request.GET.get('days') in ('1', '3', '7') else (7 if bare else 3)  # the stand-alone calendar shows the whole week
+    keep = (f'&dept={chosen}' if chosen else '') + ('&all=1' if member.books_own_schedule and not mine else '') + ('&bare=1' if bare else '')
     calendar = {}
     if view == 'calendar':
         day_list = [day + datetime.timedelta(days=i) for i in range(days)]
@@ -171,8 +174,23 @@ def _schedule_context(request, member):
             'session_types': Visit.SESSION_CHOICES, 'durations': DURATION_CHOICES, 'default_minutes': owner.default_session_minutes}
 
 
-def _appt_back(day, booked=None, kind='booked'):
-    extra = f'&booked={booked}&kind={kind}' if booked else ''
+@desk_view('assign')
+@require_POST
+def patient_assign(request, member, patient_id):
+    """Reception chooses which therapists a patient is assigned to; only they (and the clinic owner) can open the patient's record."""
+    clinic = member.clinic
+    if not _usable(request, member):
+        return _back('patients')
+    patient = get_object_or_404(clinic.patients, pk=patient_id)
+    team = clinic.members.filter(status=ClinicMember.ACTIVE, role__in=ClinicMember.BOOKABLE_ROLES, pk__in=[int(i) for i in request.POST.getlist('members') if i.isdigit()])
+    patient.assigned.set(team)
+    names = ', '.join(m.display_name for m in team)
+    messages.success(request, f'{patient.name} is assigned to {names}.' if names else f'{patient.name} is not assigned to anyone.')
+    return _back('patients')
+
+
+def _appt_back(day, booked=None, kind='booked', bare=False):
+    extra = (f'&booked={booked}&kind={kind}' if booked else '') + ('&view=calendar&days=7&bare=1' if bare else '')
     return redirect(f"{reverse('clinics:desk')}?tab=schedule&date={day}{extra}")
 
 
@@ -187,19 +205,20 @@ def appt_create(request, member):
     """Reception books a clinic patient into the clinic's appointment book (a department and a therapist if wanted)."""
     clinic = member.clinic
     if not _usable(request, member):
-        return _back('schedule')
+        return _appt_back(timezone.localdate(), bare=request.POST.get('bare') == '1')
     owner = clinic.calendar_owner
     form = AppointmentForm(request.POST, profile=owner)
     if not form.is_valid() or form.cleaned_data['patient'].clinic_id != clinic.pk:
         messages.error(request, first_error(form) if form.errors else 'Search and pick one of the clinic\'s patients.')
-        return _back('schedule')
+        return _appt_back(timezone.localdate(), bare=request.POST.get('bare') == '1')
     d = form.cleaned_data
     start = aware(d['date'], d['start_time'])
     appt = Appointment.objects.create(professional=owner, patient=d['patient'], start=start, end=start + datetime.timedelta(minutes=d['duration']),
                                       session_type=d['session_type'], notes=d['notes'], department=d['department'], practitioner=d['practitioner'])
+    assign_for_booking(appt)
     sync_next_appointment(d['patient'])
     messages.success(request, f"Appointment booked for {d['patient'].name}.")
-    return _appt_back(d['date'], appt.pk)
+    return _appt_back(d['date'], appt.pk, bare=request.POST.get('bare') == '1')
 
 
 @desk_view('appointments')
@@ -209,12 +228,12 @@ def appt_edit(request, member, appt_id):
     form = RescheduleForm(request.POST)
     if not form.is_valid():
         messages.error(request, first_error(form))
-        return _appt_back(timezone.localtime(appt.start).date())
+        return _appt_back(timezone.localtime(appt.start).date(), bare=request.POST.get('bare') == '1')
     dropped = apply_edit(member.clinic.calendar_owner, appt, form.cleaned_data)
     if dropped:
         messages.warning(request, f'{dropped} does not work in that department, so the appointment is not booked with anyone yet.')
     messages.success(request, 'Appointment rescheduled.')
-    return _appt_back(form.cleaned_data['date'], appt.pk, 'rescheduled')
+    return _appt_back(form.cleaned_data['date'], appt.pk, 'rescheduled', bare=request.POST.get('bare') == '1')
 
 
 @desk_view('appointments')
@@ -225,7 +244,7 @@ def appt_cancel(request, member, appt_id):
     appt.save(update_fields=['status'])
     sync_next_appointment(appt.patient)
     messages.success(request, 'Appointment cancelled.')
-    return _appt_back(timezone.localtime(appt.start).date(), appt.pk, 'cancelled')
+    return _appt_back(timezone.localtime(appt.start).date(), appt.pk, 'cancelled', bare=request.POST.get('bare') == '1')
 
 
 def billing_owner(clinic):
@@ -274,7 +293,12 @@ def _session_context(request, member):
 def treatment_search(request, member):
     """Type-ahead for the treatment page: the clinical / electrotherapy list, or the exercise library (?kind=exercise)."""
     from accounts.treatments import search_options
-    return JsonResponse({'results': search_options(request.GET.get('q', ''), request.GET.get('kind', ''))})
+    from assessments import disciplines
+    from billing import catalog
+    # the exercise libraries of the departments this person works in (every library when none are set)
+    kinds = {catalog.kind_of(d.name) for d in member.departments.all()} & set(disciplines.SPECIFIC)
+    visible = disciplines.visible_filter(sorted(kinds)) if kinds else None
+    return JsonResponse({'results': search_options(request.GET.get('q', ''), request.GET.get('kind', ''), visible)})
 
 
 @desk_view('record_session')

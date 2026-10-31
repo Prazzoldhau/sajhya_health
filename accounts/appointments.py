@@ -240,7 +240,14 @@ def team_of(profile):
     clinic = getattr(profile, 'clinic_workspace', None)
     if clinic is None:
         return ClinicMember.objects.none()
-    return clinic.members.filter(status=ClinicMember.ACTIVE, role__in=ClinicMember.BOOKABLE_ROLES).select_related('physio')
+    return clinic.members.filter(status=ClinicMember.ACTIVE, role__in=ClinicMember.BOOKABLE_ROLES).select_related('physio__account__profession')
+
+
+def assign_for_booking(appt):
+    """Booking a clinic patient with a team member assigns the patient to them, so they can open the patient's record."""
+    who, patient = appt.practitioner, appt.patient
+    if who is not None and patient is not None and patient.clinic_id and patient.clinic_id == who.clinic_id:
+        patient.assigned.add(who)
 
 
 def practitioner_options(profile):
@@ -266,6 +273,7 @@ def apply_edit(profile, appt, d):
     appt.save()
     if appt.patient:
         sync_next_appointment(appt.patient)
+        assign_for_booking(appt)
     return dropped
 
 
@@ -289,6 +297,7 @@ def appointment_create(request):
     appt = Appointment.objects.create(
         professional=profile, patient=d['patient'], start=start,
         end=start + datetime.timedelta(minutes=d['duration']), session_type=d['session_type'], notes=d['notes'], department=d['department'], practitioner=d['practitioner'])
+    assign_for_booking(appt)
     sync_next_appointment(d['patient'])
     messages.success(request, f"Appointment booked for {d['patient'].name}.")
     return _back(d['date'], days, booked=appt.pk)

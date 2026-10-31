@@ -21,6 +21,23 @@ def clinics_of(profile):
         Q(owner=profile) | Q(workspace=profile) | Q(members__physio=profile, members__status=ClinicMember.ACTIVE)).distinct()
 
 
+def managed_clinics(profile):
+    """Usable clinics this professional runs: the owner, or the clinic's own login. Their team members are not included."""
+    return Clinic.objects.filter(is_active=True).filter(_plan_is_active()).filter(Q(owner=profile) | Q(workspace=profile)).distinct()
+
+
+def resolve_managed_clinic(profile, value):
+    """The clinic a posted id refers to, if this professional runs it. Team members cannot add patients to a clinic."""
+    if not str(value or '').isdigit():
+        return None
+    return managed_clinics(profile).filter(pk=int(value)).first()
+
+
+def member_patients(profile, clinic):
+    """The clinic patients a team member (not the owner) may see: the ones assigned to them, and any they registered themselves."""
+    return clinic.patients.filter(Q(professional=profile) | Q(assigned__physio=profile, assigned__status=ClinicMember.ACTIVE)).distinct()
+
+
 def resolve_clinic(profile, value):
     """The clinic a posted id refers to, if this professional may use it; otherwise None (never trust the posted id)."""
     if not str(value or '').isdigit():

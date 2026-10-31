@@ -290,7 +290,7 @@ class DisciplineSeparationTests(TestCase):
         ClinicSubscription.objects.create(professional=self.ot, status='active')
         child.clinic = clinic
         child.save()
-        ClinicMember.objects.create(clinic=clinic, physio=self.physio, role='physio', status='active')
+        child.assigned.add(ClinicMember.objects.create(clinic=clinic, physio=self.physio, role='physio', status='active'))
         self.login(self.physio_user)
         self.assertEqual(self.client.get(reverse('assessments:clinical-detail', args=[record.pk])).status_code, 404)
         self.assertEqual(self.client.post(reverse('assessments:clinical-delete', args=[record.pk])).status_code, 404)

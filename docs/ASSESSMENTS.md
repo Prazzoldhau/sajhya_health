@@ -117,3 +117,14 @@ once per patient and kept as a **ClinicalRecord** with a copy of the questions i
 - **Adding or changing one:** the questions are data in `assessments/clinical_forms.py` (field types are described at the top of that file).
   `python manage.py migrate` adds new forms; `python manage.py load_clinical_forms` brings a changed form up to date and raises its version.
   Records already filled keep the questions they were filled with.
+
+## The exercise library by department
+
+The exercise library is kept per department, in the same way as assessments. Each exercise has a **Discipline**; a physiotherapist sees physiotherapy
+(and general) exercises, an occupational therapist occupational therapy ones, and so on, in the library, in the exercise search of the plan builder and
+the session form, and when prescribing (the server refuses another department's exercise). The clinic's own login switches between departments with chips
+on the library page. The imported catalogue (790 exercises) is physiotherapy.
+
+Occupational therapy, speech therapy and behaviour therapy each start with a small set of text activities (`exercises/discipline_library.py`, added by
+`migrate` or `python manage.py load_discipline_library`). They are starting points: edit them, or add your own with their pictures or videos, in the admin
+(Exercises, set the Discipline). `load_exercises --prune` never deletes them.

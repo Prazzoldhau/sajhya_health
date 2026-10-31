@@ -180,3 +180,21 @@ The front desk has a sidebar like the main workspace. Receptionists and managers
 - **Staff by department:** under Team, *Departments* on a member's row (or when adding staff) sets the departments they work in. Booking into a department then offers only those people (someone with none set is offered everywhere); the server refuses a mismatch, and moving an appointment to a department the person is not in clears the person with a note.
 - **Services by department:** the price list (Billing, Services & prices) can tag each service with a department, and a department can start from a suggested list (physiotherapy, occupational, speech, behaviour, audiology). The bill form's service picker gets a department filter; services with no department show everywhere. Prices are starting points to edit.
 - **Reception billing:** receptionists and managers use the same billing pages as the clinic itself (daily book, patient bills, payments, corrections, cancel / restore, advances, packages, sheet and Excel export, the invoice as a picture, PDF and link) inside the front-desk layout. Everything is the clinic's own workspace; bills carry the staff member's name and role; only the clinic's own patients can be billed; hard deletes and the price list are the manager's; nothing changes while the plan is inactive. The clinic needs its own login (workspace) for this; without one the simple Billing tab on the desk is used.
+
+### Team members see only their assigned patients
+
+A physiotherapist (or other registered therapist) on a clinic's team sees only the clinic patients **assigned to them**, plus any they registered themselves
+before this rule. The clinic owner and the clinic's own login see every patient. A team member can no longer add patients to a clinic (only the owner and
+the clinic's own login can); they can still keep their own private patients.
+
+- **Assigning:** the owner (clinic page, Patients, *Assign*) and reception or the manager (front desk, Patients, *Assign*) tick the team members for a patient.
+  Booking an appointment *with* someone assigns the patient to them automatically.
+- **What it limits:** the clinic's Patients tab, the queue, the queue search, opening the patient (record, assessments, plans, billing, notes) and prescribing.
+- **Assistants and visiting doctors** work from the front desk and are not limited by this.
+
+### Labels, and the week calendar in its own tab
+
+- A registered therapist is labelled with their own profession in "Book with", the team list and what they stamp on bills (*Occupational therapist*,
+  *Speech therapist*...), not "Physiotherapist" for everyone.
+- On the front desk's calendar, *Open in a new tab* shows just the week's calendar (no header or menu) to keep on a second screen. Booking, changing and
+  cancelling there stay in that tab; *Close this tab* ends it.

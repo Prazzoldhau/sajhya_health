@@ -43,9 +43,11 @@ def require_workspace(request):
 
 
 def accessible_patients(profile):
-    """Patients this professional may open: their own plus those of the clinics they own or work at."""
-    from clinics.access import clinics_of
-    return Patient.objects.filter(Q(professional=profile) | Q(clinic__in=clinics_of(profile))).distinct()
+    """Patients this professional may open: their own, every patient of the clinics they run (owner, or the clinic's own login), and - for a clinic they
+    only work at - just the patients assigned to them."""
+    from clinics.access import clinics_of, managed_clinics
+    return Patient.objects.filter(Q(professional=profile) | Q(clinic__in=managed_clinics(profile))
+                                  | Q(assigned__physio=profile, assigned__status='active', clinic__in=clinics_of(profile))).distinct()
 
 
 def own_patient(request, pk):
@@ -67,6 +69,13 @@ def first_error(form, default='Please check the form.'):
     return default
 
 
+def profession_label(profile):
+    """A professional's own profession as a label (Occupational therapist, Speech therapist...); empty when they have none (a clinic's own login)."""
+    profession = getattr(getattr(profile, 'account', None), 'profession', None)
+    name = (getattr(profession, 'name', '') or '').strip()
+    return name[:1].upper() + name[1:]
+
+
 def actor_of(user, profile=None):
     """(name, role) of whoever is doing the work, to stamp on what they register or bill: a front-desk staff member, a clinic's own
     login, or a physiotherapist."""
@@ -78,7 +87,7 @@ def actor_of(user, profile=None):
     if clinic is not None:
         return clinic.name, 'Clinic login'
     if profile is not None:
-        return profile.full_name, 'Physiotherapist'
+        return profile.full_name, profession_label(profile) or 'Physiotherapist'
     return user.get_username(), ''
 
 

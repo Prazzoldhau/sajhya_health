@@ -233,6 +233,8 @@ class Patient(models.Model):
     activation_expires_at = models.DateTimeField(null=True, blank=True, help_text='When the old patient-app activation ended.')
     enterprise = models.ForeignKey('extras.Enterprise', null=True, blank=True, on_delete=models.SET_NULL, related_name='patients',
                                    help_text='The hospital / enterprise this patient was registered under (optional).')
+    assigned = models.ManyToManyField('clinics.ClinicMember', blank=True, related_name='assigned_patients',
+                                      help_text='Clinic patients only: the team members (therapists, assistants) this patient is assigned to. A therapist on the clinic team sees only the patients assigned to them.')
     registered_by_name = models.CharField(max_length=200, blank=True, help_text='Who entered this patient (the physiotherapist, the clinic login or a staff member).')
     registered_by_role = models.CharField(max_length=40, blank=True)
     last_visit = models.DateField(null=True, blank=True)

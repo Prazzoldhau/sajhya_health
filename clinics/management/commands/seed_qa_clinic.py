@@ -175,6 +175,7 @@ class Command(BaseCommand):
             start = timezone.make_aware(datetime.datetime.combine(today + datetime.timedelta(days=day_offset), datetime.time(hour, minute)))
             Appointment.objects.create(professional=workspace, patient=patients[n % len(patients)], start=start, end=start + datetime.timedelta(minutes=45),
                                        department=departments[department], practitioner=member, session_type='treatment', notes=MARK)
+            patients[n % len(patients)].assigned.add(member)  # booked with them, so assigned to them
             n += 1
 
         for department, team in members.items():

@@ -187,9 +187,12 @@ class TeamTests(Base):
         # a member may not manage the team or edit the clinic
         self.client.post(reverse('clinics:staff-add', args=[self.clinic.pk]), {'name': 'X', 'role': 'receptionist'})
         self.assertEqual(self.client.post(reverse('clinics:update', args=[self.clinic.pk]), {**CLINIC_DATA, 'name': 'Hijack'}).status_code, 404)
-        # a patient the physio registers inside the clinic passes to the clinic when they leave
-        self.client.post(reverse('accounts:patient-add') + f'?clinic={self.clinic.pk}', {**PATIENT, 'clinic': self.clinic.pk})
-        patient = Patient.objects.get(name='Clinic Patient')
+        # a team member cannot add patients to the clinic
+        refused = self.client.post(reverse('accounts:patient-add') + f'?clinic={self.clinic.pk}', {**PATIENT, 'clinic': self.clinic.pk})
+        self.assertRedirects(refused, reverse('accounts:patients'), fetch_redirect_response=False)
+        self.assertFalse(Patient.objects.filter(name='Clinic Patient').exists())
+        # a patient they registered in the clinic earlier passes to the clinic when they leave
+        patient = make_patient(self.physio, 'Clinic Patient', clinic=self.clinic)
         self.assertEqual((patient.professional, patient.clinic), (self.physio, self.clinic))
         self.client.post(reverse('clinics:leave', args=[self.clinic.pk]))
         patient.refresh_from_db()
@@ -243,6 +246,10 @@ class JoinedClinic(Base):
         self.client.post(reverse('accounts:patient-add') + f'?clinic={self.clinic.pk}', {**PATIENT, 'clinic': self.clinic.pk, **extra})
         return Patient.objects.get(name=extra.get('name', PATIENT['name']))
 
+    def assign(self, patient, physio=None):
+        """Assign a clinic patient to a physio on the team (a team member only sees the patients assigned to them)."""
+        patient.assigned.add(ClinicMember.objects.get(clinic=self.clinic, physio=physio or self.physio))
+
 
 class ClinicPatientTests(JoinedClinic):
     def test_the_clinic_is_fixed_text_not_a_dropdown(self):
@@ -268,6 +275,7 @@ class ClinicPatientTests(JoinedClinic):
 
     def test_team_members_can_view_and_treat_clinic_patients(self):
         patient = self.add_patient()  # registered by the owner
+        self.assign(patient)
         self.as_user('physio')
         page = self.client.get(reverse('accounts:patient-detail', args=[patient.pk]))
         self.assertEqual(page.status_code, 200)
@@ -299,6 +307,7 @@ class ClinicPatientTests(JoinedClinic):
 
     def test_physios_never_see_contact_details_of_clinic_patients_but_the_owner_does(self):
         patient = self.add_patient()
+        self.assign(patient)
         owner_page = self.client.get(reverse('accounts:patient-detail', args=[patient.pk]))
         self.assertContains(owner_page, '9841234567')
         self.assertContains(owner_page, 'Secret Street 9')
@@ -316,8 +325,8 @@ class ClinicPatientTests(JoinedClinic):
         self.assertEqual((patient.phone, patient.email, patient.address), ('9841234567', 'cp@example.com', 'Secret Street 9'))
 
     def test_a_physios_own_registrations_in_the_clinic_hide_the_number_from_them_too(self):
+        patient = make_patient(self.physio, 'Registered By Physio', phone='9841234567', email='cp@example.com', address='Secret Street 9', clinic=self.clinic)  # from before members could not add
         self.as_user('physio')
-        patient = self.add_patient(name='Registered By Physio')
         self.assertEqual((patient.professional, patient.clinic), (self.physio, self.clinic))
         for url in (reverse('accounts:patients'), reverse('accounts:patient-detail', args=[patient.pk])):
             self.assertNotContains(self.client.get(url), '9841234567')
@@ -364,6 +373,7 @@ class InvitationChannelTests(JoinedClinic):
 class QueueTests(JoinedClinic):
     def test_queue_lifecycle_with_the_clinics_patients(self):
         patient = self.add_patient()
+        self.assign(patient)
         add = reverse('clinics:queue-add', args=[self.clinic.pk])
         self.client.post(add, {'patient_id': patient.pk})
         self.client.post(add, {'patient_id': patient.pk})  # duplicate ignored
@@ -571,7 +581,7 @@ class ClinicLoginTests(Base):
         clinic = self.make_clinic()
         self.set_login(clinic)
         guest_user, guest = make_professional('guest')
-        ClinicMember.objects.create(clinic=clinic, physio=guest, role=ClinicMember.PHYSIO, status=ClinicMember.ACTIVE)
+        guest_member = ClinicMember.objects.create(clinic=clinic, physio=guest, role=ClinicMember.PHYSIO, status=ClinicMember.ACTIVE)
         self.as_user('himal-desk')
         r = self.client.post(reverse('accounts:patient-add'), {'name': 'Front Desk Patient', 'phone': '9841111111', 'gender': 'F', 'date_of_birth': '1990-01-02'})
         self.assertRedirects(r, reverse('accounts:patients'), fetch_redirect_response=False)  # stays in the clinic's workspace
@@ -579,6 +589,8 @@ class ClinicLoginTests(Base):
         patient = Patient.objects.get(name='Front Desk Patient')
         self.assertEqual((patient.clinic, patient.professional), (clinic, clinic.workspace))
         self.as_user('guest')
+        self.assertEqual(self.client.get(reverse('accounts:patient-detail', args=[patient.pk])).status_code, 404)  # not assigned to them
+        patient.assigned.add(guest_member)
         self.assertEqual(self.client.get(reverse('accounts:patient-detail', args=[patient.pk])).status_code, 200)
 
     def test_only_the_owning_physio_can_change_the_login_and_usernames_are_unique(self):
@@ -1636,3 +1648,199 @@ class ReceptionFullBillingTests(Base):
         clinic.modules = ['appointments']
         clinic.save()
         self.assertEqual(self.client.get(reverse('billing:billing')).status_code, 404)  # Billing is off in the plan
+
+
+class TeamMembersSeeOnlyTheirAssignedPatientsTests(JoinedClinic):
+    """A therapist on a clinic's team sees only the clinic patients assigned to them, and cannot add patients to the clinic."""
+    def setUp(self):
+        super().setUp()
+        self.mine = self.add_patient(name='Assigned Patient')
+        self.other = self.add_patient(name='Not Assigned Patient')
+        self.assign(self.mine)
+        self.member = ClinicMember.objects.get(clinic=self.clinic, physio=self.physio)
+
+    def test_only_assigned_patients_can_be_listed_searched_or_opened(self):
+        self.as_user('physio')
+        tab = self.client.get(reverse('clinics:detail', args=[self.clinic.pk]), {'tab': 'patients'})
+        self.assertEqual([p.name for p in tab.context['patients']], ['Assigned Patient'])
+        self.assertEqual(tab.context['patient_total'], 1)
+        self.assertContains(tab, 'assigned to you')
+        self.assertEqual(self.client.get(reverse('accounts:patient-detail', args=[self.mine.pk])).status_code, 200)
+        self.assertEqual(self.client.get(reverse('accounts:patient-detail', args=[self.other.pk])).status_code, 404)
+        found = self.client.get(reverse('clinics:patient-search', args=[self.clinic.pk]), {'q': 'Patient'}).json()['results']
+        self.assertEqual([r['name'] for r in found], ['Assigned Patient'])
+        self.assertEqual(self.client.get(reverse('assessments:choose', args=[self.other.pk])).status_code, 404)
+        self.assertEqual(self.client.get(reverse('billing:billing'), {'patient': self.other.pk}).status_code, 200)  # no bill of theirs appears, and nothing leaks
+        self.assertNotContains(self.client.get(reverse('accounts:patients')), 'Not Assigned Patient')
+
+    def test_the_owner_still_sees_every_patient(self):
+        self.as_user('owner')
+        tab = self.client.get(reverse('clinics:detail', args=[self.clinic.pk]), {'tab': 'patients'})
+        self.assertEqual(len(tab.context['patients']), 2)
+        self.assertContains(tab, 'Assign')
+        self.assertContains(tab, 'Add patient to')
+        self.assertEqual(self.client.get(reverse('accounts:patient-detail', args=[self.other.pk])).status_code, 200)
+
+    def test_the_queue_shows_and_accepts_only_assigned_patients(self):
+        add = reverse('clinics:queue-add', args=[self.clinic.pk])
+        self.client.post(add, {'patient_id': self.mine.pk})
+        self.client.post(add, {'patient_id': self.other.pk})
+        self.assertEqual(QueueEntry.objects.count(), 2)  # the owner queued both
+        self.as_user('physio')
+        queue = self.client.get(reverse('clinics:detail', args=[self.clinic.pk]), {'tab': 'queue'})
+        self.assertEqual([e.patient.name for e in queue.context['entries']], ['Assigned Patient'])
+        hidden = QueueEntry.objects.get(patient=self.other)
+        self.assertEqual(self.client.post(reverse('clinics:queue-action', args=[self.clinic.pk, hidden.pk]), {'action': 'call'}).status_code, 404)
+        self.client.post(add, {'patient_id': self.other.pk})  # cannot queue a patient that is not theirs
+        self.assertEqual(QueueEntry.objects.filter(added_by=self.physio).count(), 0)
+
+    def test_a_team_member_cannot_add_patients_to_the_clinic(self):
+        self.as_user('physio')
+        tab = self.client.get(reverse('clinics:detail', args=[self.clinic.pk]), {'tab': 'patients'})
+        self.assertNotContains(tab, 'Add patient to')
+        r = self.client.get(reverse('accounts:patient-add'), {'clinic': self.clinic.pk})
+        self.assertRedirects(r, reverse('accounts:patients'), fetch_redirect_response=False)
+        before = Patient.objects.count()
+        self.client.post(reverse('accounts:patient-add') + f'?clinic={self.clinic.pk}', {**PATIENT, 'name': 'Sneaky', 'clinic': self.clinic.pk})
+        self.assertEqual(Patient.objects.count(), before)
+        # their own private patients are unaffected
+        r = self.client.post(reverse('accounts:patient-add'), {**PATIENT, 'name': 'My Own Private'})
+        self.assertTrue(Patient.objects.filter(name='My Own Private', clinic__isnull=True, professional=self.physio).exists())
+
+    def test_the_owner_assigns_and_unassigns(self):
+        url = reverse('clinics:patient-assign', args=[self.clinic.pk, self.other.pk])
+        self.client.post(url, {'members': [self.member.pk, 9999]})
+        self.assertEqual(list(self.other.assigned.all()), [self.member])
+        self.as_user('physio')
+        self.assertEqual(self.client.get(reverse('accounts:patient-detail', args=[self.other.pk])).status_code, 200)
+        self.assertEqual(self.client.post(url, {'members': []}).status_code, 404)  # a team member cannot assign
+        self.as_user('owner')
+        self.client.post(url, {'members': []})
+        self.assertEqual(self.other.assigned.count(), 0)
+        self.as_user('physio')
+        self.assertEqual(self.client.get(reverse('accounts:patient-detail', args=[self.other.pk])).status_code, 404)
+
+    def test_leaving_the_team_ends_the_access(self):
+        self.as_user('physio')
+        self.client.post(reverse('clinics:leave', args=[self.clinic.pk]))
+        self.assertEqual(self.client.get(reverse('accounts:patient-detail', args=[self.mine.pk])).status_code, 404)
+
+
+class DeskAndBookingAssignPatientsTests(Base):
+    CREDS = StaffLoginTests.CREDS
+    add_staff = StaffLoginTests.add_staff
+    setup_desk = FrontDeskRegisteredByAndBillingTests.setup_desk
+    prepare = SchedulesTests.prepare
+
+    def test_reception_assigns_a_patient_to_a_therapist(self):
+        clinic = self.prepare()
+        self.a.clinic, self.a.professional = clinic, self.workspace
+        self.a.save()
+        self.as_user('ram-desk')
+        page = self.client.get(reverse('clinics:desk'), {'tab': 'patients'})
+        self.assertContains(page, 'data-assign')
+        url = reverse('clinics:desk-patient-assign', args=[self.a.pk])
+        self.client.post(url, {'members': [self.member.pk]})
+        self.assertEqual(list(self.a.assigned.all()), [self.member])
+        self.client.force_login(self.physio_user)
+        self.assertEqual(self.client.get(reverse('accounts:patient-detail', args=[self.a.pk])).status_code, 200)
+        self.as_user('asha')  # an assistant cannot assign
+        self.assertEqual(self.client.post(url, {'members': []}).status_code, 404)
+        self.assertEqual(self.a.assigned.count(), 1)
+
+    def test_booking_with_a_therapist_assigns_the_patient_to_them(self):
+        from accounts.models import Appointment
+        clinic = self.prepare()
+        self.c.clinic, self.c.professional = clinic, self.workspace
+        self.c.save()
+        self.assertEqual(self.c.assigned.count(), 0)
+        self.as_user('ram-desk')
+        booking = {'patient': self.c.pk, 'date': timezone.localdate().isoformat(), 'start_time': '09:30', 'duration': 30, 'session_type': 'treatment', 'department': self.pt.pk, 'practitioner': self.member.pk, 'notes': 'x'}
+        self.client.post(reverse('clinics:desk-appt-create'), booking)
+        self.assertEqual(set(self.c.assigned.all()), {self.member})
+        self.client.force_login(self.physio_user)
+        self.assertEqual(self.client.get(reverse('accounts:patient-detail', args=[self.c.pk])).status_code, 200)
+        # moving an appointment to another person assigns the patient to them too
+        appt = Appointment.objects.get(notes='x')
+        self.as_user('himal-clinic')
+        self.client.post(reverse('accounts:appointment-edit', args=[appt.pk]), {'date': timezone.localdate().isoformat(), 'start_time': '10:00', 'end_time': '10:30', 'department': '', 'practitioner': self.asha.pk, 'session_type': 'treatment', 'notes': ''})
+        appt.refresh_from_db()
+        self.assertEqual(appt.practitioner, self.asha)
+        self.assertEqual(set(self.c.assigned.all()), {self.member, self.asha})
+
+
+class TherapistLabelsAndWeekCalendarTests(Base):
+    CREDS = StaffLoginTests.CREDS
+    add_staff = StaffLoginTests.add_staff
+    setup_desk = FrontDeskRegisteredByAndBillingTests.setup_desk
+    prepare = SchedulesTests.prepare
+
+    def make_therapist(self, clinic, username, profession, **names):
+        from accounts.models import Account, Profession
+        user, profile = make_professional(username, **names)
+        Account.objects.filter(pk=profile.account_id).update(profession=Profession.objects.get_or_create(name=profession)[0])
+        member = ClinicMember.objects.create(clinic=clinic, physio=profile, role='physio', status='active')
+        return ClinicMember.objects.get(pk=member.pk)  # read back, so it sees the profession set above
+
+    def test_each_person_is_labelled_with_their_own_profession_not_physiotherapist(self):
+        clinic = self.prepare()
+        ot = self.make_therapist(clinic, 'ot-one', 'occupational therapist', first_name='Oma', last_name='Rai')
+        slp = self.make_therapist(clinic, 'slp-one', 'speech therapist', first_name='Sita', last_name='Rai')
+        self.assertEqual((self.member.role_label, ot.role_label, slp.role_label), ('Physiotherapist', 'Occupational therapist', 'Speech therapist'))
+        self.assertEqual(ot.choice_label, 'Oma Rai (Occupational therapist)')
+        self.assertEqual(self.asha.choice_label, 'Asha (Therapy assistant)')
+        self.as_user('himal-clinic')
+        page = self.client.get(reverse('accounts:appointments'))
+        self.assertContains(page, 'Oma Rai (Occupational therapist)')
+        self.assertContains(page, 'Sita Rai (Speech therapist)')
+        self.assertNotContains(page, 'Oma Rai (Physiotherapist)')
+        self.as_user('ram-desk')
+        desk = self.client.get(reverse('clinics:desk'), {'tab': 'schedule'})
+        self.assertContains(desk, 'Oma Rai (Occupational therapist)')
+        self.as_user('owner')
+        self.assertContains(self.client.get(reverse('clinics:detail', args=[clinic.pk]), {'tab': 'team'}), 'Occupational therapist')
+        from accounts.access import actor_of
+        _, role = actor_of(ot.physio.account.user, ot.physio)
+        self.assertEqual(role, 'Occupational therapist')  # what a bill or a registration records
+
+    def test_the_week_calendar_opens_alone_without_the_workspace(self):
+        self.prepare()
+        self.as_user('ram-desk')
+        normal = self.client.get(reverse('clinics:desk'), {'tab': 'schedule'})
+        self.assertContains(normal, 'Open in a new tab')
+        self.assertContains(normal, 'Front desk')  # the sidebar and header
+        bare = self.client.get(reverse('clinics:desk'), {'tab': 'schedule', 'view': 'calendar', 'bare': 1})
+        self.assertEqual(bare.status_code, 200)
+        self.assertEqual(bare.context['days'], 7)  # the whole week
+        self.assertEqual(len(bare.context['columns']), 7)
+        self.assertTrue(bare.context['bare'])
+        self.assertNotContains(bare, '<header>')
+        self.assertNotContains(bare, '<nav>')
+        self.assertContains(bare, 'class="bare"')
+        self.assertContains(bare, 'Close this tab')
+        self.assertContains(bare, 'name="bare" value="1"')  # booking and changing stay in this tab
+        self.assertContains(bare, 'bare=1')
+        self.assertNotContains(bare, 'class="seg"')
+
+    def test_booking_from_the_week_calendar_returns_to_it(self):
+        from accounts.models import Appointment
+        clinic = self.prepare()
+        self.c.clinic, self.c.professional = clinic, self.workspace
+        self.c.save()
+        self.as_user('ram-desk')
+        booking = {'patient': self.c.pk, 'date': timezone.localdate().isoformat(), 'start_time': '16:00', 'duration': 30, 'session_type': 'treatment', 'department': self.ot.pk,
+                   'practitioner': self.asha.pk, 'notes': 'bare', 'bare': '1'}
+        r = self.client.post(reverse('clinics:desk-appt-create'), booking)
+        appt = Appointment.objects.get(notes='bare')
+        self.assertIn('bare=1', r['Location'])
+        self.assertIn('days=7', r['Location'])
+        r = self.client.post(reverse('clinics:desk-appt-cancel', args=[appt.pk]), {'bare': '1'})
+        self.assertIn('bare=1', r['Location'])
+        plain = self.client.post(reverse('clinics:desk-appt-create'), {**booking, 'bare': '', 'notes': 'plain'})
+        self.assertNotIn('bare=1', plain['Location'])
+
+    def test_every_role_that_has_the_schedule_can_open_it_alone(self):
+        self.prepare()
+        for who in ('ram-desk', 'mani', 'asha'):
+            self.as_user(who)
+            self.assertEqual(self.client.get(reverse('clinics:desk'), {'tab': 'schedule', 'bare': 1}).status_code, 200, who)

@@ -65,18 +65,20 @@
   .ev.attended { opacity: .6; }
   .ev.dept-0 { border-left: 5px solid #168653; } .ev.dept-1 { border-left: 5px solid #3d6fb0; } .ev.dept-2 { border-left: 5px solid #c0762b; }
   .ev.dept-3 { border-left: 5px solid #8a4fb0; } .ev.dept-4 { border-left: 5px solid #c0455f; } .ev.dept-5 { border-left: 5px solid #5d7568; }
+  .bare .shell { display: block; } .bare main { margin: 0; border: 0; border-radius: 0; padding: 10px 14px; min-height: 0; }
+  .bare .cal-scroll { max-height: calc(100vh - 92px); } .bare .msg { margin: 8px 14px 0; } .bare .paused { margin-bottom: 8px; }
   .paused { background: #fff3d6; border: 1px solid #ecd9a0; color: #7a5a0c; padding: 10px 14px; border-radius: 8px; margin-bottom: 14px; }
 </style>
 <script src="{% static 'js/sajhya-ui.js' %}"></script>
 </head>
-<body>
-<header>
+<body class="{% if bare %}bare{% endif %}">
+{% if not bare %}<header>
   <img src="{% static 'images/logo-128.png' %}" alt="Sajhya Health">
   <div><h1>{{ clinic.name }}</h1><div class="sub">Front desk · {{ user.get_username }} · {{ member.name }} ({{ member.get_role_display }})</div></div>
   <form method="post" action="{% url 'accounts:logout' %}">{% csrf_token %}<button class="out" type="submit">Log out</button></form>
-</header>
+</header>{% endif %}
 <div class="shell">
-<nav><div class="label">Front desk</div>{% for key, label in tabs %}<a href="{% if key == 'billing' %}{{ billing_url }}{% else %}?tab={{ key }}{% endif %}" class="{% if key == tab %}on{% endif %}"><i>{% if key == 'overview' %}⌂{% elif key == 'schedule' %}▦{% elif key == 'queue' %}☰{% elif key == 'patients' %}♙{% elif key == 'register' %}＋{% elif key == 'session' %}✚{% elif key == 'billing' %}▣{% else %}◈{% endif %}</i>{{ label }}</a>{% endfor %}</nav>
+{% if not bare %}<nav><div class="label">Front desk</div>{% for key, label in tabs %}<a href="{% if key == 'billing' %}{{ billing_url }}{% else %}?tab={{ key }}{% endif %}" class="{% if key == tab %}on{% endif %}"><i>{% if key == 'overview' %}⌂{% elif key == 'schedule' %}▦{% elif key == 'queue' %}☰{% elif key == 'patients' %}♙{% elif key == 'register' %}＋{% elif key == 'session' %}✚{% elif key == 'billing' %}▣{% else %}◈{% endif %}</i>{{ label }}</a>{% endfor %}</nav>{% endif %}
 <div class="content">
 {% for m in messages %}<div class="msg {{ m.tags }}">{{ m }}</div>{% endfor %}
 <main>
@@ -95,6 +97,7 @@
   </div>
   <div style="display:flex;gap:8px;flex-wrap:wrap;margin:16px 0">
     {% if can_book %}<a class="primary-btn" href="?tab=schedule&book=1" style="text-decoration:none">＋ Book an appointment</a>{% endif %}
+    {% if 'schedule' in tab_keys %}<a class="secondary-btn" href="?tab=schedule&view=calendar&days=7&bare=1" target="_blank" rel="noopener" style="text-decoration:none">⤢ Week calendar in a new tab</a>{% endif %}
     {% if can_register %}<a class="secondary-btn" href="?tab=register" style="text-decoration:none">＋ Register a patient</a>{% endif %}
     {% if can_manage_queue %}<a class="secondary-btn" href="?tab=queue" style="text-decoration:none">＋ Add to queue</a>{% endif %}
     {% if billed_today != None %}<a class="secondary-btn" href="{{ billing_url }}{% if billing_url != '?tab=billing' %}?new=1{% endif %}" style="text-decoration:none">＋ New bill</a>{% endif %}
@@ -152,7 +155,7 @@
   <div class="bar">
     <a class="secondary-btn" href="?tab=schedule&view={{ view }}&days={{ days }}&date={% if view == 'calendar' %}{{ prev_start|date:'Y-m-d' }}{% else %}{{ prev_day|date:'Y-m-d' }}{% endif %}{{ keep }}" style="text-decoration:none">&lsaquo;</a>
     <form method="get" style="margin:0;display:flex;gap:8px;flex-wrap:wrap">
-      <input type="hidden" name="tab" value="schedule"><input type="hidden" name="view" value="{{ view }}">{% if view == 'calendar' %}
+      <input type="hidden" name="tab" value="schedule"><input type="hidden" name="view" value="{{ view }}">{% if bare %}<input type="hidden" name="bare" value="1">{% endif %}{% if view == 'calendar' %}
       <select name="days" onchange="this.form.submit()" aria-label="Days shown"><option value="1" {% if days == 1 %}selected{% endif %}>1 day</option><option value="3" {% if days == 3 %}selected{% endif %}>3 days</option><option value="7" {% if days == 7 %}selected{% endif %}>7 days</option></select>{% endif %}
       <input type="date" name="date" value="{{ day|date:'Y-m-d' }}" onchange="this.form.submit()">
       {% if departments %}<select name="dept" onchange="this.form.submit()"><option value="">All departments</option>{% for d in departments %}<option value="{{ d.pk }}" {% if dept == d.pk|stringformat:'s' %}selected{% endif %}>{{ d.name }}</option>{% endfor %}</select>{% endif %}
@@ -160,9 +163,13 @@
     </form>
     <a class="secondary-btn" href="?tab=schedule&view={{ view }}&days={{ days }}&date={% if view == 'calendar' %}{{ next_start|date:'Y-m-d' }}{% else %}{{ next_day|date:'Y-m-d' }}{% endif %}{{ keep }}" style="text-decoration:none">&rsaquo;</a>
     <a class="secondary-btn" href="?tab=schedule&view={{ view }}&days={{ days }}{{ keep }}" style="text-decoration:none">Today</a>
-    <span class="seg"><a href="?tab=schedule&view=calendar&days={{ days }}&date={{ day|date:'Y-m-d' }}{{ keep }}" class="{% if view == 'calendar' %}on{% endif %}">Calendar</a><a href="?tab=schedule&view=list&date={{ day|date:'Y-m-d' }}{{ keep }}" class="{% if view == 'list' %}on{% endif %}">List</a></span>
+    {% if not bare %}<span class="seg"><a href="?tab=schedule&view=calendar&days={{ days }}&date={{ day|date:'Y-m-d' }}{{ keep }}" class="{% if view == 'calendar' %}on{% endif %}">Calendar</a><a href="?tab=schedule&view=list&date={{ day|date:'Y-m-d' }}{{ keep }}" class="{% if view == 'list' %}on{% endif %}">List</a></span>{% endif %}
     {% if member.books_own_schedule %}{% if mine %}<a class="secondary-btn" href="?tab=schedule&view={{ view }}&days={{ days }}&date={{ day|date:'Y-m-d' }}&all=1{% if dept %}&dept={{ dept }}{% endif %}" style="text-decoration:none">Show everyone</a>{% else %}<a class="secondary-btn" href="?tab=schedule&view={{ view }}&days={{ days }}&date={{ day|date:'Y-m-d' }}{% if dept %}&dept={{ dept }}{% endif %}" style="text-decoration:none">Only mine</a>{% endif %}{% endif %}
-    {% if can_book %}<button type="button" class="primary-btn" data-open="bookModal" style="margin-left:auto">＋ Book an appointment</button>{% endif %}
+    <span style="margin-left:auto;display:flex;gap:8px;flex-wrap:wrap">
+      {% if bare %}<a class="secondary-btn" href="?tab=schedule&view=calendar&days={{ days }}&date={{ day|date:'Y-m-d' }}" style="text-decoration:none">Back to the front desk</a><button type="button" class="secondary-btn" onclick="window.close()">Close this tab</button>
+      {% elif view == 'calendar' %}<a class="secondary-btn" href="?tab=schedule&view=calendar&days=7&bare=1&date={{ day|date:'Y-m-d' }}{{ keep }}" target="_blank" rel="noopener" title="Open the calendar alone in a new browser tab, to keep it on a second screen">⤢ Open in a new tab</a>{% endif %}
+      {% if can_book %}<button type="button" class="primary-btn" data-open="bookModal">＋ Book an appointment</button>{% endif %}
+    </span>
   </div>
   <p class="hint" style="margin-top:0">{% if view == 'calendar' %}{{ range_label }}. {% endif %}{% if own_department %}Appointments in <b>{{ own_department.name }}</b>{% elif mine %}Appointments booked with you{% else %}All appointments{% endif %}{% if view == 'list' %} on {{ day|date:"l, j M Y" }}{% endif %}.{% if view == 'calendar' and can_book %} Click an empty time to book, or an appointment to change it.{% endif %}</p>
 
@@ -195,14 +202,14 @@
     <td>{{ a.get_status_display }}</td>
     {% if can_book %}<td>{% if a.status == 'scheduled' %}
       <details><summary class="secondary-btn" style="display:inline-block;list-style:none;cursor:pointer">Change</summary>
-        <form method="post" action="{% url 'clinics:desk-appt-edit' a.pk %}" class="form" style="min-width:300px;margin-top:8px">{% csrf_token %}
+        <form method="post" action="{% url 'clinics:desk-appt-edit' a.pk %}" class="form" style="min-width:300px;margin-top:8px">{% csrf_token %}{% if bare %}<input type="hidden" name="bare" value="1">{% endif %}
           <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px"><label>Date<input type="date" name="date" value="{{ a.start|date:'Y-m-d' }}" required></label><label>Start<input type="time" name="start_time" value="{{ a.start|time:'H:i' }}" required></label><label>End<input type="time" name="end_time" value="{{ a.end|time:'H:i' }}" required></label></div>
           <input type="hidden" name="session_type" value="{{ a.session_type }}"><input type="hidden" name="notes" value="{{ a.notes }}">
           <label>Department<select name="department"><option value="">No department</option>{% for d in book_departments %}<option value="{{ d.pk }}" {% if d.pk == a.department_id %}selected{% endif %}>{{ d.name }}</option>{% endfor %}</select></label>
           <label>Book with<select name="practitioner"><option value="">Anyone / not set</option>{% for pk, name, depts in book_team %}<option value="{{ pk }}" data-depts="{{ depts }}" {% if pk == a.practitioner_id %}selected{% endif %}>{{ name }}</option>{% endfor %}</select></label>
           <button class="primary-btn" type="submit" style="width:fit-content">Save changes</button>
         </form>
-        <form method="post" action="{% url 'clinics:desk-appt-cancel' a.pk %}" onsubmit="return confirm('Cancel this appointment?')" style="margin-top:6px">{% csrf_token %}<button class="secondary-btn" type="submit">Cancel appointment</button></form>
+        <form method="post" action="{% url 'clinics:desk-appt-cancel' a.pk %}" onsubmit="return confirm('Cancel this appointment?')" style="margin-top:6px">{% csrf_token %}{% if bare %}<input type="hidden" name="bare" value="1">{% endif %}<button class="secondary-btn" type="submit">Cancel appointment</button></form>
       </details>{% endif %}</td>{% endif %}
   </tr>{% empty %}<tr><td colspan="6" class="hint">No appointments on this day.</td></tr>{% endfor %}
   </tbody></table>
@@ -211,7 +218,7 @@
   {% if can_book %}
   <div class="modal" id="bookModal" role="dialog" aria-modal="true"><div class="modal-card">
     <div class="modal-head"><h2>Book an appointment</h2><button type="button" class="modal-x" data-close aria-label="Close">×</button></div>
-    <form method="post" action="{% url 'clinics:desk-appt-create' %}" class="form" style="max-width:none">{% csrf_token %}
+    <form method="post" action="{% url 'clinics:desk-appt-create' %}" class="form" style="max-width:none">{% csrf_token %}{% if bare %}<input type="hidden" name="bare" value="1">{% endif %}
       <label>Patient<span class="search"><input type="text" id="apptSearch" placeholder="Search the clinic's patients by name or ID..." autocomplete="off"></span></label>
       <input type="hidden" name="patient" id="apptPatient"><span class="hint" id="apptChosen"></span>
       <div class="grid3">
@@ -236,7 +243,7 @@
       <select id="dKind" style="height:34px;border:1px solid var(--line);border-radius:8px"><option value="booked">Confirmation</option><option value="reminder">Reminder</option><option value="rescheduled">Rescheduled</option></select>
       <span id="dChannels" style="display:inline-flex;gap:6px;flex-wrap:wrap"></span></div>
     <div id="dEdit">
-      <form method="post" id="editForm" class="form" style="max-width:none" data-url="{% url 'clinics:desk-appt-edit' 0 %}">{% csrf_token %}
+      <form method="post" id="editForm" class="form" style="max-width:none" data-url="{% url 'clinics:desk-appt-edit' 0 %}">{% csrf_token %}{% if bare %}<input type="hidden" name="bare" value="1">{% endif %}
         <div class="grid3"><label>Date<input type="date" name="date" id="ed_date" required></label><label>Start<input type="time" name="start_time" id="ed_start" required></label><label>End<input type="time" name="end_time" id="ed_end" required></label></div>
         <input type="hidden" name="session_type" id="ed_session"><input type="hidden" name="notes" id="ed_notes">
         <div class="grid3" style="grid-template-columns:1fr 1fr">
@@ -245,7 +252,7 @@
         </div>
         <button class="primary-btn" type="submit" style="width:fit-content">Save changes</button>
       </form>
-      <form method="post" id="cancelForm" data-url="{% url 'clinics:desk-appt-cancel' 0 %}" onsubmit="return confirm('Cancel this appointment?')" style="margin-top:8px">{% csrf_token %}<button class="secondary-btn" type="submit">Cancel appointment</button></form>
+      <form method="post" id="cancelForm" data-url="{% url 'clinics:desk-appt-cancel' 0 %}" onsubmit="return confirm('Cancel this appointment?')" style="margin-top:8px">{% csrf_token %}{% if bare %}<input type="hidden" name="bare" value="1">{% endif %}<button class="secondary-btn" type="submit">Cancel appointment</button></form>
     </div>
   </div></div>
   {% endif %}
@@ -320,9 +327,37 @@
   <form method="get" style="display:flex;gap:8px;margin-bottom:14px"><input type="hidden" name="tab" value="patients">
     <input type="search" name="q" value="{{ q }}" placeholder="Search name{% if can_contact %}, phone{% endif %} or ID" style="height:38px;border:1px solid var(--line);border-radius:8px;padding:0 10px;min-width:260px">
     <button class="secondary-btn" type="submit">Search</button><span class="hint" style="align-self:center">{{ patient_total }} patients at this clinic.</span></form>
-  <table><thead><tr><th>PATIENT</th><th>ID</th>{% if can_contact %}<th>PHONE</th>{% endif %}<th>REGISTERED BY</th><th>STATUS</th></tr></thead><tbody>
-  {% for p in patients %}<tr><td><b>{{ p.name }}</b>{% if p.age_label %}<div class="hint">{{ p.age_label }}</div>{% endif %}</td><td>{{ p.patient_code }}</td>{% if can_contact %}<td>{{ p.phone }}</td>{% endif %}<td>{{ p.registered_by_label }}<div class="hint">{{ p.created_at|date:"M j" }}</div></td><td>{{ p.get_status_display }}</td></tr>
-  {% empty %}<tr><td colspan="5" class="hint">No patients found.</td></tr>{% endfor %}</tbody></table>
+  <table><thead><tr><th>PATIENT</th><th>ID</th>{% if can_contact %}<th>PHONE</th>{% endif %}<th>REGISTERED BY</th><th>STATUS</th><th>ASSIGNED TO</th></tr></thead><tbody>
+  {% for p in patients %}<tr><td><b>{{ p.name }}</b>{% if p.age_label %}<div class="hint">{{ p.age_label }}</div>{% endif %}</td><td>{{ p.patient_code }}</td>{% if can_contact %}<td>{{ p.phone }}</td>{% endif %}<td>{{ p.registered_by_label }}<div class="hint">{{ p.created_at|date:"M j" }}</div></td><td>{{ p.get_status_display }}</td>
+    <td>{% for m in p.assigned.all %}{{ m.display_name }}{% if not forloop.last %}, {% endif %}{% empty %}<span class="hint">Nobody yet</span>{% endfor %}
+      {% if can_assign %}<button type="button" class="secondary-btn" data-assign="{{ p.pk }}" data-name="{{ p.name }}" data-selected="{% for m in p.assigned.all %}{{ m.pk }}{% if not forloop.last %},{% endif %}{% endfor %}" style="padding:4px 10px">Assign</button>{% endif %}</td></tr>
+  {% empty %}<tr><td colspan="6" class="hint">No patients found.</td></tr>{% endfor %}</tbody></table>
+  {% if can_assign %}
+  <div class="modal" id="assignModal" role="dialog" aria-modal="true"><div class="modal-card">
+    <div class="modal-head"><h2 id="asTitle">Assign patient</h2><button type="button" class="modal-x" data-close aria-label="Close">×</button></div>
+    <form method="post" id="assignForm" class="form" style="max-width:none" data-url="{% url 'clinics:desk-patient-assign' 0 %}">{% csrf_token %}
+      <p class="hint" style="margin:0">Only the people ticked here (and the clinic owner) can open this patient's record. Booking an appointment with someone assigns the patient to them automatically.</p>
+      {% for m in assign_team %}<label style="display:flex;gap:8px;align-items:center;font-weight:600;color:var(--ink)"><input type="checkbox" name="members" value="{{ m.pk }}" style="width:auto"> {{ m.choice_label }}</label>
+      {% empty %}<p class="hint">No therapists on the team yet.</p>{% endfor %}
+      <button class="primary-btn" type="submit" style="width:fit-content">Save</button>
+    </form>
+  </div></div>
+  <script>
+  (function () {
+    var modal = document.getElementById('assignModal');
+    modal.addEventListener('click', function (e) { if (e.target === modal || e.target.closest('[data-close]')) modal.classList.remove('open'); });
+    document.querySelectorAll('[data-assign]').forEach(function (b) {
+      b.addEventListener('click', function () {
+        var f = document.getElementById('assignForm'), picked = (b.dataset.selected || '').split(',');
+        f.action = f.dataset.url.replace('/0/', '/' + b.dataset.assign + '/');
+        document.getElementById('asTitle').textContent = 'Assign ' + b.dataset.name;
+        f.querySelectorAll('input[type=checkbox]').forEach(function (c) { c.checked = picked.indexOf(c.value) > -1; });
+        modal.classList.add('open');
+      });
+    });
+  })();
+  </script>
+  {% endif %}
   <p class="hint">Clinical records are only visible to the clinic's physiotherapists.</p>
 
 {% elif tab == 'register' %}
@@ -474,7 +509,7 @@
 {% elif tab == 'team' %}
   <table><thead><tr><th>NAME</th><th>ROLE</th></tr></thead><tbody>
     <tr><td><b>{{ clinic.owner.full_name }}</b></td><td>Owner / physiotherapist</td></tr>
-    {% for m in members %}<tr><td><b>{{ m.display_name }}</b></td><td>{{ m.get_role_display }}</td></tr>{% endfor %}
+    {% for m in members %}<tr><td><b>{{ m.display_name }}</b></td><td>{{ m.role_label }}</td></tr>{% endfor %}
   </tbody></table>
 {% endif %}
 </main>

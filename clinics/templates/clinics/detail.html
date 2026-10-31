@@ -108,7 +108,7 @@
         {% for m in members %}
         <tr>
           <td><b>{{ m.display_name }}</b>{% if m.physio %}<div class="hint">{{ m.physio.title }} · verified</div>{% endif %}</td>
-          <td>{{ m.get_role_display }}{% if m.specialty %} <span class="hint">({{ m.specialty }})</span>{% endif %}{% if m.department %}<div class="hint">{{ m.department.name }}</div>{% endif %}{% for d in m.departments.all %}{% if forloop.first %}<div class="hint">{% endif %}{{ d.name }}{% if not forloop.last %}, {% else %}</div>{% endif %}{% endfor %}</td>
+          <td>{{ m.role_label }}{% if m.specialty %} <span class="hint">({{ m.specialty }})</span>{% endif %}{% if m.department %}<div class="hint">{{ m.department.name }}</div>{% endif %}{% for d in m.departments.all %}{% if forloop.first %}<div class="hint">{% endif %}{{ d.name }}{% if not forloop.last %}, {% else %}</div>{% endif %}{% endfor %}</td>
           <td>{% if m.status == 'invited' %}<span class="tone warn">Invitation sent</span>{% else %}<span class="tone good">Active</span>{% endif %}</td>
           <td>{% if m.physio %}{{ m.physio.mobile }}{% else %}{{ m.phone }}{% if m.email %}<div class="hint">{{ m.email }}</div>{% endif %}{% endif %}</td>
           <td>{% if clinic.owner_id == profile.pk and not m.physio_id %}<button type="button" class="text-link" data-staff-login="{{ m.pk }}" data-name="{{ m.name }}" data-username="{{ m.user.username }}" data-role="{{ m.get_role_display }}">{% if m.user_id %}🔑 Login: {{ m.user.username }}{% else %}🔑 Give a login{% endif %}</button>{% endif %}
@@ -236,16 +236,41 @@
 {% elif tab == 'patients' %}
   <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px;flex-wrap:wrap">
     <form method="get" style="display:flex;gap:8px"><input type="hidden" name="tab" value="patients"><input type="search" name="q" value="{{ q }}" placeholder="Search name or ID..." style="height:36px;border:1px solid var(--line);border-radius:8px;padding:0 10px"><button class="secondary-btn" type="submit">Search</button></form>
-    <span class="hint">{{ patient_total }} patient{{ patient_total|pluralize }} at this clinic. {% if not is_owner %}Contact details are visible to the clinic owner only.{% endif %}</span>
-    <a class="primary-btn" href="{% url 'accounts:patient-add' %}?clinic={{ clinic.pk }}" style="margin-left:auto;text-decoration:none;display:inline-flex;align-items:center">＋ Add patient to {{ clinic.name }}</a>
+    <span class="hint">{% if is_owner %}{{ patient_total }} patient{{ patient_total|pluralize }} at this clinic.{% else %}{{ patient_total }} patient{{ patient_total|pluralize }} assigned to you. The clinic assigns patients to its team; contact details stay with the clinic owner.{% endif %}</span>
+    {% if is_owner %}<a class="primary-btn" href="{% url 'accounts:patient-add' %}?clinic={{ clinic.pk }}" style="margin-left:auto;text-decoration:none;display:inline-flex;align-items:center">＋ Add patient to {{ clinic.name }}</a>{% endif %}
   </div>
   <section class="panel"><div class="table-wrap"><table class="cl-table">
-    <thead><tr><th>PATIENT</th><th>ID</th><th>CONTACT</th><th>REGISTERED BY</th><th>LAST VISIT</th><th></th></tr></thead>
+    <thead><tr><th>PATIENT</th><th>ID</th><th>CONTACT</th><th>REGISTERED BY</th>{% if is_owner %}<th>ASSIGNED TO</th>{% endif %}<th>LAST VISIT</th><th></th></tr></thead>
     <tbody>{% for p in patients %}<tr><td><b>{{ p.name }}</b></td><td>{{ p.patient_code }}</td>
       <td>{% if is_owner %}{{ p.phone|default:"-" }}{% else %}<span class="hint">Hidden</span>{% endif %}</td>
-      <td>{% if p.registered_by_name %}<b>{{ p.registered_by_name }}</b><div class="hint">{{ p.registered_by_role }} · {{ p.created_at|date:"M j" }}</div>{% else %}{{ p.professional.full_name }}<div class="hint">{{ p.created_at|date:"M j" }}</div>{% endif %}</td><td>{{ p.last_visit|date:"Y-m-d"|default:"-" }}</td><td><a class="text-link" href="{% url 'accounts:patient-detail' p.pk %}" style="text-decoration:none">Open &amp; treat</a></td></tr>
-    {% empty %}<tr><td colspan="6" style="padding:22px;text-align:center;color:var(--muted)">No patients at this clinic yet. Use <b>Add patient</b> to register the first one.</td></tr>{% endfor %}</tbody>
+      <td>{% if p.registered_by_name %}<b>{{ p.registered_by_name }}</b><div class="hint">{{ p.registered_by_role }} · {{ p.created_at|date:"M j" }}</div>{% else %}{{ p.professional.full_name }}<div class="hint">{{ p.created_at|date:"M j" }}</div>{% endif %}</td>{% if is_owner %}<td>{% for m in p.assigned.all %}{{ m.display_name }}{% if not forloop.last %}, {% endif %}{% empty %}<span class="hint">Nobody yet</span>{% endfor %}
+        <button type="button" class="text-link" data-assign="{{ p.pk }}" data-name="{{ p.name }}" data-selected="{% for m in p.assigned.all %}{{ m.pk }}{% if not forloop.last %},{% endif %}{% endfor %}">Assign</button></td>{% endif %}<td>{{ p.last_visit|date:"Y-m-d"|default:"-" }}</td><td><a class="text-link" href="{% url 'accounts:patient-detail' p.pk %}" style="text-decoration:none">Open &amp; treat</a></td></tr>
+    {% empty %}<tr><td colspan="7" style="padding:22px;text-align:center;color:var(--muted)">{% if is_owner %}No patients at this clinic yet. Use <b>Add patient</b> to register the first one.{% else %}No patients are assigned to you at this clinic yet. The clinic assigns patients to you, or books them with you.{% endif %}</td></tr>{% endfor %}</tbody>
   </table></div></section>
+  {% if is_owner %}
+  <div class="modal-backdrop" id="assignModal" role="dialog" aria-modal="true">
+    <div class="modal-card" style="max-width:440px">
+      <div class="modal-head"><h2 id="asTitle">Assign patient</h2><button type="button" class="modal-x" data-close aria-label="Close">×</button></div>
+      <form method="post" id="assignForm" class="cl-form" style="padding:6px 18px 18px" data-url="{% url 'clinics:patient-assign' clinic.pk 0 %}">{% csrf_token %}
+        <p class="hint" style="margin:0">Only the people ticked here (and the clinic owner) can open this patient's record. Booking an appointment with someone assigns the patient to them automatically.</p>
+        {% for m in assign_team %}<label style="display:flex;gap:8px;align-items:center;font-weight:600"><input type="checkbox" name="members" value="{{ m.pk }}" style="width:auto;height:auto"> {{ m.choice_label }}</label>
+        {% empty %}<p class="hint">No therapists on the team yet.</p>{% endfor %}
+        <button class="primary-btn" type="submit" style="width:fit-content">Save</button>
+      </form>
+    </div>
+  </div>
+  <script>
+  document.querySelectorAll('[data-assign]').forEach(function (b) {
+    b.addEventListener('click', function () {
+      var f = document.getElementById('assignForm'), picked = (b.dataset.selected || '').split(',');
+      f.action = f.dataset.url.replace('/0/', '/' + b.dataset.assign + '/');
+      document.getElementById('asTitle').textContent = 'Assign ' + b.dataset.name;
+      f.querySelectorAll('input[type=checkbox]').forEach(function (c) { c.checked = picked.indexOf(c.value) > -1; });
+      SajhyaUI.openModal('assignModal');
+    });
+  });
+  </script>
+  {% endif %}
 
 {% elif tab == 'queue' %}
   <section class="panel cl-box">
