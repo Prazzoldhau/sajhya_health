@@ -128,3 +128,7 @@ on the library page. The imported catalogue (790 exercises) is physiotherapy.
 Occupational therapy, speech therapy and behaviour therapy each start with a small set of text activities (`exercises/discipline_library.py`, added by
 `migrate` or `python manage.py load_discipline_library`). They are starting points: edit them, or add your own with their pictures or videos, in the admin
 (Exercises, set the Discipline). `load_exercises --prune` never deletes them.
+
+## Treatments given in a session, by department
+
+The "Treatment given" search and quick buttons in a session (the patient's *Record Session* form and the front desk's *Record treatment* page) are the department's own, in `accounts/treatments.py`: physiotherapy (TENS, IFC, ultrasound, heat / cold, traction, manual therapy...), occupational therapy (sensory integration, fine motor, handwriting, hand therapy, daily living, play...), speech therapy (articulation, language, voice, fluency, swallowing, AAC, hearing...) and behaviour therapy (ABA, social skills, reinforcement, regulation, parent training...). A person sees their own department's, from their profession; a front-desk assistant or visiting doctor sees those of the departments they are assigned to (all when none are set); the clinic's own login sees every department's, each result labelled with its department. Doses are usual starting points. To change a list, edit `OT_OPTIONS`, `SPEECH_OPTIONS`, `BEHAVIOUR_OPTIONS` or `OPTIONS` (physiotherapy) and `CHIPS` in that file.

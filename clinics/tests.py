@@ -1927,3 +1927,27 @@ class WideDaysScrollSidewaysTests(Base):
             self.assertEqual(desk.context['columns'][0]['min_width'], 700)
             self.assertContains(desk, 'minmax(700px,1fr)')
             self.assertContains(desk, 'position: sticky; left: 0')  # the hours stay in view while scrolling
+
+
+class DeskTreatmentsByDepartmentTests(Base):
+    CREDS = StaffLoginTests.CREDS
+    add_staff = StaffLoginTests.add_staff
+    setup_desk = FrontDeskRegisteredByAndBillingTests.setup_desk
+    prepare = SchedulesTests.prepare
+
+    def test_an_assistant_is_offered_the_treatments_of_their_departments(self):
+        self.prepare()
+        self.as_user('asha')
+        any_department = self.client.get(reverse('clinics:desk'), {'tab': 'session'})
+        self.assertEqual(any_department.context['treat_ui']['chips'], [])  # no department set: generic
+        self.asha.departments.set([self.ot])
+        page = self.client.get(reverse('clinics:desk'), {'tab': 'session'})
+        self.assertContains(page, '＋ Sensory integration')
+        self.assertNotContains(page, '＋ TENS')
+        names = [r['name'] for r in self.client.get(reverse('clinics:desk-treatment-search'), {'q': 'sensory', 'kind': 'clinical'}).json()['results']]
+        self.assertIn('Sensory integration therapy', names)
+        self.assertEqual(self.client.get(reverse('clinics:desk-treatment-search'), {'q': 'tens', 'kind': 'clinical'}).json()['results'], [])
+        self.asha.departments.set([self.pt])
+        physio = self.client.get(reverse('clinics:desk'), {'tab': 'session'})
+        self.assertContains(physio, '＋ TENS')
+        self.assertNotContains(physio, '＋ Sensory integration')

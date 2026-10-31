@@ -377,9 +377,9 @@
       <label>Session type<select name="session_type">{% for v, l in session_types %}<option value="{{ v }}" {% if v == 'treatment' %}selected{% endif %}>{{ l }}</option>{% endfor %}</select></label></div>
 
     <div class="tx-box" data-tx="treatments" data-kind="clinical">
-      <div class="tx-title">Treatment given <span class="hint">electrotherapy, heat / cold, traction, manual therapy...</span></div>
-      <div class="tx-chips"><button type="button" class="chip" data-quick="TENS (pain relief)|15-20 min">＋ TENS</button><button type="button" class="chip" data-quick="IFC / Interferential current|15-20 min">＋ IFC</button><button type="button" class="chip" data-quick="Therapeutic ultrasound|5-8 min">＋ Ultrasound</button><button type="button" class="chip" data-quick="Hot pack|15 min">＋ Hot pack</button><button type="button" class="chip" data-quick="Cold pack / cryotherapy|10-15 min">＋ Cold pack</button><button type="button" class="chip" data-quick="Cervical traction|10-15 min">＋ Traction</button></div>
-      <span style="position:relative;display:block"><input type="search" class="tx-search" placeholder="Search treatments (TENS, ultrasound, SWD...) or type your own and press Enter" autocomplete="off"></span>
+      <div class="tx-title">Treatment given <span class="hint">{{ treat_ui.hint }}</span></div>
+      <div class="tx-chips">{% for name, dose, short in treat_ui.chips %}<button type="button" class="chip" data-quick="{{ name }}|{{ dose }}">＋ {{ short }}</button>{% endfor %}</div>
+      <span style="position:relative;display:block"><input type="search" class="tx-search" placeholder="{{ treat_ui.placeholder }}" autocomplete="off"></span>
       <div class="tx-list"></div><input type="hidden" name="treatments" value="[]">
     </div>
     <div class="tx-box" data-tx="exercises" data-kind="exercise">

@@ -321,9 +321,9 @@
       <label>Session type {{ visit_form.session_type }}</label>
       <label>Progress {{ visit_form.progress }}</label>
       <div class="tx-box">
-        <div class="tx-title">Treatment given <span class="patient-id">search electrotherapy, manual therapy or exercises, then add</span></div>
-        <div class="tx-chips"><button type="button" class="chip" data-tx-quick="TENS (pain relief)|clinical|15-20 min">＋ TENS</button><button type="button" class="chip" data-tx-quick="IFC / Interferential current|clinical|15-20 min">＋ IFC</button><button type="button" class="chip" data-tx-quick="Therapeutic ultrasound|clinical|5-8 min">＋ Ultrasound</button><button type="button" class="chip" data-tx-quick="Hot pack|clinical|15 min">＋ Hot pack</button><button type="button" class="chip" data-tx-quick="Strengthening exercises|clinical|3 x 10">＋ Exercises</button></div>
-        <span style="position:relative;display:block"><input type="search" id="txSearch" placeholder="Search treatments or exercises (e.g. TENS, ultrasound, bridging)..." autocomplete="off"></span>
+        <div class="tx-title">Treatment given <span class="patient-id">search {{ treat_ui.hint }} or exercises, then add</span></div>
+        <div class="tx-chips">{% for name, dose, short in treat_ui.chips %}<button type="button" class="chip" data-tx-quick="{{ name }}|clinical|{{ dose }}">＋ {{ short }}</button>{% endfor %}</div>
+        <span style="position:relative;display:block"><input type="search" id="txSearch" placeholder="{{ treat_ui.placeholder }}" autocomplete="off"></span>
         <div id="txList"></div>
         <input type="hidden" name="treatments" id="txJson" value="[]">
       </div>

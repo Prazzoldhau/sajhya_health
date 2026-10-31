@@ -18,7 +18,8 @@ from sajhya_health.throttle import too_many
 from .access import actor_of, can_see_contact, first_error, own_patient, own_profile, staff_required, workspace_context, workspace_profile
 from .services import record_visit
 from .forms import BUSINESS_STEP_FORMS, BUSINESS_STEP_TITLES, SUBTYPES, STEP_FORMS, STEP_TITLES, NextVisitForm, PatientEditForm, PatientForm, PatientNotesForm, PatientPhotoForm, ProfilePictureForm, SignupForm, VisitForm
-from .treatments import parse_treatments
+from assessments import disciplines
+from .treatments import parse_treatments, ui_for
 from billing.catalog import catalog_for
 from billing.models import advance_balance
 from billing.forms import AdvanceForm, BillCorrectionForm, EntryPaymentForm, PackagePaymentForm, PatientBillForm
@@ -394,6 +395,7 @@ def patient_detail(request, pk):
         'advance_form': AdvanceForm() if tab == 'billing' else None,
         'correct_form': BillCorrectionForm() if tab == 'billing' else None,
         'visit_form': VisitForm(initial={'date': timezone.localdate()}),
+        'treat_ui': ui_for(disciplines.allowed(profile)),
         'next_form': NextVisitForm(initial={'date': timezone.localdate() + datetime.timedelta(days=7)}),
         'notes_form': PatientNotesForm(instance=patient),
     })
@@ -405,7 +407,6 @@ def patient_detail(request, pk):
     if tab == 'soap':
         context['soap_notes'] = patient.soap_notes.all()
     if tab == 'assessments':
-        from assessments import disciplines
         from assessments.services import patient_summary
         context['summary'] = patient_summary(patient, disciplines.visible_filter(disciplines.allowed(profile)))
         context['disciplines'] = disciplines.LABELS

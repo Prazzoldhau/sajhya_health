@@ -477,3 +477,69 @@ class DepartmentTests(TestCase):
         mine.delete()
         appt.refresh_from_db()
         self.assertIsNone(appt.department)  # the appointment stays
+
+
+class DepartmentTreatmentTests(TestCase):
+    """The treatments offered in a session are the department's own: no TENS or ultrasound for occupational, speech or behaviour therapy."""
+    def setUp(self):
+        from accounts.models import Account, Profession
+        self.users = {}
+        for key, profession in (('physio', 'physiotherapist'), ('ot', 'occupational therapist'), ('speech', 'speech therapist'), ('behaviour', 'behaviour therapist')):
+            user, profile = make_professional(f'u-{key}')
+            Account.objects.filter(pk=profile.account_id).update(profession=Profession.objects.get_or_create(name=profession)[0])
+            self.users[key] = (user, profile)
+
+    def search(self, key, q):
+        self.client.force_login(self.users[key][0])
+        return [r['name'] for r in self.client.get(reverse('accounts:treatment-search'), {'q': q, 'kind': 'clinical'}).json()['results']]
+
+    def test_each_department_is_offered_its_own_treatments(self):
+        self.assertIn('TENS (pain relief)', self.search('physio', 'tens'))
+        self.assertEqual(self.search('ot', 'tens'), [])
+        self.assertEqual(self.search('speech', 'tens'), [])
+        self.assertEqual(self.search('behaviour', 'ultrasound'), [])
+        self.assertIn('Sensory integration therapy', self.search('ot', 'sensory'))
+        self.assertIn('Handwriting training', self.search('ot', 'handwriting'))
+        self.assertEqual(self.search('physio', 'sensory integration'), [])
+        self.assertIn('Articulation therapy', self.search('speech', 'articulation'))
+        self.assertIn('Swallowing (dysphagia) therapy', self.search('speech', 'swallow'))
+        self.assertIn('Applied behaviour analysis (ABA) session', self.search('behaviour', 'aba'))
+        self.assertEqual(self.search('physio', 'articulation'), [])
+
+    def test_the_session_form_has_the_departments_own_quick_buttons(self):
+        patients = {}
+        for key, (user, profile) in self.users.items():
+            patients[key] = make_patient(profile, f'Patient {key}')
+        expect = {'physio': ('＋ TENS', '＋ Ultrasound'), 'ot': ('＋ Sensory integration', '＋ Handwriting'), 'speech': ('＋ Articulation', '＋ Voice'), 'behaviour': ('＋ ABA session', '＋ Token system')}
+        for key, (user, profile) in self.users.items():
+            self.client.force_login(user)
+            page = self.client.get(reverse('accounts:patient-detail', args=[patients[key].pk]))
+            for chip in expect[key]:
+                self.assertContains(page, chip, msg_prefix=key)
+            for other, chips in expect.items():
+                if other != key:
+                    for chip in chips:
+                        self.assertNotContains(page, chip, msg_prefix=f'{key} must not see {other}')
+        self.client.force_login(self.users['ot'][0])
+        self.assertContains(self.client.get(reverse('accounts:patient-detail', args=[patients['ot'].pk])), 'search sensory integration, fine motor')
+
+    def test_a_clinic_login_searches_every_department_with_labels(self):
+        from clinics.login import set_clinic_login
+        from clinics.models import Clinic, ClinicSubscription
+        clinic = Clinic.objects.create(owner=self.users['physio'][1], name='Mixed', phone='01555')
+        ClinicSubscription.objects.create(professional=self.users['physio'][1], status='active')
+        user = set_clinic_login(clinic, 'mixed-clinic', 'Gr33n!Health-99')
+        self.client.force_login(user)
+        results = self.client.get(reverse('accounts:treatment-search'), {'q': 'therapy', 'kind': 'clinical'}).json()['results']
+        groups = {r['group'].split(':')[0] for r in results}
+        self.assertGreater(len(groups), 1)
+        self.assertTrue(all(':' in r['group'] for r in results))  # each result says which department it belongs to
+
+    def test_a_visit_keeps_whatever_treatment_was_typed_or_picked(self):
+        from accounts.models import Visit
+        user, profile = self.users['ot']
+        patient = make_patient(profile, 'Child')
+        self.client.force_login(user)
+        self.client.post(reverse('accounts:patient-visit-add', args=[patient.pk]), {'date': timezone.localdate().isoformat(), 'session_type': 'treatment',
+                                                                                    'treatments': '[{"kind": "clinical", "name": "Sensory integration therapy", "dosage": "30 min"}]'})
+        self.assertEqual([t.name for t in Visit.objects.get().treatments.all()], ['Sensory integration therapy'])

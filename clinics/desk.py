@@ -23,6 +23,7 @@ from billing.models import ADVANCE, BillingEntry, EntryPayment, PatientAdvance, 
 
 from .forms import FrontDeskPatientForm
 from .models import ClinicMember, QueueEntry
+from accounts.treatments import ui_for
 from .schedule import appointments_between, appointments_on, day_context, parse_day
 
 TABS = [('overview', 'Dashboard', 'overview'), ('schedule', 'Schedule', 'schedule'), ('queue', 'Queue', 'queue'), ('patients', 'Patients', 'patients'),
@@ -277,6 +278,14 @@ def _billing_context(request, member):
     }
 
 
+def _member_kinds(member):
+    """The departments a front-desk clinician works in (read from the departments they are assigned to); None when none are set, meaning every department."""
+    from assessments import disciplines
+    from billing import catalog
+    kinds = {catalog.kind_of(d.name) for d in member.departments.all()} & set(disciplines.SPECIFIC)
+    return sorted(kinds) or None
+
+
 def _session_context(request, member):
     """The assistant's page for recording what was done: the patient, the treatment given, the exercises supervised."""
     clinic = member.clinic
@@ -285,7 +294,7 @@ def _session_context(request, member):
     mine = (Visit.objects.filter(patient__clinic=clinic, date=today, therapist=member.name, recorded_by_role=member.get_role_display())
             .select_related('patient').prefetch_related('treatments').order_by('-id'))
     return {'today': today, 'preset': {'id': preset.pk, 'name': preset.name, 'code': preset.patient_code} if preset else None, 'my_sessions': list(mine[:30]),
-            'session_types': Visit.SESSION_CHOICES}
+            'session_types': Visit.SESSION_CHOICES, 'treat_ui': ui_for(_member_kinds(member))}
 
 
 @desk_view('record_session')
@@ -294,10 +303,9 @@ def treatment_search(request, member):
     """Type-ahead for the treatment page: the clinical / electrotherapy list, or the exercise library (?kind=exercise)."""
     from accounts.treatments import search_options
     from assessments import disciplines
-    from billing import catalog
-    # the exercise libraries of the departments this person works in (every library when none are set)
-    kinds = {catalog.kind_of(d.name) for d in member.departments.all()} & set(disciplines.SPECIFIC)
-    visible = disciplines.visible_filter(sorted(kinds)) if kinds else None
+    # the treatments and exercise libraries of the departments this person works in (every department when none are set)
+    kinds = _member_kinds(member)
+    visible = disciplines.visible_filter(kinds) if kinds else None
     return JsonResponse({'results': search_options(request.GET.get('q', ''), request.GET.get('kind', ''), visible)})
 
 
