@@ -73,9 +73,9 @@
     <div class="kpi"><div class="k">In queue today</div><div class="v">{{ queue_counts.waiting }} waiting</div><div class="n">{{ queue_counts.called }} in session · {{ queue_counts.completed }} done</div></div>
     <div class="kpi"><div class="k">Visits in {{ month_label }}</div><div class="v">{{ month_visits }}</div></div>
   </div>
-  <section class="panel"><div class="panel-header"><div class="panel-title">Activity by physio - {{ month_label }}</div></div>
+  <section class="panel"><div class="panel-header"><div class="panel-title">Activity by therapist - {{ month_label }}</div></div>
     <div class="table-wrap"><table class="cl-table">
-      <thead><tr><th>PHYSIO</th><th>VISITS</th><th>PATIENTS SEEN</th></tr></thead>
+      <thead><tr><th>THERAPIST</th><th>VISITS</th><th>PATIENTS SEEN</th></tr></thead>
       <tbody>{% for a in activity %}<tr><td><b>{{ a.name }}</b></td><td>{{ a.visits }}</td><td>{{ a.patients }}</td></tr>
       {% empty %}<tr><td colspan="3" style="padding:20px;text-align:center;color:var(--muted)">No visits yet this month for patients registered under this clinic.</td></tr>{% endfor %}</tbody>
     </table></div>
@@ -124,13 +124,14 @@
     <div class="modal-card" style="max-width:560px">
       <div class="modal-head"><h2>Add team</h2><button type="button" class="modal-x" data-close aria-label="Close">×</button></div>
       <div class="chipbar" style="display:flex;margin:0 18px">
-        <a href="#" class="on" data-teamtab="physio">Physiotherapist</a><a href="#" data-teamtab="staff">Staff</a>
+        <a href="#" class="on" data-teamtab="physio">Registered professional</a><a href="#" data-teamtab="staff">Staff</a>
       </div>
       <div style="padding:6px 18px 18px">
         <div data-teampane="physio">
-            <p class="hint" style="margin-top:0">Only physios with verified Sajhya credentials can be added. They receive an invitation and join when they accept.</p>
+            <p class="hint" style="margin-top:0">Search for a professional who is registered and verified on Sajhya: a physiotherapist, occupational, speech or behaviour therapist, doctor, dentist, nurse and so on. They receive an invitation and join when they accept. Someone who is not on Sajhya can be added under <b>Staff</b> (for example as a Doctor / therapist).</p>
       <form method="post" action="{% url 'clinics:invite' clinic.pk %}" class="cl-form" id="inviteForm">{% csrf_token %}
-        <div class="cl-search"><input type="text" id="physioSearch" placeholder="Search by name, username or licence number..." autocomplete="off"></div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap"><select id="professionFilter" aria-label="Profession" style="height:38px;border:1px solid var(--line);border-radius:8px;padding:0 8px"><option value="">Any profession</option>{% for p in professions %}<option value="{{ p.pk }}">{{ p.name|capfirst }}</option>{% endfor %}</select>
+          <div class="cl-search" style="flex:1;min-width:220px"><input type="text" id="physioSearch" placeholder="Search by name, username, licence number or profession..." autocomplete="off"></div></div>
         <input type="hidden" name="physio_id" id="physioId"><span class="hint" id="physioChosen"></span>
         <button class="primary-btn" type="submit" style="width:fit-content">Send invitation</button>
       </form>
@@ -221,9 +222,9 @@
   (function () {
     var input = document.getElementById('physioSearch'); if (!input || !window.SajhyaUI) return;
     SajhyaUI.picker(input, {
-      url: "{% url 'clinics:physio-search' %}", params: function () { return { clinic: {{ clinic.pk }} }; }, emptyText: 'No verified physio found',
-      render: function (p) { return '<b>' + SajhyaUI.esc(p.name) + '</b> <span style="color:#7c9186">' + SajhyaUI.esc(p.title) + ' · @' + SajhyaUI.esc(p.username) + (p.licence ? ' · licence ' + SajhyaUI.esc(p.licence) : '') + '</span>'; },
-      onPick: function (p) { document.getElementById('physioId').value = p.id; input.value = p.name; document.getElementById('physioChosen').textContent = 'Selected: ' + p.name + ' (@' + p.username + ')'; },
+      url: "{% url 'clinics:physio-search' %}", params: function () { return { clinic: {{ clinic.pk }}, profession: document.getElementById('professionFilter').value }; }, emptyText: 'No verified professional found',
+      render: function (p) { return '<b>' + SajhyaUI.esc(p.name) + '</b> <span style="color:#7c9186">' + SajhyaUI.esc(p.profession ? p.profession + ' · ' : '') + SajhyaUI.esc(p.title) + ' · @' + SajhyaUI.esc(p.username) + (p.licence ? ' · licence ' + SajhyaUI.esc(p.licence) : '') + '</span>'; },
+      onPick: function (p) { document.getElementById('physioId').value = p.id; input.value = p.name; document.getElementById('physioChosen').textContent = 'Selected: ' + p.name + ' (' + (p.profession || p.title) + ', @' + p.username + ')'; },
       onType: function () { document.getElementById('physioId').value = ''; document.getElementById('physioChosen').textContent = ''; },
     });
     document.getElementById('inviteForm').addEventListener('submit', function (e) {

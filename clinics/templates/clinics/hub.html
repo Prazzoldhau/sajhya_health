@@ -16,7 +16,7 @@
   <div class="cl-card" style="border-color:#f0c874;background:#fffaf0">
     <h3>{{ inv.clinic.name }}</h3>
     <div class="sub">Invited by {{ inv.clinic.owner.full_name }} · {{ inv.clinic.address }}</div>
-    <div class="sub">If you join, you can view the clinic's patients and record treatment for them. You will not see patients' contact details (phone, email, address); the clinic can see counts of visits you record.</div>
+    <div class="sub">If you join, you can view the patients the clinic assigns to you and record treatment for them. You will not see patients' contact details (phone, email, address); the clinic can see counts of visits you record.</div>
     <form method="post" action="{% url 'clinics:invitation-respond' inv.pk %}" style="display:flex;gap:8px;margin-top:6px">{% csrf_token %}
       <button class="primary-btn" name="action" value="accept">Accept</button><button class="secondary-btn" name="action" value="decline">Decline</button></form>
   </div>

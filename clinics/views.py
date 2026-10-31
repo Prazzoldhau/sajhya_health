@@ -9,8 +9,8 @@ from django.urls import reverse
 from django.utils import timezone
 from django.views.decorators.http import require_GET, require_POST
 
-from accounts.access import first_error, require_workspace, workspace_context, workspace_profile
-from accounts.models import Patient, ProfessionalProfile, Visit
+from accounts.access import first_error, profession_label, require_workspace, workspace_context, workspace_profile
+from accounts.models import Patient, Profession, ProfessionalProfile, Visit
 
 from .access import clinic_allowance, clinic_for_member, clinic_for_owner, member_patients
 from .forms import ClinicForm, ClinicLoginForm, DepartmentLoginForm, StaffForm, StaffLoginForm
@@ -137,7 +137,8 @@ def _detail_context(request, profile, clinic, is_owner, tab, form=None, login_fo
             'month_visits': sum(v['n'] for v in visits), 'percent': percent, 'missing': missing, 'module_rows': clinic.module_rows,
         })
     elif tab == 'team':
-        context.update({'members': clinic.members.exclude(status__in=[ClinicMember.LEFT, ClinicMember.DECLINED]).select_related('physio').prefetch_related('departments'),
+        context.update({'members': clinic.members.exclude(status__in=[ClinicMember.LEFT, ClinicMember.DECLINED]).select_related('physio__account__profession').prefetch_related('departments'),
+                        'professions': Profession.objects.filter(is_business_owner=False),
                         'clinic_departments': clinic.calendar_owner.departments.all(),
                         'staff_form': StaffForm(clinic=clinic), 'past': clinic.members.filter(status__in=[ClinicMember.LEFT, ClinicMember.DECLINED]).select_related('physio')})
     elif tab == 'patients':
@@ -251,17 +252,21 @@ def _plan_needed(request, clinic):
 @login_required
 @require_GET
 def physio_search(request):
-    """Owner's type-ahead: only physios whose credentials are verified can be found."""
+    """Owner's type-ahead for adding a registered professional to the team: any verified professional (physiotherapist, occupational, speech or behaviour
+    therapist, doctor, dentist, nurse...), found by name, username, licence number or profession, optionally narrowed to one profession. Business owners are not
+    clinicians and cannot be added."""
     profile = require_workspace(request)
     clinic = get_object_or_404(Clinic.objects.filter(Q(owner=profile) | Q(workspace=profile)), pk=request.GET.get('clinic', 0))
     q = request.GET.get('q', '').strip()
     if len(q) < 2:
         return JsonResponse({'results': []})
     taken = clinic.members.filter(status__in=[ClinicMember.ACTIVE, ClinicMember.INVITED]).values_list('physio_id', flat=True)
-    found = (ProfessionalProfile.objects.filter(status=ProfessionalProfile.APPROVED).exclude(pk=profile.pk).exclude(pk__in=[t for t in taken if t])
-             .filter(Q(first_name__icontains=q) | Q(last_name__icontains=q) | Q(account__user__username__icontains=q) | Q(license_number__icontains=q))
-             .select_related('account__user')[:10])
-    return JsonResponse({'results': [{'id': p.pk, 'name': p.full_name, 'title': p.title, 'username': p.account.user.username,
+    found = (ProfessionalProfile.objects.filter(status=ProfessionalProfile.APPROVED, account__profession__is_business_owner=False).exclude(pk=profile.pk).exclude(pk__in=[t for t in taken if t])
+             .filter(Q(first_name__icontains=q) | Q(last_name__icontains=q) | Q(account__user__username__icontains=q) | Q(license_number__icontains=q) | Q(account__profession__name__icontains=q)))
+    if request.GET.get('profession', '').isdigit():
+        found = found.filter(account__profession_id=int(request.GET['profession']))
+    found = found.select_related('account__user', 'account__profession')[:10]
+    return JsonResponse({'results': [{'id': p.pk, 'name': p.full_name, 'title': p.title, 'username': p.account.user.username, 'profession': profession_label(p),
                                       'licence': ('...' + p.license_number[-4:]) if p.license_number else ''} for p in found]})
 
 
@@ -271,9 +276,10 @@ def member_invite(request, pk):
     profile, clinic = clinic_for_owner(request, pk)
     if (blocked := _plan_needed(request, clinic)):
         return blocked
-    physio = ProfessionalProfile.objects.filter(pk=request.POST.get('physio_id') or 0, status=ProfessionalProfile.APPROVED).exclude(pk=profile.pk).first()
+    physio = (ProfessionalProfile.objects.filter(pk=request.POST.get('physio_id') or 0, status=ProfessionalProfile.APPROVED, account__profession__is_business_owner=False)
+              .exclude(pk=profile.pk).first())
     if physio is None:
-        messages.error(request, 'Only physios with verified credentials can be added. Search and pick one from the list.')
+        messages.error(request, 'Only professionals with verified credentials can be added. Search and pick one from the list.')
         return _back(clinic, 'team')
     member, created = ClinicMember.objects.get_or_create(clinic=clinic, physio=physio, defaults={'role': ClinicMember.PHYSIO, 'status': ClinicMember.INVITED})
     if not created:

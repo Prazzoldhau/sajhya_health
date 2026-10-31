@@ -1951,3 +1951,58 @@ class DeskTreatmentsByDepartmentTests(Base):
         physio = self.client.get(reverse('clinics:desk'), {'tab': 'session'})
         self.assertContains(physio, '＋ TENS')
         self.assertNotContains(physio, '＋ Sensory integration')
+
+
+class AddAnyRegisteredProfessionalTests(Base):
+    """The owner adds speech and occupational therapists, doctors, dentists... by searching, the way physiotherapists are added."""
+    def setUp(self):
+        super().setUp()
+        from accounts.models import Account, Profession
+        self.clinic = self.make_clinic()
+        self.people = {}
+        for username, first, profession in (('ot-one', 'Oma', 'occupational therapist'), ('slp-one', 'Sita', 'speech therapist'), ('doc-one', 'Dev', 'doctors'),
+                                            ('dent-one', 'Dina', 'dentist'), ('bo-one', 'Bishnu', 'business owner')):
+            user, profile = make_professional(username, first_name=first, last_name='Rai')
+            Account.objects.filter(pk=profile.account_id).update(profession=Profession.objects.get_or_create(name=profession)[0])
+            self.people[first] = profile
+
+    def search(self, q, **extra):
+        return self.client.get(reverse('clinics:physio-search'), {'q': q, 'clinic': self.clinic.pk, **extra}).json()['results']
+
+    def test_they_are_found_by_name_or_by_profession_and_show_what_they_are(self):
+        found = {r['name']: r['profession'] for r in self.search('Rai')}
+        self.assertEqual(found, {'Oma Rai': 'Occupational therapist', 'Sita Rai': 'Speech therapist', 'Dev Rai': 'Doctors', 'Dina Rai': 'Dentist'})  # not the business owner
+        self.assertEqual([r['name'] for r in self.search('speech')], ['Sita Rai'])  # by profession
+        self.assertEqual([r['name'] for r in self.search('dentist')], ['Dina Rai'])
+        from accounts.models import Profession
+        only_ot = Profession.objects.get(name='occupational therapist')
+        self.assertEqual([r['name'] for r in self.search('Rai', profession=only_ot.pk)], ['Oma Rai'])  # narrowed to one profession
+        self.assertEqual(self.search('Bishnu'), [])  # a business owner is not a clinician
+        page = self.client.get(reverse('clinics:detail', args=[self.clinic.pk]), {'tab': 'team'})
+        self.assertContains(page, 'Registered professional')
+        self.assertContains(page, 'professionFilter')
+        self.assertNotIn('business owner', [p.name for p in page.context['professions']])  # not offered as a profession to add
+        self.assertIn('speech therapist', [p.name for p in page.context['professions']])
+
+    def test_inviting_them_works_and_they_join_with_their_own_profession(self):
+        for first in ('Oma', 'Sita', 'Dev'):
+            r = self.client.post(reverse('clinics:invite', args=[self.clinic.pk]), {'physio_id': self.people[first].pk})
+            self.assertEqual(r.status_code, 302)
+        self.assertEqual(ClinicMember.objects.filter(clinic=self.clinic, status='invited').count(), 3)
+        self.client.post(reverse('clinics:invite', args=[self.clinic.pk]), {'physio_id': self.people['Bishnu'].pk})
+        self.assertFalse(ClinicMember.objects.filter(physio=self.people['Bishnu']).exists())  # refused
+        member = ClinicMember.objects.get(physio=self.people['Oma'])
+        self.as_user('ot-one')
+        self.client.post(reverse('clinics:invitation-respond', args=[member.pk]), {'action': 'accept'})
+        member.refresh_from_db()
+        self.assertEqual((member.status, member.role_label), ('active', 'Occupational therapist'))
+        self.as_user('owner')
+        team = self.client.get(reverse('clinics:detail', args=[self.clinic.pk]), {'tab': 'team'})
+        self.assertContains(team, 'Occupational therapist')
+        self.assertContains(team, 'Speech therapist')  # invited, shown with what they are
+        self.assertContains(team, 'Doctors')
+        # and they are bookable like any therapist, labelled with their profession
+        from clinics.login import set_clinic_login
+        set_clinic_login(self.clinic, 'clinic-desk', PASSWORD)
+        self.as_user('clinic-desk')
+        self.assertContains(self.client.get(reverse('accounts:appointments')), 'Oma Rai (Occupational therapist)')
