@@ -366,26 +366,6 @@ def patient_add(request):
     return render(request, 'accounts/patient_add.html', context)
 
 
-def _local_path(value):
-    """A path on this site to return to (never another site)."""
-    value = value or ''
-    return value if value.startswith('/') and not value.startswith('//') else ''
-
-
-def _my_appointment(profile, patient, appt_id):
-    """A scheduled appointment of this patient that is with this professional (booked with them on a clinic calendar, or on their own calendar)."""
-    if not str(appt_id or '').isdigit():
-        return None
-    return (Appointment.objects.filter(pk=int(appt_id), patient=patient, kind=Appointment.APPOINTMENT, status=Appointment.SCHEDULED)
-            .filter(Q(professional=profile) | Q(practitioner__physio=profile)).first())
-
-
-def _visit_defaults(request, profile, patient):
-    """When recording a session from an appointment, start from that appointment's session type."""
-    appt = _my_appointment(profile, patient, request.GET.get('appt')) if request.GET.get('record') == '1' else None
-    return {'session_type': appt.session_type} if appt else {}
-
-
 @login_required
 def patient_detail(request, pk):
     from .appointments import booked_prompt
@@ -413,9 +393,7 @@ def patient_detail(request, pk):
         'advance_moves': patient.advances.select_related('entry')[:15] if tab == 'billing' else None,
         'advance_form': AdvanceForm() if tab == 'billing' else None,
         'correct_form': BillCorrectionForm() if tab == 'billing' else None,
-        'visit_form': VisitForm(initial={'date': timezone.localdate(), **_visit_defaults(request, profile, patient)}),
-        'open_visit': request.GET.get('record') == '1' and tab == 'visits', 'record_appt': request.GET.get('appt', '') if request.GET.get('appt', '').isdigit() else '',
-        'record_next': _local_path(request.GET.get('next')),
+        'visit_form': VisitForm(initial={'date': timezone.localdate()}),
         'next_form': NextVisitForm(initial={'date': timezone.localdate() + datetime.timedelta(days=7)}),
         'notes_form': PatientNotesForm(instance=patient),
     })
@@ -464,19 +442,9 @@ def patient_visit_add(request, pk):
             data = form.cleaned_data
             given = parse_treatments(request.POST.get('treatments'))
             _, used = record_visit(patient, profile.full_name, data['date'], data['session_type'], data['progress'], data['notes'], given, professional=profile)
-            appt = _my_appointment(profile, patient, request.POST.get('appt'))
-            if appt is not None:  # recorded from the schedule: that appointment is now attended
-                from .appointments import sync_next_appointment
-                appt.status = Appointment.ATTENDED
-                appt.save(update_fields=['status'])
-                sync_next_appointment(patient)
-            messages.success(request, 'Session recorded' + (f' with {len(given)} treatment{"s" if len(given) != 1 else ""}.' if given else '.') + (' One package session used.' if used else '')
-                             + (' The appointment is marked attended.' if appt is not None else ''))
+            messages.success(request, 'Session recorded' + (f' with {len(given)} treatment{"s" if len(given) != 1 else ""}.' if given else '.') + (' One package session used.' if used else ''))
         else:
             messages.error(request, 'Could not save the session - check the date and session type.')
-        back = _local_path(request.POST.get('next'))
-        if back:
-            return redirect(back)
     return redirect('accounts:patient-detail', pk=patient.pk)
 
 

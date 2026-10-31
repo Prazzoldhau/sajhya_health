@@ -5,10 +5,6 @@
   .ms-table { width: 100%; border-collapse: collapse; background: #fff; border: 1px solid var(--line); border-radius: 12px; overflow: hidden; }
   .ms-table th { text-align: left; font-size: 11px; color: var(--muted); padding: 10px 14px; border-bottom: 1px solid var(--line); }
   .ms-table td { padding: 11px 14px; border-bottom: 1px solid var(--line); vertical-align: top; } .ms-table tr:last-child td { border-bottom: 0; }
-  .ms-act { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; } .ms-act .primary-btn, .ms-act .secondary-btn { padding: 6px 11px; font-size: 12px; text-decoration: none; border-radius: 8px; border: 1px solid var(--green); font-weight: 700; cursor: pointer; }
-  .ms-act .primary-btn { background: var(--green); color: #fff; } .ms-act .secondary-btn { background: #fff; color: var(--green-dark); }
-  .ms-more { position: relative; } .ms-more summary { list-style: none; } .ms-more > div { position: absolute; right: 0; z-index: 20; min-width: 160px; background: #fff; border: 1px solid var(--line); border-radius: 10px; box-shadow: 0 8px 22px #0002; padding: 4px; }
-  .ms-more > div a { display: block; padding: 7px 10px; border-radius: 7px; color: var(--ink); text-decoration: none; font-size: 12.5px; } .ms-more > div a:hover { background: #f1f8f4; }
   .ms-time { font-weight: 800; color: var(--green-dark); white-space: nowrap; } .ms-sub { color: var(--muted); font-size: 11.5px; }
 {% endblock %}
 
@@ -24,7 +20,7 @@
 <div class="panel" style="padding:30px;text-align:center;color:var(--muted)">You are not on a clinic team yet. When a clinic adds you, the appointments booked with you appear here.</div>
 {% else %}
 <table class="ms-table">
-  <thead><tr><th>TIME</th><th>PATIENT</th><th>DEPARTMENT</th><th>CLINIC</th><th>STATUS</th><th>WORK ON THE PATIENT</th></tr></thead>
+  <thead><tr><th>TIME</th><th>PATIENT</th><th>DEPARTMENT</th><th>CLINIC</th><th>STATUS</th></tr></thead>
   <tbody>
   {% for a in appointments %}
     <tr>
@@ -33,21 +29,9 @@
       <td>{{ a.department.name|default:"-" }}</td>
       <td>{{ a.practitioner.clinic.name }}</td>
       <td>{{ a.get_status_display }}</td>
-      <td class="ms-act">{% if a.can_work %}
-        {% if a.status == 'scheduled' %}<a class="primary-btn" href="{% url 'accounts:patient-detail' a.patient_id %}?tab=visits&record=1&appt={{ a.pk }}&next={{ here|urlencode }}">▶ Record session</a>{% endif %}
-        <a class="secondary-btn" href="{% url 'assessments:choose' a.patient_id %}">Assessment</a>
-        <a class="secondary-btn" href="{% url 'soapnotes:new' a.patient_id %}">SOAP note</a>
-        <details class="ms-more"><summary class="secondary-btn">More ▾</summary><div>
-          <a href="{% url 'accounts:patient-detail' a.patient_id %}">Open patient</a>
-          <a href="{% url 'accounts:patient-detail' a.patient_id %}?tab=visits">Sessions</a>
-          <a href="{% url 'accounts:patient-detail' a.patient_id %}?tab=plan">Treatment plan</a>
-          <a href="{% url 'accounts:patient-detail' a.patient_id %}?tab=exercises">Exercises</a>
-          <a href="{% url 'accounts:patient-detail' a.patient_id %}?tab=notes">Notes</a>
-        </div></details>
-      {% else %}<span class="ms-sub">Not assigned to you yet. Ask the clinic to assign this patient.</span>{% endif %}</td>
     </tr>
   {% empty %}
-    <tr><td colspan="6" style="padding:26px;text-align:center;color:var(--muted)">No appointments booked with you {% if day == today %}today{% else %}on this day{% endif %}.</td></tr>
+    <tr><td colspan="5" style="padding:26px;text-align:center;color:var(--muted)">No appointments booked with you {% if day == today %}today{% else %}on this day{% endif %}.</td></tr>
   {% endfor %}
   </tbody>
 </table>

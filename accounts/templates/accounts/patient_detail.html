@@ -317,7 +317,6 @@
     <div class="modal-head"><h2>Record Session</h2><button type="button" class="modal-x" data-close aria-label="Close">×</button></div>
     <form method="post" action="{% url 'accounts:patient-visit-add' patient.pk %}" class="mini-form">
       {% csrf_token %}
-      {% if record_appt %}<input type="hidden" name="appt" value="{{ record_appt }}">{% endif %}{% if record_next %}<input type="hidden" name="next" value="{{ record_next }}">{% endif %}
       <label>Date {{ visit_form.date }}</label>
       <label>Session type {{ visit_form.session_type }}</label>
       <label>Progress {{ visit_form.progress }}</label>
@@ -333,7 +332,6 @@
     </form>
   </div>
 </div>
-{% if open_visit %}<script>document.addEventListener('DOMContentLoaded', function () { SajhyaUI.openModal('visitModal'); });</script>{% endif %}
 <style>
   .tx-box { border: 1px solid var(--line); border-radius: 10px; padding: 10px 12px; background: #f6faf7; display: grid; gap: 8px; }
   .tx-title { font-size: 12px; font-weight: 800; color: var(--green-dark); }

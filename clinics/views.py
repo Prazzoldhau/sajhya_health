@@ -69,16 +69,11 @@ def my_schedule(request):
     profile = workspace_profile(request)
     if profile is None:
         return redirect('accounts:welcome')
-    from accounts.access import accessible_patients
     from .schedule import appointments_on, day_context, parse_day
     members = ClinicMember.objects.filter(physio=profile, status=ClinicMember.ACTIVE, clinic__is_active=True)
     day = parse_day(request.GET.get('date'))
-    appointments = appointments_on(day, practitioner__in=members) if members else []
-    openable = set(accessible_patients(profile).filter(pk__in=[a.patient_id for a in appointments]).values_list('pk', flat=True))  # patients whose record they can work in
-    for a in appointments:
-        a.can_work = a.patient_id in openable
     context = workspace_context(request.user, profile)
-    context.update({'active': 'schedule', **day_context(day), 'appointments': appointments, 'memberships': members.exists(), 'here': request.get_full_path()})
+    context.update({'active': 'schedule', **day_context(day), 'appointments': appointments_on(day, practitioner__in=members) if members else [], 'memberships': members.exists()})
     return render(request, 'clinics/my_schedule.html', context)
 
 
