@@ -1900,3 +1900,30 @@ class ReceptionAppointmentBookLayoutTests(Base):
         self.assertIn('bare=1', self.client.post(reverse('accounts:appointment-edit', args=[appt.pk]), {**edit, 'bare': '1'})['Location'])
         self.assertNotIn('bare=1', self.client.post(reverse('accounts:appointment-edit', args=[appt.pk]), edit)['Location'])
         self.assertIn('bare=1', self.client.post(reverse('accounts:appointment-action', args=[appt.pk]), {'action': 'cancel', 'days': 7, 'bare': '1'})['Location'])
+
+
+class WideDaysScrollSidewaysTests(Base):
+    CREDS = StaffLoginTests.CREDS
+    add_staff = StaffLoginTests.add_staff
+    setup_desk = FrontDeskRegisteredByAndBillingTests.setup_desk
+    prepare = SchedulesTests.prepare
+
+    def test_a_busy_day_gets_wider_so_simultaneous_appointments_stay_readable(self):
+        from accounts.models import Appointment
+        self.prepare()
+        for i in range(3):  # two are already booked at 1:30 pm; five at once in all
+            patient = make_patient(self.workspace, f'Extra {i}')
+            Appointment.objects.create(professional=self.workspace, patient=patient, start=self.when, end=self.when + datetime.timedelta(minutes=30), department=self.pt, practitioner=self.member)
+        self.as_user('himal-clinic')
+        for params in ({}, {'bare': 1}):
+            page = self.client.get(reverse('accounts:appointments'), params)
+            today, tomorrow = page.context['columns'][0], page.context['columns'][1]
+            self.assertEqual(today['min_width'], 5 * 140)  # five side by side
+            self.assertEqual(tomorrow['min_width'], 170)  # an empty day keeps the normal width
+            self.assertContains(page, 'minmax(700px,1fr)')  # the grid is wider than the window, so it scrolls sideways
+        self.as_user('ram-desk')
+        for params in ({'tab': 'schedule'}, {'tab': 'schedule', 'bare': 1}):
+            desk = self.client.get(reverse('clinics:desk'), params)
+            self.assertEqual(desk.context['columns'][0]['min_width'], 700)
+            self.assertContains(desk, 'minmax(700px,1fr)')
+            self.assertContains(desk, 'position: sticky; left: 0')  # the hours stay in view while scrolling

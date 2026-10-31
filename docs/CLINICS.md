@@ -202,3 +202,5 @@ the clinic's own login can); they can still keep their own private patients.
 ### Reception's appointment book: more room, and its own tab
 
 The clinic login's **Appointments** page (what reception works in) opens with the side panel (month calendar and to-do list) closed, so the week grid gets the whole width; **Side panel** in the toolbar brings it back and the choice is remembered on that computer. A physiotherapist's own calendar still opens with it. **Week in a new tab** opens the appointment book alone (`?bare=1`): no header, no menu, no side panel, seven days; booking, changing and cancelling there stay in that tab, and *Close this tab* ends it. The front desk's Schedule tab has the same stand-alone week view.
+
+Every calendar (the clinic login's Appointments page, the front desk's Schedule tab, and both stand-alone week views) scrolls sideways: a day is at least 170 px wide and grows by 140 px for each appointment at the same time, so a busy day stays readable instead of being squeezed, and the hours column stays in view while scrolling.

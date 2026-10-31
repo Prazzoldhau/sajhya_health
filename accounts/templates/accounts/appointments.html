@@ -42,10 +42,10 @@
   .cal-scroll { overflow: auto; max-height: calc(100vh - 235px); position: relative; }
   .cal-grid { display: grid; grid-template-columns: 56px repeat(var(--cols), minmax(150px, 1fr)); min-width: 100%; }
   .cal-corner, .cal-dayhead { position: sticky; top: 0; z-index: 8; background: #f6faf7; border-bottom: 1px solid var(--line); border-left: 1px solid var(--line); text-align: center; padding: 9px 4px 6px; font-weight: 700; font-size: 12px; }
-  .cal-corner { border-left: 0; }
+  .cal-corner { border-left: 0; left: 0; z-index: 9; }
   .cal-dayhead.today { background: #d4ecdd; color: var(--green-dark); }
   .cal-dayhead small { display: block; color: #8aa095; font-size: 10px; font-weight: 600; margin-top: 3px; }
-  .gutter { position: relative; height: var(--gh); }
+  .gutter { position: sticky; left: 0; z-index: 6; background: #fff; border-right: 1px solid var(--line); height: var(--gh); }  /* the hours stay in view while scrolling sideways */
   .gutter span { position: absolute; right: 8px; transform: translateY(-50%); font-size: 10px; color: #7c9186; }
   .gutter span:first-child { transform: none; }
   .day-col { position: relative; height: var(--gh); border-left: 1px solid var(--line); cursor: cell;
@@ -162,7 +162,7 @@
     </div>
     {% endif %}
     <div class="cal-scroll" id="calScroll">
-      <div class="cal-grid" style="--cols:{{ columns|length }};--gh:{{ grid_height }}px;--hr:{% widthratio 60 1 px_per_min %}px">
+      <div class="cal-grid" style="grid-template-columns:56px {% for col in columns %}minmax({{ col.min_width }}px,1fr) {% endfor %};--cols:{{ columns|length }};--gh:{{ grid_height }}px;--hr:{% widthratio 60 1 px_per_min %}px">
         <div class="cal-corner"></div>
         {% for col in columns %}<div class="cal-dayhead {% if col.is_today %}today{% endif %}">{{ col.label }}<small>{{ display_name }}</small></div>{% endfor %}
         <div class="gutter">{% for h in hours %}<span style="top:{{ h.top }}px">{{ h.label }}</span>{% endfor %}</div>

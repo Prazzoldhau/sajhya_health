@@ -54,8 +54,8 @@
   .cal-scroll { overflow: auto; max-height: calc(100vh - 260px); border: 1px solid var(--line); border-radius: 10px; position: relative; }
   .cal-grid { display: grid; grid-template-columns: 56px repeat(var(--cols), minmax(150px, 1fr)); min-width: 100%; }
   .cal-corner, .cal-dayhead { position: sticky; top: 0; z-index: 8; background: #f6faf7; border-bottom: 1px solid var(--line); border-left: 1px solid var(--line); text-align: center; padding: 9px 4px; font-weight: 800; font-size: 12px; }
-  .cal-corner { border-left: 0; } .cal-dayhead.today { background: #d4ecdd; color: var(--green-dark); }
-  .gutter { position: relative; height: var(--gh); } .gutter span { position: absolute; right: 8px; transform: translateY(-50%); font-size: 10px; color: #7c9186; } .gutter span:first-child { transform: none; }
+  .cal-corner { border-left: 0; left: 0; z-index: 9; } .cal-dayhead.today { background: #d4ecdd; color: var(--green-dark); }
+  .gutter { position: sticky; left: 0; z-index: 6; background: #fff; border-right: 1px solid var(--line); height: var(--gh); } .gutter span { position: absolute; right: 8px; transform: translateY(-50%); font-size: 10px; color: #7c9186; } .gutter span:first-child { transform: none; }
   .day-col { position: relative; height: var(--gh); border-left: 1px solid var(--line); cursor: cell;
     background-image: repeating-linear-gradient(to bottom, #e6efe9 0, #e6efe9 1px, transparent 1px, transparent calc(var(--hr) - 1px)); }
   .day-col.today { background-color: #f7fcf9; }
@@ -175,7 +175,7 @@
 
   {% if view == 'calendar' %}
   <div class="cal-scroll">
-    <div class="cal-grid" style="--cols:{{ columns|length }};--gh:{{ grid_height }}px;--hr:{% widthratio 60 1 px_per_min %}px">
+    <div class="cal-grid" style="grid-template-columns:56px {% for col in columns %}minmax({{ col.min_width }}px,1fr) {% endfor %};--cols:{{ columns|length }};--gh:{{ grid_height }}px;--hr:{% widthratio 60 1 px_per_min %}px">
       <div class="cal-corner"></div>
       {% for col in columns %}<div class="cal-dayhead {% if col.is_today %}today{% endif %}">{{ col.label }}</div>{% endfor %}
       <div class="gutter">{% for h in hours %}<span style="top:{{ h.top }}px">{{ h.label }}</span>{% endfor %}</div>
@@ -193,7 +193,7 @@
     </div>
   </div>
   {% else %}
-  <table><thead><tr><th>TIME</th><th>PATIENT</th>{% if not own_department %}<th>DEPARTMENT</th>{% endif %}<th>WITH</th><th>STATUS</th>{% if can_book %}<th></th>{% endif %}</tr></thead><tbody>
+  <div style="overflow-x:auto"><table><thead><tr><th>TIME</th><th>PATIENT</th>{% if not own_department %}<th>DEPARTMENT</th>{% endif %}<th>WITH</th><th>STATUS</th>{% if can_book %}<th></th>{% endif %}</tr></thead><tbody>
   {% for a in appointments %}<tr>
     <td><b>{{ a.start|time:"g:i A" }}</b><div class="hint">to {{ a.end|time:"g:i A" }}</div></td>
     <td><b>{{ a.patient.name }}</b><div class="hint">{{ a.patient.patient_code }} &middot; {{ a.get_session_type_display }}{% if can_contact and a.patient.phone %} &middot; {{ a.patient.phone }}{% endif %}</div></td>
@@ -212,7 +212,7 @@
         <form method="post" action="{% url 'clinics:desk-appt-cancel' a.pk %}" onsubmit="return confirm('Cancel this appointment?')" style="margin-top:6px">{% csrf_token %}{% if bare %}<input type="hidden" name="bare" value="1">{% endif %}<button class="secondary-btn" type="submit">Cancel appointment</button></form>
       </details>{% endif %}</td>{% endif %}
   </tr>{% empty %}<tr><td colspan="6" class="hint">No appointments on this day.</td></tr>{% endfor %}
-  </tbody></table>
+  </tbody></table></div>
   {% endif %}
 
   {% if can_book %}

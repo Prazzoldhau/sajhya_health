@@ -16,6 +16,7 @@ from .services import record_visit
 from .access import can_see_contact, first_error, workspace_context, workspace_profile
 
 PX_PER_MIN = 1.5
+DAY_MIN_WIDTH, LANE_MIN_WIDTH = 170, 140  # px: a day is at least this wide, and each appointment at the same time needs this much; wider than the window scrolls sideways
 DEFAULT_FIRST_HOUR, DEFAULT_LAST_HOUR = 8, 18
 DEPARTMENT_TINTS = 6  # colours the calendar cycles through for departments
 TYPE_CLASS = {Visit.INITIAL: 'initial', Visit.TREATMENT: 'treatment', Visit.FOLLOW_UP: 'followup'}
@@ -82,7 +83,7 @@ def booked_prompt(request, profile):
 
 
 def _layout_lanes(items):
-    """Side-by-side columns for overlapping appointments within one day."""
+    """Side-by-side columns for overlapping appointments within one day. Returns how many sit side by side at the busiest moment."""
     items.sort(key=lambda e: e['start_min'])
     group, group_end, lanes = [], -1, []
 
@@ -105,6 +106,7 @@ def _layout_lanes(items):
         group.append(e)
         group_end = max(group_end, e['end_min'])
     close()
+    return max((e['lane'] for e in items), default=-1) + 1
 
 
 def _task_label(task, today):
@@ -155,11 +157,11 @@ def build_grid(profile, events, day_list, today, patient_link=True, with_links=T
                 'tint': tints.get(ev.department_id, '') if ev.department_id and ev.kind == Appointment.APPOINTMENT else '',
                 'date': s.date().isoformat(), 'start_hm': s.strftime('%H:%M'), 'end_hm': e.strftime('%H:%M'),
             })
-        _layout_lanes(items)
+        side_by_side = _layout_lanes(items)
         for it in items:
             it['links_json'] = json.dumps(it['links'])
         columns.append({
-            'date': day, 'iso': day.isoformat(), 'is_today': day == today,
+            'date': day, 'iso': day.isoformat(), 'is_today': day == today, 'min_width': max(DAY_MIN_WIDTH, side_by_side * LANE_MIN_WIDTH),
             'label': f"{day:%a}, {ordinal(day.day)} {day:%b}", 'events': items,
         })
 
