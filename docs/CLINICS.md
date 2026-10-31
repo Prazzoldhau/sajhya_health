@@ -198,3 +198,7 @@ the clinic's own login can); they can still keep their own private patients.
   *Speech therapist*...), not "Physiotherapist" for everyone.
 - On the front desk's calendar, *Open in a new tab* shows just the week's calendar (no header or menu) to keep on a second screen. Booking, changing and
   cancelling there stay in that tab; *Close this tab* ends it.
+
+### Reception's appointment book: more room, and its own tab
+
+The clinic login's **Appointments** page (what reception works in) opens with the side panel (month calendar and to-do list) closed, so the week grid gets the whole width; **Side panel** in the toolbar brings it back and the choice is remembered on that computer. A physiotherapist's own calendar still opens with it. **Week in a new tab** opens the appointment book alone (`?bare=1`): no header, no menu, no side panel, seven days; booking, changing and cancelling there stay in that tab, and *Close this tab* ends it. The front desk's Schedule tab has the same stand-alone week view.

@@ -1,4 +1,4 @@
-{% extends 'accounts/pro_base.html' %}
+{% extends base_template|default:'accounts/pro_base.html' %}
 {% block title %}Appointments | Sajhya Health{% endblock %}
 {% block extra_css %}
   main { padding-top: 18px; }
@@ -75,6 +75,7 @@
   .keys div { display: flex; justify-content: space-between; align-items: center; }
   .detail-row { padding: 2px 24px; font-size: 13px; color: #426052; }
   .detail-actions { display: flex; gap: 8px; flex-wrap: wrap; padding: 16px 24px 22px; }
+  .appt-layout.no-side { grid-template-columns: minmax(0, 1fr); } .appt-layout.no-side .side { display: none; }
   @media (max-width: 1000px) { .appt-layout { grid-template-columns: 1fr; } .cal-scroll { max-height: 70vh; } }
 {% endblock %}
 
@@ -85,22 +86,25 @@
   <button type="button" class="pill solid" data-open="apptModal">＋ New appointment</button>
   <button type="button" class="pill" data-block="available">One-off availability</button>
   <button type="button" class="pill" data-block="unavailable">Unavailable block</button>
-  <button type="button" class="pill" onclick="notify('SMS rescheduling is not connected yet.')">Reschedule SMS</button>
+  {% if not bare %}<button type="button" class="pill" onclick="notify('SMS rescheduling is not connected yet.')">Reschedule SMS</button>{% endif %}
   <button type="button" class="pill icon" title="Refresh" onclick="location.reload()">↻</button>
-  <button type="button" class="pill icon" title="Notifications" onclick="notify('No new notifications.')">♧</button>
+  {% if not bare %}<button type="button" class="pill icon" title="Notifications" onclick="notify('No new notifications.')">♧</button>{% endif %}
   <form method="get" class="pill" style="padding:0 6px">
-    <input type="hidden" name="date" value="{{ start_date|date:'Y-m-d' }}">
+    <input type="hidden" name="date" value="{{ start_date|date:'Y-m-d' }}">{% if bare %}<input type="hidden" name="bare" value="1">{% endif %}
     <select name="days" onchange="this.form.submit()" aria-label="Days shown">
       <option value="1" {% if days == 1 %}selected{% endif %}>1 Day</option>
       <option value="3" {% if days == 3 %}selected{% endif %}>3 Days</option>
       <option value="7" {% if days == 7 %}selected{% endif %}>7 Days</option>
     </select>
   </form>
-  <button type="button" class="pill" onclick="notify('Schedule & visibility settings are not connected yet.')">Schedule &amp; visibility</button>
+  {% if not bare %}<button type="button" class="pill" onclick="notify('Schedule & visibility settings are not connected yet.')">Schedule &amp; visibility</button>{% endif %}
   <button type="button" class="pill" data-open="keysModal">Shortcut keys</button>
+  {% if bare %}<a class="pill" href="{% url 'accounts:appointments' %}?date={{ start_date|date:'Y-m-d' }}&days={{ days }}">Back to the workspace</a><button type="button" class="pill" onclick="window.close()">Close this tab</button>
+  {% else %}<a class="pill" href="?bare=1&days=7&date={{ start_date|date:'Y-m-d' }}{% if dept %}&dept={{ dept }}{% endif %}" target="_blank" rel="noopener" title="Open the appointment book alone in a new browser tab, to keep it on a second screen">⤢ Week in a new tab</a>
+  <button type="button" class="pill" id="sideToggle" title="Show or hide the side calendar and to-do list">☰ Side panel</button>{% endif %}
 </div>
 
-<div class="appt-layout">
+<div class="appt-layout {% if not side_open %}no-side{% endif %}" id="apptLayout">
   <aside class="side">
     <select class="who" aria-label="Practitioner"><option>{{ display_name }}</option></select>
     <div class="seg" id="panelSeg">
@@ -144,16 +148,16 @@
 
   <section class="cal-card">
     <div class="cal-bar">
-      <a class="pill icon" id="navPrev" href="?date={{ prev_date|date:'Y-m-d' }}&days={{ days }}" aria-label="Previous">‹</a>
-      <a class="pill" id="navToday" href="?date={{ today|date:'Y-m-d' }}&days={{ days }}">Today</a>
-      <a class="pill icon" id="navNext" href="?date={{ next_date|date:'Y-m-d' }}&days={{ days }}" aria-label="Next">›</a>
+      <a class="pill icon" id="navPrev" href="?date={{ prev_date|date:'Y-m-d' }}&days={{ days }}{{ bare_q }}" aria-label="Previous">‹</a>
+      <a class="pill" id="navToday" href="?date={{ today|date:'Y-m-d' }}&days={{ days }}{{ bare_q }}">Today</a>
+      <a class="pill icon" id="navNext" href="?date={{ next_date|date:'Y-m-d' }}&days={{ days }}{{ bare_q }}" aria-label="Next">›</a>
       <span class="range">{{ range_label }}</span>
     </div>
     {% if departments %}
     <div class="dept-chips">
-      <a href="?date={{ start_date|date:'Y-m-d' }}&days={{ days }}" class="{% if not dept %}on{% endif %}">All departments</a>
-      {% for d in departments %}<a href="?date={{ start_date|date:'Y-m-d' }}&days={{ days }}&dept={{ d.id }}" class="{% if dept == d.id|stringformat:'s' %}on{% endif %}"><i style="background:{% if d.tint == 0 %}#168653{% elif d.tint == 1 %}#3d6fb0{% elif d.tint == 2 %}#c0762b{% elif d.tint == 3 %}#8a4fb0{% elif d.tint == 4 %}#c0455f{% else %}#5d7568{% endif %}"></i>{{ d.name }}</a>{% endfor %}
-      <a href="?date={{ start_date|date:'Y-m-d' }}&days={{ days }}&dept=none" class="{% if dept == 'none' %}on{% endif %}">No department</a>
+      <a href="?date={{ start_date|date:'Y-m-d' }}&days={{ days }}{{ bare_q }}" class="{% if not dept %}on{% endif %}">All departments</a>
+      {% for d in departments %}<a href="?date={{ start_date|date:'Y-m-d' }}&days={{ days }}&dept={{ d.id }}{{ bare_q }}" class="{% if dept == d.id|stringformat:'s' %}on{% endif %}"><i style="background:{% if d.tint == 0 %}#168653{% elif d.tint == 1 %}#3d6fb0{% elif d.tint == 2 %}#c0762b{% elif d.tint == 3 %}#8a4fb0{% elif d.tint == 4 %}#c0455f{% else %}#5d7568{% endif %}"></i>{{ d.name }}</a>{% endfor %}
+      <a href="?date={{ start_date|date:'Y-m-d' }}&days={{ days }}&dept=none{{ bare_q }}" class="{% if dept == 'none' %}on{% endif %}">No department</a>
       <a href="{% url 'accounts:departments' %}" style="border-style:dashed">Manage</a>
     </div>
     {% endif %}
@@ -186,6 +190,7 @@
     <form method="post" action="{% url 'accounts:appointment-create' %}" class="mini-form">
       {% csrf_token %}
       <input type="hidden" name="days" value="{{ days }}">
+      {% if bare %}<input type="hidden" name="bare" value="1">{% endif %}
       <label>Patient
         <span class="psearch" style="position:relative;display:block">
           <input type="search" id="patientSearch" placeholder="Search by name, phone or patient ID..." autocomplete="off">
@@ -209,6 +214,7 @@
     <form method="post" action="{% url 'accounts:block-create' %}" class="mini-form">
       {% csrf_token %}
       <input type="hidden" name="days" value="{{ days }}">
+      {% if bare %}<input type="hidden" name="bare" value="1">{% endif %}
       <label>Type {{ block_form.kind }}</label>
       <label>Label {{ block_form.title }}</label>
       <label>Date {{ block_form.date }}</label>
@@ -227,6 +233,7 @@
     <form method="post" id="actionForm" class="detail-actions" data-url="{% url 'accounts:appointment-action' 0 %}">
       {% csrf_token %}
       <input type="hidden" name="days" value="{{ days }}">
+      {% if bare %}<input type="hidden" name="bare" value="1">{% endif %}
       <a class="secondary-btn" id="dOpen" href="#" style="text-decoration:none;display:inline-flex;align-items:center">Open patient</a>
       <button class="primary-btn" name="action" value="attend" id="dAttend">Mark attended</button>
       <span id="dWaWrap" style="display:inline-flex;gap:4px;align-items:center">
@@ -246,6 +253,7 @@
     <form method="post" id="editForm" class="mini-form" data-url="{% url 'accounts:appointment-edit' 0 %}">
       {% csrf_token %}
       <input type="hidden" name="days" value="{{ days }}">
+      {% if bare %}<input type="hidden" name="bare" value="1">{% endif %}
       <div class="two"><label>Date <input type="date" name="date" id="e_date" required></label><label>Start time <input type="time" name="start_time" id="e_start" required></label></div>
       <div class="two"><label>End time <input type="time" name="end_time" id="e_end" required></label>
         <label id="e_type_wrap">Type <select name="session_type" id="e_type">{% for value, label in session_choices %}<option value="{{ value }}">{{ label }}</option>{% endfor %}</select></label></div>
@@ -290,6 +298,17 @@
     }
     document.addEventListener('change', function (e) { if (e.target.name === 'department' && e.target.tagName === 'SELECT') narrowWho(e.target); });
     document.querySelectorAll('select[name=department]').forEach(narrowWho);
+  (function () {  // remember whether the side panel was opened or closed on this computer
+    var layout = $('apptLayout'), btn = $('sideToggle'), saved = null;
+    try { saved = localStorage.getItem('apptSide'); } catch (err) {}
+    if (btn) {
+      if (saved) layout.classList.toggle('no-side', saved === 'closed');
+      btn.addEventListener('click', function () {
+        var closed = layout.classList.toggle('no-side');
+        try { localStorage.setItem('apptSide', closed ? 'closed' : 'open'); } catch (err) {}
+      });
+    }
+  })();
   function typing(e) { return /INPUT|TEXTAREA|SELECT/.test((e.target.tagName || '')); }
 
   function pad(n) { return (n < 10 ? '0' : '') + n; }

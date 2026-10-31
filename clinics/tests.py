@@ -1844,3 +1844,59 @@ class TherapistLabelsAndWeekCalendarTests(Base):
         for who in ('ram-desk', 'mani', 'asha'):
             self.as_user(who)
             self.assertEqual(self.client.get(reverse('clinics:desk'), {'tab': 'schedule', 'bare': 1}).status_code, 200, who)
+
+
+class ReceptionAppointmentBookLayoutTests(Base):
+    """The clinic login's appointment book (used by reception): no side calendar by default, and a stand-alone week view for its own browser tab."""
+    CREDS = StaffLoginTests.CREDS
+    add_staff = StaffLoginTests.add_staff
+    setup_desk = FrontDeskRegisteredByAndBillingTests.setup_desk
+    prepare = SchedulesTests.prepare
+
+    def test_the_side_calendar_is_closed_for_the_clinic_login_and_open_for_a_professional(self):
+        self.prepare()
+        self.as_user('himal-clinic')
+        page = self.client.get(reverse('accounts:appointments'))
+        self.assertFalse(page.context['side_open'])
+        self.assertContains(page, 'class="appt-layout no-side"')  # the grid takes the whole width
+        self.assertContains(page, 'id="sideToggle"')  # one click brings the month calendar and to-do list back
+        self.assertContains(page, 'Week in a new tab')
+        self.as_user('owner')  # a physiotherapist's own calendar is unchanged
+        own = self.client.get(reverse('accounts:appointments'))
+        self.assertTrue(own.context['side_open'])
+        self.assertNotContains(own, 'class="appt-layout no-side"')
+
+    def test_the_book_opens_alone_for_the_whole_week(self):
+        self.prepare()
+        self.as_user('himal-clinic')
+        bare = self.client.get(reverse('accounts:appointments'), {'bare': 1})
+        self.assertEqual(bare.status_code, 200)
+        self.assertEqual((bare.context['days'], len(bare.context['columns'])), (7, 7))
+        self.assertTrue(bare.context['bare'])
+        self.assertEqual(bare.templates[0].name, 'accounts/appointments.html')
+        self.assertNotContains(bare, 'class="topbar"')  # no header
+        self.assertNotContains(bare, 'class="sidebar"')  # no workspace menu
+        self.assertContains(bare, 'class="appt-layout no-side"')
+        self.assertContains(bare, 'Close this tab')
+        self.assertNotContains(bare, 'Week in a new tab')
+        self.assertContains(bare, 'name="bare" value="1"')
+        self.assertContains(bare, 'amp;bare=1')  # moving between weeks stays in this view (an escaped &)
+        normal = self.client.get(reverse('accounts:appointments'))
+        self.assertContains(normal, 'class="topbar"')
+        self.assertContains(normal, 'class="sidebar"')
+
+    def test_booking_and_changing_from_the_alone_view_return_to_it(self):
+        from accounts.models import Appointment
+        clinic = self.prepare()
+        self.c.clinic, self.c.professional = clinic, self.workspace
+        self.c.save()
+        self.as_user('himal-clinic')
+        day = (timezone.localdate() + datetime.timedelta(days=1)).isoformat()
+        r = self.client.post(reverse('accounts:appointment-create'), {'patient': self.c.pk, 'date': day, 'start_time': '10:00', 'duration': 30, 'session_type': 'treatment',
+                                                                       'department': self.ot.pk, 'practitioner': self.asha.pk, 'notes': 'b', 'days': 7, 'bare': '1'})
+        self.assertIn('bare=1', r['Location'])
+        appt = Appointment.objects.get(notes='b')
+        edit = {'date': day, 'start_time': '10:30', 'end_time': '11:00', 'session_type': 'treatment', 'notes': 'b', 'department': self.ot.pk, 'practitioner': self.asha.pk, 'days': 7}
+        self.assertIn('bare=1', self.client.post(reverse('accounts:appointment-edit', args=[appt.pk]), {**edit, 'bare': '1'})['Location'])
+        self.assertNotIn('bare=1', self.client.post(reverse('accounts:appointment-edit', args=[appt.pk]), edit)['Location'])
+        self.assertIn('bare=1', self.client.post(reverse('accounts:appointment-action', args=[appt.pk]), {'action': 'cancel', 'days': 7, 'bare': '1'})['Location'])

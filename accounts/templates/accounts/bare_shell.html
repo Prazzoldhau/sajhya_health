@@ -1,0 +1,7 @@
+{% extends 'accounts/pro_base.html' %}
+{% comment %}A workspace page on its own, for a second screen or a browser tab of its own: no header, no menu, the page gets the whole window.{% endcomment %}
+{% block topbar %}{% endblock %}
+{% block aside %}{% endblock %}
+{% block late_css %}
+  .layout { display: block; min-height: 0; } main { padding: 10px 14px 14px; } .cal-scroll { max-height: calc(100vh - 150px); }
+{% endblock %}

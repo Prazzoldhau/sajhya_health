@@ -179,7 +179,8 @@ def appointments(request):
         start_date = datetime.date.fromisoformat(request.GET.get('date', ''))
     except ValueError:
         start_date = today
-    days = int(request.GET['days']) if request.GET.get('days') in ('1', '3', '7') else 3
+    bare = request.GET.get('bare') == '1'  # the appointment book alone, to open in its own browser tab
+    days = int(request.GET['days']) if request.GET.get('days') in ('1', '3', '7') else (7 if bare else 3)  # the whole week there
     day_list = [start_date + datetime.timedelta(days=i) for i in range(days)]
 
     departments = list(profile.departments.all())
@@ -214,7 +215,9 @@ def appointments(request):
 
     context = workspace_context(request.user, profile)
     context.update({
-        'active': 'appointments', 'columns': columns, 'hours': hours, 'days': days,
+        'active': 'appointments', 'bare': bare, 'bare_q': '&bare=1' if bare else '', 'base_template': 'accounts/bare_shell.html' if bare else 'accounts/pro_base.html',
+        'side_open': not bare and getattr(profile, 'clinic_workspace', None) is None,  # a clinic's own login (reception) gets the whole width
+        'columns': columns, 'hours': hours, 'days': days,
         'grid_height': grid_height, 'grid_start_min': grid_start_min,
         'px_per_min': PX_PER_MIN, 'start_date': start_date, 'today': today,
         'prev_date': start_date - datetime.timedelta(days=days),
@@ -277,8 +280,8 @@ def apply_edit(profile, appt, d):
     return dropped
 
 
-def _back(date, days, booked=None, kind='booked'):
-    extra = f'&booked={booked}&kind={kind}' if booked else ''
+def _back(date, days, booked=None, kind='booked', bare=False):
+    extra = (f'&booked={booked}&kind={kind}' if booked else '') + ('&bare=1' if bare else '')
     return redirect(f"{reverse('accounts:appointments')}?date={date}&days={days}{extra}")
 
 
@@ -300,7 +303,7 @@ def appointment_create(request):
     assign_for_booking(appt)
     sync_next_appointment(d['patient'])
     messages.success(request, f"Appointment booked for {d['patient'].name}.")
-    return _back(d['date'], days, booked=appt.pk)
+    return _back(d['date'], days, booked=appt.pk, bare=request.POST.get('bare') == '1')
 
 
 @login_required
@@ -318,7 +321,7 @@ def block_create(request):
         professional=profile, kind=d['kind'], title=d['title'],
         start=aware(d['date'], d['start_time']), end=aware(d['date'], d['end_time']))
     messages.success(request, 'Calendar updated.')
-    return _back(d['date'], days)
+    return _back(d['date'], days, bare=request.POST.get('bare') == '1')
 
 
 @login_required
@@ -334,16 +337,16 @@ def appointment_edit(request, pk):
     form = RescheduleForm(request.POST)
     if appt.status != Appointment.SCHEDULED and appt.kind == Appointment.APPOINTMENT:
         messages.error(request, 'Only a scheduled appointment can be changed.')
-        return _back(timezone.localtime(appt.start).date(), days)
+        return _back(timezone.localtime(appt.start).date(), days, bare=request.POST.get('bare') == '1')
     if not form.is_valid():
         messages.error(request, first_error(form))
-        return _back(timezone.localtime(appt.start).date(), days)
+        return _back(timezone.localtime(appt.start).date(), days, bare=request.POST.get('bare') == '1')
     d = form.cleaned_data
     dropped = apply_edit(profile, appt, d)
     if dropped:
         messages.warning(request, f'{dropped} does not work in that department, so the appointment is not booked with anyone yet.')
     messages.success(request, 'Appointment rescheduled.' if appt.kind == Appointment.APPOINTMENT else 'Calendar updated.')
-    return _back(d['date'], days, booked=appt.pk if appt.kind == Appointment.APPOINTMENT else None, kind='rescheduled')
+    return _back(d['date'], days, booked=appt.pk if appt.kind == Appointment.APPOINTMENT else None, kind='rescheduled', bare=request.POST.get('bare') == '1')
 
 
 @login_required
@@ -371,8 +374,8 @@ def appointment_action(request, pk):
     if patient:
         sync_next_appointment(patient)
     if action == 'cancel' and appt.kind == Appointment.APPOINTMENT and patient:
-        return _back(local_date, request.POST.get('days', 3), booked=appt.pk, kind='cancelled')
-    return _back(local_date, request.POST.get('days', 3))
+        return _back(local_date, request.POST.get('days', 3), booked=appt.pk, kind='cancelled', bare=request.POST.get('bare') == '1')
+    return _back(local_date, request.POST.get('days', 3), bare=request.POST.get('bare') == '1')
 
 
 @login_required
