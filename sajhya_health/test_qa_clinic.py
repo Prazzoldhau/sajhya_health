@@ -115,7 +115,10 @@ class ClinicRoleSweepTests(ClinicWorld):
         pid = self.patient.pk
         for role, user in self.staff_users.items():
             c = self.login(user)
-            for page in ('/accounts/dashboard/', '/accounts/patients/', f'/accounts/patients/{pid}/', f'/soapnotes/patients/{pid}/new/', '/accounts/messages/', '/billing/', '/accounts/reports/'):
+            pages = ['/accounts/dashboard/', '/accounts/patients/', f'/accounts/patients/{pid}/', f'/soapnotes/patients/{pid}/new/', '/accounts/messages/', '/accounts/reports/']
+            if role not in ('receptionist', 'manager'):  # the two roles that bill use the billing pages; nobody else may
+                pages.append('/billing/')
+            for page in pages:
                 self.assertIn(c.get(page).status_code, (302, 403, 404), f'{role} reached {page}')
 
     def test_a_get_request_never_changes_data_for_the_clinic_roles(self):

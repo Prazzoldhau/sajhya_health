@@ -206,7 +206,7 @@ class AccessTests(Base):
         self.patient.clinic = clinic
         self.patient.save()
         physio_user, physio = make_professional('colleague')
-        ClinicMember.objects.create(clinic=clinic, physio=physio, status='active')
+        self.patient.assigned.add(ClinicMember.objects.create(clinic=clinic, physio=physio, status='active'))
         draft = self.create()
         final = self.create(action='final')
         self.as_user('colleague')
