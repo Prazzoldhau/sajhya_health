@@ -98,6 +98,25 @@
     </table>
   </div>
 </section>
+
+{% if package_sessions %}
+<section class="panel" style="margin-top:14px" id="package-sessions">
+  <div class="panel-header"><div class="panel-title"><span class="small-icon">✓</span>Package sessions used{% if not search %} today{% endif %}</div>
+    <span class="patient-id">{{ package_sessions|length }} session{{ package_sessions|length|pluralize }} · already paid through the package, not billed again</span></div>
+  <div class="table-wrap"><table>
+    <thead><tr><th>{% if search %}DATE{% else %}PATIENT{% endif %}</th>{% if search %}<th>PATIENT</th>{% endif %}<th>PACKAGE</th><th>SESSION</th><th>RECORDED BY</th><th>NOTE</th><th style="text-align:right">WORTH</th></tr></thead>
+    <tbody>{% for r in package_sessions %}<tr>
+      {% if search %}<td>{{ r.entry.date|date:"M j, Y" }}</td>{% endif %}
+      <td>{% if staff_mode %}<b>{{ r.patient.name }}</b>{% else %}<a href="{% url 'accounts:patient-detail' r.patient.pk %}?tab=billing" style="color:inherit;font-weight:700;text-decoration:none">{{ r.patient.name }}</a>{% endif %}<div class="patient-id">{{ r.patient.patient_code }}</div></td>
+      <td>{{ r.package.get_duration_display }} package<div class="patient-id">NPR {{ r.package.total_amount }}{% if r.package.is_fully_paid %} · paid in full{% else %} · NPR {{ r.package.amount_due }} still due{% endif %}</div></td>
+      <td><b>{{ r.number }} of {{ r.of }}</b>{% if r.package.effective_status == 'completed' and r.number == r.of %}<div class="patient-id" style="color:#16834f;font-weight:700">Package complete</div>{% endif %}</td>
+      <td>{{ r.entry.recorded_by_name|default:"-" }}{% if r.entry.recorded_by_role %}<div class="patient-id">{{ r.entry.recorded_by_role }}</div>{% endif %}</td>
+      <td>{{ r.entry.note|default:"" }}</td>
+      <td style="text-align:right">≈ NPR {{ r.value|floatformat:0 }}</td>
+    </tr>{% endfor %}</tbody>
+  </table></div>
+</section>
+{% endif %}
 {% endblock %}
 
 {% block modals %}

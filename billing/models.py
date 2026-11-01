@@ -465,6 +465,18 @@ class PackageSession(models.Model):
         return f'{self.package} - {self.date}'
 
 
+def package_session_rows(sessions):
+    """Package sessions for a billing list, each with its number in the package ("3 of 10") and the value it represents (the package price over its sessions).
+    `sessions` must come with package, patient and the package's session log loaded."""
+    rows = []
+    for entry in sessions:
+        package = entry.package
+        live = [e for e in package.session_log.all() if e.undone_at is None]
+        number = package.unlogged_sessions + (live.index(entry) + 1 if entry in live else 0)
+        rows.append({'entry': entry, 'package': package, 'patient': package.patient, 'number': number, 'of': package.total_sessions, 'value': package.per_session})
+    return rows
+
+
 class PackagePayment(models.Model):
     package = models.ForeignKey(PatientPackage, on_delete=models.CASCADE, related_name='payments')
     amount = models.DecimalField(max_digits=10, decimal_places=2)

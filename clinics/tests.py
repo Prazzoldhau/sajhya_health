@@ -2113,3 +2113,70 @@ class PackageSessionsAtBillingTests(Base):
         self.assertEqual(self.use().status_code, 404)
         self.package.refresh_from_db()
         self.assertEqual(self.package.sessions_used, 0)
+
+
+class PackageSessionsInTheDailyRecordTests(Base):
+    """A package session used shows in that day's billing record, as a done record that is not billed again."""
+    CREDS = StaffLoginTests.CREDS
+    add_staff = StaffLoginTests.add_staff
+    setup_desk = FrontDeskRegisteredByAndBillingTests.setup_desk
+    register = FrontDeskRegisteredByAndBillingTests.register
+    start = PackageSessionsAtBillingTests.start
+
+    def use(self, day=None, **extra):
+        return self.client.post(reverse('billing:package-use', args=[self.package.pk]), {'date': (day or timezone.localdate()).isoformat(), 'note': '', **extra})
+
+    def test_the_day_shows_the_sessions_used_with_their_number_and_who_recorded_them(self):
+        self.start(sessions=3)
+        self.use(note='Back exercises')
+        self.use()
+        page = self.client.get(reverse('billing:billing'))
+        rows = page.context['package_sessions']
+        self.assertEqual([(r['number'], r['of'], r['entry'].recorded_by_name) for r in rows], [(1, 3, 'Ram'), (2, 3, 'Ram')])
+        self.assertContains(page, 'Package sessions used today')
+        self.assertContains(page, '1 of 3')
+        self.assertContains(page, '2 of 3')
+        self.assertContains(page, 'Back exercises')
+        self.assertContains(page, 'not billed again')
+        self.assertContains(page, '≈ NPR 1000')  # the value of a session: price over sessions
+        self.assertEqual(page.context['total'], 0)  # nothing is added to the day's billed total
+
+    def test_another_day_has_its_own_sessions_and_a_patient_search_lists_them_all(self):
+        self.start(sessions=3)
+        yesterday = timezone.localdate() - datetime.timedelta(days=1)
+        self.package.start_date = yesterday
+        self.package.save()
+        self.use(day=yesterday)
+        self.use()
+        today = self.client.get(reverse('billing:billing')).context['package_sessions']
+        self.assertEqual([r['number'] for r in today], [2])
+        past = self.client.get(reverse('billing:billing'), {'date': yesterday.isoformat()}).context['package_sessions']
+        self.assertEqual([r['number'] for r in past], [1])
+        found = self.client.get(reverse('billing:billing'), {'patient': self.patient.pk})
+        self.assertEqual([r['number'] for r in found.context['package_sessions']], [2, 1])  # newest first, every date
+        self.assertContains(found, 'Package sessions used')
+        self.assertNotContains(found, 'Package sessions used today')
+
+    def test_a_session_taken_back_leaves_the_record_and_the_clinic_login_sees_it_too(self):
+        self.start(sessions=2)
+        self.use()
+        entry = self.package.session_log.get()
+        self.as_user('himal-clinic')
+        self.assertEqual(len(self.client.get(reverse('billing:billing')).context['package_sessions']), 1)
+        self.client.post(reverse('billing:package-session-undo', args=[self.package.pk, entry.pk]))
+        page = self.client.get(reverse('billing:billing'))
+        self.assertEqual(page.context['package_sessions'], [])
+        self.assertNotContains(page, 'Package sessions used')
+
+    def test_the_completed_package_is_marked_and_the_excel_file_has_a_sheet(self):
+        import io
+        from openpyxl import load_workbook
+        self.start(sessions=2)
+        self.use()
+        self.use(note='Last one')
+        page = self.client.get(reverse('billing:billing'))
+        self.assertContains(page, 'Package complete')
+        book = load_workbook(io.BytesIO(self.client.get(reverse('billing:export-xlsx')).content))
+        self.assertIn('Package sessions', book.sheetnames)
+        rows = list(book['Package sessions'].iter_rows(min_row=2, values_only=True))
+        self.assertEqual([(r[1], r[4], r[5], r[6], r[9]) for r in rows], [('Walk In', 1, 2, 'Ram', 'Used'), ('Walk In', 2, 2, 'Ram', 'Used')])

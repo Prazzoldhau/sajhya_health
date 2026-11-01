@@ -21,7 +21,7 @@ from accounts.messaging import channel_links
 from . import catalog, exports
 from . import invoice as inv
 from .forms import AdvanceForm, BillCorrectionForm, BillingEntryForm, EntryPaymentForm, PackagePaymentForm, PatientBillForm, PatientPackageForm
-from .models import ServiceItem, ADVANCE, BillingEntry, EntryPayment, PackagePayment, PatientAdvance, PatientPackage, advance_balance, lock_patient
+from .models import PackageSession, package_session_rows, ServiceItem, ADVANCE, BillingEntry, EntryPayment, PackagePayment, PatientAdvance, PatientPackage, advance_balance, lock_patient
 
 
 def revenue_for(profile, date):
@@ -106,9 +106,21 @@ def billing(request):
         entries = found
         owed = [e for e in owed if e in found]
 
+    logs = (PackageSession.objects.filter(package__professional=profile, undone_at__isnull=True).select_related('package__patient', 'package__professional')
+            .prefetch_related('package__session_log'))
+    if search:  # one patient's (or one search's) package sessions on every date, like the bills
+        if patient_id.isdigit():
+            logs = logs.filter(package__patient_id=int(patient_id))
+        else:
+            logs = logs.filter(Q(package__patient__name__icontains=text) | Q(package__patient__patient_code__icontains=text))
+        logs = logs.order_by('-date', '-id')[:300]
+    else:
+        logs = logs.filter(date=selected).order_by('id')
+    package_sessions = package_session_rows(logs)
+
     context = billing_context(request, profile)
     context.update({
-        'active': 'billing', 'billing_tab': 'book', 'search': search, 'form': form, 'entries': entries, 'selected': selected, 'today': today,
+        'package_sessions': package_sessions, 'active': 'billing', 'billing_tab': 'book', 'search': search, 'form': form, 'entries': entries, 'selected': selected, 'today': today,
         'prev_date': selected - datetime.timedelta(days=1), 'next_date': selected + datetime.timedelta(days=1),
         'total': total, 'by_mode': [(mode_names[m], v) for m, v in by_mode.items()],
         'month_total': month_total, 'month_label': f'{selected:%B %Y}', 'package_payments': revenue_for(profile, selected) - collected - advance_net, 'collected': collected, 'advance_net': advance_net, 'received_total': revenue_for(profile, selected), 'advance_held': advance_held, 'advance_held_total': advance_held,

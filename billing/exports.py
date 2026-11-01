@@ -207,6 +207,20 @@ def build_workbook(scope, f):
                                            (p.total_sessions, None), (p.total_amount, MONEY), (p.amount_paid, MONEY), (p.amount_due, MONEY), (p.effective_status_display, None)), 1):
             _put(pk, r, c, value, fmt)
 
+    from .models import PackageSession
+    ps = wb.create_sheet('Package sessions')
+    _header(ps, ['Date', 'Patient', 'Patient ID', 'Package', 'Session', 'Of', 'Recorded by', 'Role', 'Note', 'Status'], [12, 26, 20, 14, 9, 7, 22, 16, 30, 12])
+    logged = (PackageSession.objects.filter(package__in=scope.packages, date__gte=f.start, date__lte=f.end).select_related('package__patient').prefetch_related('package__session_log')
+              .order_by('date', 'id')[:MAX_EXPORT_ROWS])
+    for r, entry in enumerate(logged, 2):
+        package = entry.package
+        live = [e for e in package.session_log.all() if e.undone_at is None]
+        number = package.unlogged_sessions + (live.index(entry) + 1 if entry in live else 0)
+        for c, (value, fmt) in enumerate(((entry.date, DAY), (package.patient.name, None), (package.patient.patient_code or '', None), (package.get_duration_display(), None),
+                                           (number if entry.undone_at is None else '', None), (package.total_sessions, None), (entry.recorded_by_name, None), (entry.recorded_by_role, None),
+                                           (entry.note, None), ('Taken back' if entry.undone_at else 'Used', None)), 1):
+            _put(ps, r, c, value, fmt)
+
     svc = wb.create_sheet('By service')
     _header(svc, ['Service / add-on', 'Times billed', 'Amount (NPR)'], [34, 14, 16])
     by_service = {}

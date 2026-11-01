@@ -935,7 +935,7 @@ class BillingSheetTests(BillingBase):
         self.bill(rate='700', status='due')
         self.client.post(reverse('billing:advance-add', args=[self.patient.pk]), {'amount': '1000', 'payment_mode': 'online'})
         wb = self.workbook()
-        self.assertEqual(wb.sheetnames, ['Summary', 'Bills', 'Payments received', 'Advances', 'Packages', 'By service'])
+        self.assertEqual(wb.sheetnames, ['Summary', 'Bills', 'Payments received', 'Advances', 'Packages', 'Package sessions', 'By service'])
         bills = wb['Bills']
         self.assertEqual([c.value for c in bills[1]][:9], ['Date', 'Invoice', 'Patient', 'Patient ID', 'Phone', 'Service', 'Amount (NPR)', 'Received (NPR)', 'Due (NPR)'])
         self.assertEqual((bills['A2'].value.date() if hasattr(bills['A2'].value, 'date') else bills['A2'].value), self.today)
@@ -1099,7 +1099,7 @@ class PriceListTests(BillingBase):
             self.client.post(reverse('billing:patient-bill', args=[self.patient.pk]), {'entry_date': self.today.isoformat(), 'service': ' + '.join(names), 'rate': rate, 'payment_mode': 'cash',
                                                                                      'payment_status': 'paid', 'lines': lines})
         wb = load_workbook(io.BytesIO(self.client.get(reverse('billing:export-xlsx')).content))
-        self.assertEqual(wb.sheetnames, ['Summary', 'Bills', 'Payments received', 'Advances', 'Packages', 'By service'])
+        self.assertEqual(wb.sheetnames, ['Summary', 'Bills', 'Payments received', 'Advances', 'Packages', 'Package sessions', 'By service'])
         rows = {r[0].value: (r[1].value, r[2].value) for r in wb['By service'].iter_rows(min_row=2)}
         self.assertEqual(rows, {'Basic Physiotherapy': (2, 800), 'Needling': (1, 300)})
         stranger, _ = make_professional('stranger')
