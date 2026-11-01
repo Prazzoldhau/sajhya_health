@@ -400,7 +400,7 @@ def packages(request):
     profile = billing_profile(request)
     if profile is None:
         return redirect('accounts:welcome')
-    all_packages = list(PatientPackage.objects.filter(professional=profile).select_related('patient').prefetch_related('payments'))
+    all_packages = list(PatientPackage.objects.filter(professional=profile).select_related('patient', 'professional').prefetch_related('payments', 'session_log'))
     flt = request.GET.get('show', '')
     if flt == 'due':
         shown = [p for p in all_packages if p.effective_status != 'cancelled' and not p.is_fully_paid]
@@ -417,7 +417,7 @@ def packages(request):
     context = billing_context(request, profile)
     context.update({
         'advance_held_total': PatientAdvance.objects.filter(professional=profile).aggregate(t=Sum('amount'))['t'] or 0,
-        'active': 'billing', 'billing_tab': 'packages', 'packages': shown, 'show': flt, 'filters': PACKAGE_FILTERS,
+        'active': 'billing', 'billing_tab': 'packages', 'packages': shown, 'show': flt, 'filters': PACKAGE_FILTERS, 'today': timezone.localdate(),
         'form': PatientPackageForm(profile=profile, initial={'start_date': timezone.localdate(), 'amount_paid_now': 0}),
         'payment_form': PackagePaymentForm(),
         'active_count': len(live), 'sessions_left': sum(p.sessions_remaining for p in live),
@@ -468,6 +468,44 @@ def package_payment(request, pk):
         else:
             messages.error(request, 'Enter a valid payment amount.')
     return _packages_back(request, package.patient)
+
+
+@login_required
+def package_use(request, pk):
+    """Front desk or admin: record that the patient used a session of their package on a date."""
+    profile = billing_require(request)
+    package = get_object_or_404(PatientPackage, pk=pk, professional=profile)
+    if request.method != 'POST':
+        return _packages_back(request)
+    try:
+        day = datetime.date.fromisoformat(request.POST.get('date', ''))
+    except ValueError:
+        day = timezone.localdate()
+    if day > timezone.localdate():
+        messages.error(request, 'A session cannot be recorded for a future date.')
+    elif day < package.start_date:
+        messages.error(request, f'That is before the package started on {package.start_date:%b} {package.start_date.day}.')
+    else:
+        name, role = actor_of(request.user, profile)
+        entry = package.use_session(day, name, role, request.POST.get('note', '').strip())
+        if entry is None:
+            messages.error(request, f'This package is {package.effective_status_display.lower()}, so no more sessions can be recorded.')
+        else:
+            left = package.sessions_remaining
+            messages.success(request, f'Session recorded for {package.patient.name}: {package.sessions_used} of {package.total_sessions} used' + (f', {left} left.' if left else '. The package is now complete.'))
+    return _packages_back(request)
+
+
+@login_required
+def package_session_undo(request, pk, entry_id):
+    """Take back a session that was recorded by mistake (it stays in the log as undone)."""
+    profile = billing_require(request)
+    package = get_object_or_404(PatientPackage, pk=pk, professional=profile)
+    entry = get_object_or_404(package.session_log, pk=entry_id)
+    if request.method == 'POST':
+        name, _ = actor_of(request.user, profile)
+        messages.success(request, 'Session taken back.' if package.undo_session(entry, name) else 'That session was already taken back.')
+    return _packages_back(request)
 
 
 @login_required

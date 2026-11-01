@@ -375,6 +375,52 @@ class PatientPackage(models.Model):
     def per_session(self):
         return self.total_amount / self.total_sessions if self.total_sessions else Decimal('0')
 
+    @property
+    def counted_at_billing(self):
+        """A clinic's packages are counted by the front desk and the clinic's own login on the billing page; a solo professional's are counted
+        automatically whenever they record a session."""
+        return getattr(self.professional, 'clinic_workspace', None) is not None
+
+    @property
+    def active_log(self):
+        return [entry for entry in self.session_log.all() if entry.undone_at is None]
+
+    @property
+    def unlogged_sessions(self):
+        """Sessions counted before the dated log existed."""
+        return max(0, self.sessions_used - len(self.active_log))
+
+    def use_session(self, date=None, name='', role='', note=''):
+        """Record that one session of this package was used, on a date, by whom. Returns the log entry, or None when the package is not active
+        (finished, expired or cancelled). Taken under a row lock, so two people clicking together cannot use the same session twice."""
+        with transaction.atomic():
+            fresh = PatientPackage.objects.select_for_update().get(pk=self.pk)
+            if fresh.effective_status != 'active':
+                return None
+            entry = PackageSession.objects.create(package=fresh, date=date or timezone.localdate(), note=(note or '')[:255], recorded_by_name=(name or '')[:200], recorded_by_role=(role or '')[:40])
+            fresh.sessions_used += 1
+            if fresh.sessions_used >= fresh.total_sessions:
+                fresh.status = self.COMPLETED
+            fresh.save()
+        self.sessions_used, self.status = fresh.sessions_used, fresh.status
+        return entry
+
+    def undo_session(self, entry, name=''):
+        """Take back a session that was recorded by mistake. The entry stays in the log, marked as undone, so there is a trail. Returns False if it was already undone."""
+        with transaction.atomic():
+            fresh = PatientPackage.objects.select_for_update().get(pk=self.pk)
+            row = PackageSession.objects.select_for_update().get(pk=entry.pk, package=fresh)
+            if row.undone_at is not None:
+                return False
+            row.undone_at, row.undone_by_name = timezone.now(), (name or '')[:200]
+            row.save(update_fields=['undone_at', 'undone_by_name'])
+            fresh.sessions_used = max(0, fresh.sessions_used - 1)
+            if fresh.status == self.COMPLETED and fresh.sessions_used < fresh.total_sessions:
+                fresh.status = self.ACTIVE
+            fresh.save()
+        self.sessions_used, self.status = fresh.sessions_used, fresh.status
+        return True
+
     def record_session(self):
         """Use up one session. No-op (False) unless the package is actually active."""
         if self.effective_status != 'active':
@@ -401,6 +447,24 @@ class PatientPackage(models.Model):
         return payment
 
 
+class PackageSession(models.Model):
+    """One session used from a package: the date, who recorded it at billing, and a note. Undoing keeps the row (marked undone) as a trail."""
+    package = models.ForeignKey(PatientPackage, on_delete=models.CASCADE, related_name='session_log')
+    date = models.DateField(default=timezone.localdate)
+    note = models.CharField(max_length=255, blank=True)
+    recorded_by_name = models.CharField(max_length=200, blank=True)
+    recorded_by_role = models.CharField(max_length=40, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    undone_at = models.DateTimeField(null=True, blank=True)
+    undone_by_name = models.CharField(max_length=200, blank=True)
+
+    class Meta:
+        ordering = ['date', 'id']
+
+    def __str__(self):
+        return f'{self.package} - {self.date}'
+
+
 class PackagePayment(models.Model):
     package = models.ForeignKey(PatientPackage, on_delete=models.CASCADE, related_name='payments')
     amount = models.DecimalField(max_digits=10, decimal_places=2)
@@ -417,9 +481,12 @@ class PackagePayment(models.Model):
 
 
 def use_package_session(patient):
-    """Called when a visit is recorded: counts one session against the patient's active package, if any."""
-    package = patient.packages.filter(status=PatientPackage.ACTIVE).order_by('created_at').first()
-    return package.record_session() if package else False
+    """Called when a visit is recorded: counts one session against the patient's active package, if any. A clinic's packages are not counted here: the
+    front desk or the clinic's login records those on the billing page."""
+    for package in patient.packages.filter(status=PatientPackage.ACTIVE).select_related('professional').order_by('created_at'):
+        if not package.counted_at_billing:
+            return package.record_session()
+    return False
 
 
 # ---------------------------------------------------------------- patient allowance (Professional pricing)

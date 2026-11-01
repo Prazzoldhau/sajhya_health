@@ -33,5 +33,7 @@ urlpatterns = [
     path('packages/', views.packages, name='packages'),
     path('packages/create/', views.package_create, name='package-create'),
     path('packages/<int:pk>/payment/', views.package_payment, name='package-payment'),
+    path('packages/<int:pk>/use/', views.package_use, name='package-use'),
+    path('packages/<int:pk>/sessions/<int:entry_id>/undo/', views.package_session_undo, name='package-session-undo'),
     path('packages/<int:pk>/cancel/', views.package_cancel, name='package-cancel'),
 ]

@@ -1,6 +1,11 @@
 {% extends base_template|default:'accounts/pro_base.html' %}
 {% block title %}Packages | Sajhya Health{% endblock %}
 {% block extra_css %}
+  .pk-use { border-top: 1px solid var(--line); padding: 10px 16px 12px; background: #f9fcfa; }
+  .pk-use-head { margin-bottom: 6px; } .pk-use-form { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; margin-bottom: 8px; }
+  .pk-use-form input[type=date], .pk-use-form input[type=text] { height: 34px; border: 1px solid var(--line); border-radius: 8px; padding: 0 10px; background: #fff; }
+  .pk-use-form input[type=text] { flex: 1; min-width: 160px; } .pk-use-form .primary-btn { height: 34px; padding: 0 14px; }
+  .pk-log { margin: 0; padding-left: 20px; font-size: 12.5px; display: grid; gap: 3px; } .pk-log li.undone { text-decoration: line-through; opacity: .55; }
   .pk-head { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; margin-bottom: 14px; }
   .pk-head h1 { margin: 0 10px 0 0; font-size: 24px; }
   .pk { background: #fff; border: 1px solid var(--line); border-radius: 12px; margin-bottom: 14px; overflow: hidden; }
@@ -27,7 +32,7 @@
   <div class="kpi"><div class="k">Active packages</div><div class="v">{{ active_count }}</div><div class="n">{{ sessions_left }} session{{ sessions_left|pluralize }} left in total</div></div>
   <div class="kpi"><div class="k">Collected</div><div class="v">NPR {{ collected }}</div><div class="n">Across all packages</div></div>
   <div class="kpi"><div class="k">Balance due</div><div class="v" style="color:#b78317">NPR {{ total_due }}</div><div class="n" style="color:#b78317">Still to collect</div></div>
-  <div class="kpi"><div class="k">Package options</div><div class="v" style="font-size:16px;line-height:1.4">1 · 2 · 3 · 4 weeks</div><div class="n">Each visit uses a session</div></div>
+  <div class="kpi"><div class="k">Package options</div><div class="v" style="font-size:16px;line-height:1.4">1 · 2 · 3 · 4 weeks</div><div class="n">Sessions used are recorded on each package</div></div>
 </div>
 
 <div class="chipbar">
@@ -53,6 +58,26 @@
     <div><div class="l">Paid</div><b style="color:#16834f">NPR {{ pk.amount_paid }}</b></div>
     <div><div class="l">Balance due</div><b style="color:{% if pk.is_fully_paid %}#16834f{% else %}#b78317{% endif %}">{% if pk.is_fully_paid %}Fully paid{% else %}NPR {{ pk.amount_due }}{% endif %}</b></div>
   </div>
+  {% if pk.counted_at_billing %}
+  <div class="pk-use no-print">
+    <div class="pk-use-head"><b>Sessions used</b> <span class="hint">recorded here by the front desk or admin</span></div>
+    {% if pk.effective_status == 'active' %}
+    <form method="post" action="{% url 'billing:package-use' pk.pk %}" class="pk-use-form">{% csrf_token %}
+      <input type="date" name="date" value="{{ today|date:'Y-m-d' }}" min="{{ pk.start_date|date:'Y-m-d' }}" max="{{ today|date:'Y-m-d' }}" required aria-label="Date of the session">
+      <input type="text" name="note" maxlength="255" placeholder="Note (optional)" aria-label="Note">
+      <button class="primary-btn" type="submit">＋ Session used</button>
+    </form>
+    {% else %}<div class="hint">This package is {{ pk.effective_status_display|lower }}: no more sessions can be recorded.</div>{% endif %}
+    <ol class="pk-log">
+      {% if pk.unlogged_sessions %}<li class="hint">{{ pk.unlogged_sessions }} earlier session{{ pk.unlogged_sessions|pluralize }} counted before this log</li>{% endif %}
+      {% for s in pk.session_log.all %}
+      <li class="{% if s.undone_at %}undone{% endif %}"><b>{{ s.date|date:"M j, Y" }}</b>{% if s.note %} · {{ s.note }}{% endif %} <span class="hint">· {{ s.recorded_by_name }}{% if s.recorded_by_role %} ({{ s.recorded_by_role }}){% endif %}</span>
+        {% if s.undone_at %}<span class="hint">· taken back by {{ s.undone_by_name }}</span>
+        {% else %}<form method="post" action="{% url 'billing:package-session-undo' pk.pk s.pk %}" onsubmit="return confirm('Take back this session?')" style="display:inline">{% csrf_token %}<button class="table-action" type="submit">Undo</button></form>{% endif %}</li>
+      {% empty %}{% if not pk.unlogged_sessions %}<li class="hint">No sessions recorded yet.</li>{% endif %}{% endfor %}
+    </ol>
+  </div>
+  {% else %}<div class="pk-foot hint">Counted automatically each time a session is recorded for this patient.</div>{% endif %}
   {% if pk.payments.all or pk.notes %}<div class="pk-foot">{% if pk.notes %}{{ pk.notes }}{% endif %}{% if pk.payments.all %}{% if pk.notes %} · {% endif %}Payments: {% for pay in pk.payments.all %}{{ pay.created_at|date:"M j" }} NPR {{ pay.amount }} ({{ pay.get_payment_mode_display }}){% if not forloop.last %} · {% endif %}{% endfor %}{% endif %}</div>{% endif %}
 </article>
 {% empty %}

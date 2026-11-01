@@ -2006,3 +2006,110 @@ class AddAnyRegisteredProfessionalTests(Base):
         set_clinic_login(self.clinic, 'clinic-desk', PASSWORD)
         self.as_user('clinic-desk')
         self.assertContains(self.client.get(reverse('accounts:appointments')), 'Oma Rai (Occupational therapist)')
+
+
+class PackageSessionsAtBillingTests(Base):
+    """A clinic's package sessions are recorded on the billing page by the front desk or the clinic login, not counted when a therapist records a session."""
+    CREDS = StaffLoginTests.CREDS
+    add_staff = StaffLoginTests.add_staff
+    setup_desk = FrontDeskRegisteredByAndBillingTests.setup_desk
+    register = FrontDeskRegisteredByAndBillingTests.register
+
+    def start(self, sessions=3):
+        from billing.models import PatientPackage
+        clinic = self.setup_desk()
+        self.as_user('ram-desk')
+        self.register()
+        self.patient = Patient.objects.get(name='Walk In')
+        r = self.client.post(reverse('billing:package-create'), {'patient': self.patient.pk, 'duration': '10_day', 'total_sessions': sessions, 'total_amount': '3000', 'amount_paid_now': '1000',
+                                                                 'start_date': timezone.localdate().isoformat()})
+        self.assertEqual(r.status_code, 302)
+        self.package = PatientPackage.objects.get()
+        return clinic
+
+    def use(self, **extra):
+        return self.client.post(reverse('billing:package-use', args=[self.package.pk]), {'date': timezone.localdate().isoformat(), 'note': '', **extra})
+
+    def test_reception_records_each_session_used_and_the_package_completes(self):
+        clinic = self.start()
+        self.assertTrue(self.package.counted_at_billing)
+        page = self.client.get(reverse('billing:packages'))
+        self.assertContains(page, 'Session used')
+        self.assertContains(page, '0 of 3 used')
+        self.use(note='First visit')
+        self.package.refresh_from_db()
+        entry = self.package.session_log.get()
+        self.assertEqual((self.package.sessions_used, entry.recorded_by_name, entry.recorded_by_role, entry.note), (1, 'Ram', 'Receptionist', 'First visit'))
+        self.assertContains(self.client.get(reverse('billing:packages')), '1 of 3 used')
+        self.as_user('himal-clinic')  # the clinic's own login (admin) records them too
+        self.use()
+        self.as_user('mani')  # and the manager
+        self.use()
+        self.package.refresh_from_db()
+        self.assertEqual((self.package.sessions_used, self.package.status), (3, 'completed'))
+        self.assertEqual(sorted(e.recorded_by_name for e in self.package.session_log.all()), sorted(['Mani', 'Ram', clinic.name]))
+        refused = self.use()  # nothing left
+        self.package.refresh_from_db()
+        self.assertEqual(self.package.sessions_used, 3)
+        self.assertContains(self.client.get(reverse('billing:packages')), 'no more sessions can be recorded')
+        self.assertEqual(refused.status_code, 302)
+
+    def test_a_therapist_recording_a_session_does_not_use_the_clinics_package(self):
+        import json
+        self.start()
+        self.as_user('asha')
+        self.client.post(reverse('clinics:desk-session-create'), {'patient_id': self.patient.pk, 'date': timezone.localdate().isoformat(), 'session_type': 'treatment',
+                                                                  'treatments': json.dumps([{'name': 'Hot pack'}]), 'exercises': '[]'})
+        self.package.refresh_from_db()
+        self.assertEqual(self.package.sessions_used, 0)  # counted at billing, not here
+        self.assertEqual(Visit.objects.count(), 1)
+
+    def test_a_solo_professionals_package_still_counts_automatically(self):
+        from billing.models import PatientPackage
+        self.setup_desk()
+        solo = make_patient(self.owner, 'Solo Patient')
+        self.as_user('owner')
+        self.client.post(reverse('billing:package-create'), {'patient': solo.pk, 'duration': '10_day', 'total_sessions': 3, 'total_amount': '3000', 'amount_paid_now': '0',
+                                                             'start_date': timezone.localdate().isoformat()})
+        package = PatientPackage.objects.get(patient=solo)
+        self.assertFalse(package.counted_at_billing)
+        self.assertContains(self.client.get(reverse('billing:packages')), 'Counted automatically')
+        self.client.post(reverse('accounts:patient-visit-add', args=[solo.pk]), {'date': timezone.localdate().isoformat(), 'session_type': 'treatment', 'notes': ''})
+        package.refresh_from_db()
+        self.assertEqual(package.sessions_used, 1)
+
+    def test_a_mistaken_session_can_be_taken_back_and_the_trail_is_kept(self):
+        self.start(sessions=2)
+        self.use()
+        self.use(note='Mistake')
+        self.package.refresh_from_db()
+        self.assertEqual((self.package.sessions_used, self.package.status), (2, 'completed'))
+        wrong = self.package.session_log.get(note='Mistake')
+        r = self.client.post(reverse('billing:package-session-undo', args=[self.package.pk, wrong.pk]))
+        self.assertEqual(r.status_code, 302)
+        self.package.refresh_from_db()
+        wrong.refresh_from_db()
+        self.assertEqual((self.package.sessions_used, self.package.status), (1, 'active'))  # reopened
+        self.assertEqual((wrong.undone_by_name, bool(wrong.undone_at)), ('Ram', True))
+        self.assertEqual(self.package.session_log.count(), 2)  # the row stays, marked undone
+        self.client.post(reverse('billing:package-session-undo', args=[self.package.pk, wrong.pk]))  # twice does nothing more
+        self.package.refresh_from_db()
+        self.assertEqual(self.package.sessions_used, 1)
+        self.assertContains(self.client.get(reverse('billing:packages')), 'taken back by Ram')
+
+    def test_dates_are_checked_and_only_billing_roles_can_record(self):
+        self.start()
+        tomorrow = (timezone.localdate() + datetime.timedelta(days=1)).isoformat()
+        before = (timezone.localdate() - datetime.timedelta(days=5)).isoformat()
+        self.use(date=tomorrow)
+        self.use(date=before)  # before the package started today
+        self.package.refresh_from_db()
+        self.assertEqual(self.package.sessions_used, 0)
+        self.as_user('asha')  # an assistant does not do billing
+        self.assertEqual(self.use().status_code, 404)
+        self.assertEqual(self.client.post(reverse('billing:package-session-undo', args=[self.package.pk, 1])).status_code, 404)
+        stranger, other = make_professional('far-physio')
+        self.client.force_login(stranger)  # another practice cannot touch it
+        self.assertEqual(self.use().status_code, 404)
+        self.package.refresh_from_db()
+        self.assertEqual(self.package.sessions_used, 0)
