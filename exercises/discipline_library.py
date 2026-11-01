@@ -110,3 +110,5 @@ def sync(region_model, subregion_model, exercise_model):
                     exercise_model.objects.get_or_create(id=exercise_id, defaults={
                         'sub_region_fk_id': sub.pk, 'exercise_name': name, 'exercise_type': kind, 'difficulty_level': level, 'default_sets': sets, 'default_reps': reps,
                         'hold_time_sec': hold, 'default_rest_time_sec': 30, 'exercise_description': description + NOTE, 'discipline': discipline})
+    from . import department_exercises  # the fuller sets from the clinic reference sheets
+    department_exercises.sync(region_model, subregion_model, exercise_model)

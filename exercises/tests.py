@@ -244,24 +244,27 @@ class DepartmentLibraryTests(TestCase):
 
     def test_each_department_sees_only_its_own_library(self):
         self.client.force_login(self.ot_user)
-        ot = self.client.get(reverse('exercises:library'))
-        self.assertIn('Bead threading', self.names(ot))
-        self.assertNotIn('Wall Squat', self.names(ot))
-        self.assertNotIn('Tongue movements', self.names(ot))
+        lib = reverse('exercises:library')
+        ot = self.client.get(lib)
+        self.assertIn('Bead threading', self.names(self.client.get(lib, {'q': 'bead'})))
+        self.assertEqual(self.names(self.client.get(lib, {'q': 'wall squat'})), [])
+        self.assertEqual(self.names(self.client.get(lib, {'q': 'tongue'})), [])
         self.assertEqual(ot.context['current'], 'ot')
         self.assertEqual(ot.context['switcher'], [])  # a specific discipline has no switcher
         self.client.force_login(self.speech_user)
-        speech = self.client.get(reverse('exercises:library'))
-        self.assertIn('Tongue movements', self.names(speech))
-        self.assertNotIn('Bead threading', self.names(speech))
+        self.assertIn('Tongue movements', self.names(self.client.get(lib, {'q': 'tongue'})))
+        self.assertEqual(self.names(self.client.get(lib, {'q': 'bead'})), [])
         self.client.force_login(self.pt_user)
-        pt = self.client.get(reverse('exercises:library'))
-        self.assertIn('Wall Squat', self.names(pt))
-        self.assertNotIn('Bead threading', self.names(pt))
-        self.assertNotIn('Tongue movements', self.names(pt))
+        pt = self.client.get(lib)
+        self.assertIn('Wall Squat', self.names(self.client.get(lib, {'q': 'squat'})))
+        self.assertEqual(self.names(self.client.get(lib, {'q': 'bead'})), [])
+        self.assertEqual(self.names(self.client.get(lib, {'q': 'tongue'})), [])
         self.assertEqual(pt.context['total'], ExerciseMain.objects.filter(discipline__in=['physio', 'general']).count())
         # regions listed are only the department's own
-        self.assertEqual({r.region_name for r in ot.context['regions']}, {'Fine motor and hand function', 'Sensory processing', 'Handwriting and self-care'})
+        regions = {r.region_name for r in ot.context['regions']}
+        self.assertIn('Occupational therapy activities', regions)
+        self.assertNotIn('Speech therapy activities', regions)
+        self.assertNotIn('Lower_Limb', regions)
 
     def test_the_server_refuses_another_departments_exercises(self):
         bead = ExerciseMain.objects.get(exercise_name='Bead threading')
@@ -296,19 +299,20 @@ class DepartmentLibraryTests(TestCase):
         page = self.client.get(reverse('exercises:library'))
         self.assertEqual(page.context['current'], 'physio')
         self.assertEqual([key for key, _, _ in page.context['switcher']], ['physio', 'ot', 'speech', 'behaviour'])
-        speech = self.client.get(reverse('exercises:library'), {'discipline': 'speech'})
+        speech = self.client.get(reverse('exercises:library'), {'discipline': 'speech', 'q': 'tongue'})
         self.assertIn('Tongue movements', self.names(speech))
-        self.assertNotIn('Wall Squat', self.names(speech))
+        self.assertEqual(self.names(self.client.get(reverse('exercises:library'), {'q': 'squat'})), [])
         again = self.client.get(reverse('exercises:library'))  # the choice is remembered
         self.assertEqual(again.context['current'], 'speech')
 
     def test_the_session_form_search_uses_the_persons_own_library(self):
         from accounts.treatments import search_options
-        self.assertEqual([r['name'] for r in search_options('tongue', 'exercise', ['speech', 'general'])], ['Tongue movements'])
+        self.assertIn('Tongue movements', [r['name'] for r in search_options('tongue', 'exercise', ['speech', 'general'])])
         self.assertEqual(search_options('tongue', 'exercise', ['physio', 'general']), [])
         self.client.force_login(self.ot_user)
         found = self.client.get(reverse('accounts:treatment-search'), {'q': 'bead', 'kind': 'exercise'}).json()['results']
-        self.assertEqual([r['name'] for r in found], ['Bead threading'])
+        self.assertIn('Bead threading', [r['name'] for r in found])
+        self.assertEqual([r for r in found if 'tongue' in r['name'].lower()], [])
         self.assertEqual(self.client.get(reverse('accounts:treatment-search'), {'q': 'squat', 'kind': 'exercise'}).json()['results'], [])
 
     def test_starter_sets_exist_and_loading_again_keeps_admin_edits(self):
@@ -322,3 +326,64 @@ class DepartmentLibraryTests(TestCase):
         call_command('load_discipline_library', verbosity=0)
         bead.refresh_from_db()
         self.assertEqual((ExerciseMain.objects.count(), bead.default_reps), (before, 99))
+
+
+class DepartmentExerciseSetsTests(TestCase):
+    """The fuller exercise sets for occupational, speech and behaviour therapy, prescribed the way physiotherapy exercises are."""
+    def setUp(self):
+        from accounts.models import Account, Profession
+        self.users = {}
+        for key, profession in (('ot', 'occupational therapist'), ('speech', 'speech therapist'), ('behaviour', 'behaviour therapist')):
+            user, profile = make_professional(f'dept-{key}')
+            Account.objects.filter(pk=profile.account_id).update(profession=Profession.objects.get_or_create(name=profession)[0])
+            self.users[key] = (user, profile)
+
+    def test_each_department_has_a_full_set_with_no_repeats(self):
+        for key, minimum in (('ot', 60), ('speech', 60), ('behaviour', 60)):
+            names = list(ExerciseMain.objects.filter(discipline=key).values_list('exercise_name', flat=True))
+            self.assertGreaterEqual(len(names), minimum, key)
+            self.assertEqual(len(names), len({n.lower() for n in names}), f'{key} has a repeated name')
+        for e in ExerciseMain.objects.exclude(discipline='physio').exclude(discipline='general'):
+            self.assertTrue(e.exercise_description, e.exercise_name)
+            self.assertGreaterEqual(e.default_sets, 1)
+            self.assertGreaterEqual(e.default_reps, 1)
+        fear = ExerciseMain.objects.get(exercise_name='Fear ladder')
+        self.assertEqual(fear.discipline, 'behaviour')
+        self.assertIn('Easier or harder:', fear.exercise_description)
+        self.assertIn('You need:', ExerciseMain.objects.get(exercise_name='Therapy putty squeeze and pinch').exercise_description)
+
+    def test_each_therapist_prescribes_from_their_own_set_and_the_patient_sees_it(self):
+        picks = {'ot': 'Therapy putty squeeze and pinch', 'speech': 'Lip stretches: "ee" and "oo"', 'behaviour': 'Fear ladder'}
+        for key, name in picks.items():
+            user, profile = self.users[key]
+            self.client.force_login(user)
+            patient = make_patient(profile, f'Child {key}')
+            exercise = ExerciseMain.objects.get(exercise_name=name, discipline=key)
+            found = self.client.get(reverse('exercises:library'), {'q': name.split()[0]})
+            self.assertIn(name, [e.exercise_name for e in found.context['page_obj']])
+            r = self.client.post(reverse('exercises:prescribe'), data=json.dumps({'patient_id': patient.pk, 'condition_label': 'Plan', 'exercises': [{'id': exercise.pk, 'sets': 2, 'reps': 5}]}),
+                                 content_type='application/json')
+            self.assertEqual(r.status_code, 200, key)
+            item = Prescription.objects.get(patient=patient).exercises.get()
+            self.assertEqual((item.exercise_name, item.sets, item.reps), (name, 2, 5))
+            tab = self.client.get(reverse('accounts:patient-detail', args=[patient.pk]), {'tab': 'exercises'})
+            self.assertContains(tab, name.replace('"', '&quot;'))
+            detail = self.client.get(reverse('exercises:detail', args=[exercise.pk])).json()
+            self.assertTrue(detail['description'])
+        # and not across departments
+        user, profile = self.users['ot']
+        self.client.force_login(user)
+        patient = make_patient(profile, 'Cross')
+        speech = ExerciseMain.objects.get(exercise_name='Straw blowing races', discipline='speech')
+        r = self.client.post(reverse('exercises:prescribe'), data=json.dumps({'patient_id': patient.pk, 'exercises': [{'id': speech.pk}]}), content_type='application/json')
+        self.assertEqual(r.status_code, 400)
+
+    def test_loading_again_adds_nothing_and_keeps_edits(self):
+        from django.core.management import call_command
+        before = ExerciseMain.objects.count()
+        ex = ExerciseMain.objects.get(exercise_name='Fear ladder')
+        ex.default_reps = 7
+        ex.save()
+        call_command('load_discipline_library', verbosity=0)
+        ex.refresh_from_db()
+        self.assertEqual((ExerciseMain.objects.count(), ex.default_reps), (before, 7))
