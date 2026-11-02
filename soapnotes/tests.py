@@ -65,6 +65,8 @@ class TabTests(Base):
         self.assertContains(page, 'Range of motion')
         self.assertContains(page, 'Baseline metrics')
         self.assertContains(page, 'Clinical goals')
+        self.assertContains(page, 'id="hepName"')  # the home exercise programme searches the library
+        self.assertContains(page, 'id="dl-hep-dose"')  # and the dose is a searchable list
 
 
 class WritingTests(Base):

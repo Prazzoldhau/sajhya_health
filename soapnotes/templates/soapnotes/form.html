@@ -92,7 +92,13 @@
       <label class="sn-f">For how many weeks<input type="number" name="duration_weeks" min="0" max="104" value="{{ v.duration_weeks }}"></label>
       <label class="sn-f">Next review<input type="date" name="next_review" value="{{ v.next_review }}"></label>
     </div>
-    <label class="sn-f">Home exercise programme<textarea name="hep">{{ v.hep }}</textarea></label>
+    <div class="sn-f"><span>Home exercise programme</span>
+      <div class="hep-add" style="display:grid;grid-template-columns:minmax(0,1.6fr) minmax(0,1fr) auto;gap:8px;align-items:center;margin:4px 0 6px">
+        <input type="text" id="hepName" placeholder="Search an exercise (e.g. bridging, pendulum)..." autocomplete="off">
+        <input type="text" id="hepDose" list="dl-hep-dose" placeholder="Dose: type or pick (3 sets x 10, hold 10s, 3x/day...)" autocomplete="off">
+        <button type="button" class="secondary-btn" id="hepAdd">＋ Add</button>
+      </div>
+      <textarea name="hep" id="hepText" placeholder="Exercises with their dose, one per line. Search above to add, or type your own.">{{ v.hep }}</textarea></div>
     <div class="sn-grid">
       <label class="sn-f">Patient education and advice<textarea name="education">{{ v.education }}</textarea></label>
       <label class="sn-f">Precautions / contraindications<textarea name="precautions">{{ v.precautions }}</textarea></label>
@@ -113,6 +119,7 @@
 </form>
 </div>
 
+<datalist id="dl-hep-dose"></datalist>
 <datalist id="dl-pain">{% for p in presets.PAIN_CHARACTERS %}<option value="{{ p }}">{% endfor %}</datalist>
 <datalist id="dl-rom">{% for p in presets.ROM_MOVEMENTS %}<option value="{{ p }}">{% endfor %}</datalist>
 <datalist id="dl-muscle">{% for p in presets.MUSCLES %}<option value="{{ p }}">{% endfor %}</datalist>
@@ -204,6 +211,35 @@
       render: function (r) { return '<b>' + SajhyaUI.esc(r.code) + '</b> ' + SajhyaUI.esc(r.title); },
       onPick: function (r) { $('icdCode').value = r.code; var imp = $('impression'); if (!imp.value.trim()) imp.value = r.title; } });
   }
+})();
+</script>
+<script>
+(function () {
+  // home exercise programme: search the exercise library, pick a dose (searchable list, free text allowed) and add the line to the programme text
+  var nameBox = document.getElementById('hepName'), doseBox = document.getElementById('hepDose'), text = document.getElementById('hepText'), list = document.getElementById('dl-hep-dose');
+  if (!nameBox || !text) return;
+  var DOSES = ['1 set x 10 reps', '2 sets x 10 reps', '3 sets x 10 reps', '3 sets x 12 reps', '3 sets x 15 reps', '4 sets x 10 reps', '5 reps', '10 reps', '15 reps', '20 reps',
+               'hold 5s', 'hold 10s', 'hold 15s', 'hold 30s', 'hold 60s', '2 min', '5 min', '10 min', '15 min', '20 min',
+               'once a day', 'twice a day', '3x/day', '4x/day', 'every hour', 'every 2 hours', 'alternate days', '3x/week', 'daily for 2 weeks', 'as tolerated, pain-free range'];
+  function fill() { list.innerHTML = ''; DOSES.forEach(function (d) { var o = document.createElement('option'); o.value = d; list.appendChild(o); }); }
+  fill();
+  SajhyaUI.picker(nameBox, {
+    url: "{% url 'exercises:search' %}",
+    render: function (r) { return '<span class="ex-cell">' + SajhyaUI.thumb(r.name, r.cover) + '<span><b>' + SajhyaUI.esc(r.name) + '</b> <span style="color:#7c9186">' + SajhyaUI.esc(r.dose) + '</span></span></span>'; },
+    onPick: function (r) {
+      nameBox.value = r.name; doseBox.value = r.dose;
+      if (r.dose && DOSES.indexOf(r.dose) === -1) { DOSES.unshift(r.dose); fill(); }
+    },
+  });
+  function add() {
+    var name = nameBox.value.trim();
+    if (!name) { nameBox.focus(); return; }
+    var dose = doseBox.value.trim(), line = name + (dose ? ' - ' + dose : '');
+    text.value = (text.value.trim() ? text.value.replace(/\s+$/, '') + String.fromCharCode(10) : '') + line;
+    nameBox.value = ''; doseBox.value = ''; nameBox.focus();
+  }
+  document.getElementById('hepAdd').addEventListener('click', add);
+  [nameBox, doseBox].forEach(function (b) { b.addEventListener('keydown', function (e) { if (e.key === 'Enter') { e.preventDefault(); add(); } }); });
 })();
 </script>
 {% endblock %}
