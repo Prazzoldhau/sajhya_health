@@ -87,18 +87,12 @@ MAX_TREATMENTS = 30
 
 def kinds_in(visible):
     """The departments whose treatments to offer, from the visible disciplines (everything when not restricted)."""
-    kinds = [d for d in (SPECIFIC if visible is None else visible) if d in LISTS]
-    if 'physio' in kinds:  # physiotherapy treatment also covers speech and behaviour (and occupational) work: its list is not kept apart
-        kinds = list(SPECIFIC)
-    return kinds
+    return [d for d in (SPECIFIC if visible is None else visible) if d in LISTS]
 
 
 def ui_for(visible):
     """The quick buttons and hints of the session form: those of the person's own department; generic when they work across several."""
     kinds = kinds_in(visible)
-    if 'physio' in (visible or []) and 'ot' not in visible:  # physiotherapy keeps its quick buttons, and searches every department's treatments
-        return {'chips': CHIPS['physio'], 'hint': 'electrotherapy, heat / cold, traction, manual therapy, speech, behaviour and occupational therapy...',
-                'placeholder': 'Search treatments (TENS, ultrasound, speech, behaviour...) or type your own and press Enter', 'label': ''}
     if len(kinds) == 1:
         hint, placeholder = HINTS[kinds[0]]
         return {'chips': CHIPS[kinds[0]], 'hint': hint, 'placeholder': placeholder, 'label': LABELS[kinds[0]]}
@@ -144,9 +138,8 @@ def search_options(query, kind='', visible=None):
     results = []
     if kind != 'exercise':
         kinds = kinds_in(visible)
-        own_physio = visible is not None and 'physio' in visible and 'ot' not in visible  # a physiotherapist's own group names stay plain
         for key in kinds:
-            results += [{'kind': 'clinical', 'name': name, 'dose': dose, 'group': group if len(kinds) == 1 or (key == 'physio' and own_physio) else f'{LABELS[key]}: {group}'}
+            results += [{'kind': 'clinical', 'name': name, 'dose': dose, 'group': group if len(kinds) == 1 else f'{LABELS[key]}: {group}'}
                         for group, name, dose in LISTS[key] if q in name.lower() or q in group.lower()][:10]
     if kind != 'clinical' and len(q) >= 2:
         from exercises.models import ExerciseMain

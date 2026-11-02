@@ -500,12 +500,11 @@ class DepartmentTreatmentTests(TestCase):
         self.assertEqual(self.search('behaviour', 'ultrasound'), [])
         self.assertIn('Sensory integration therapy', self.search('ot', 'sensory'))
         self.assertIn('Handwriting training', self.search('ot', 'handwriting'))
-        self.assertIn('Sensory integration therapy', self.search('physio', 'sensory integration'))  # physiotherapy treatment also covers the other departments' work
+        self.assertEqual(self.search('physio', 'sensory integration'), [])
         self.assertIn('Articulation therapy', self.search('speech', 'articulation'))
         self.assertIn('Swallowing (dysphagia) therapy', self.search('speech', 'swallow'))
         self.assertIn('Applied behaviour analysis (ABA) session', self.search('behaviour', 'aba'))
-        self.assertIn('Articulation therapy', self.search('physio', 'articulation'))
-        self.assertIn('Applied behaviour analysis (ABA) session', self.search('physio', 'aba'))
+        self.assertEqual(self.search('physio', 'articulation'), [])
 
     def test_the_session_form_has_the_departments_own_quick_buttons(self):
         patients = {}
@@ -518,7 +517,7 @@ class DepartmentTreatmentTests(TestCase):
             for chip in expect[key]:
                 self.assertContains(page, chip, msg_prefix=key)
             for other, chips in expect.items():
-                if other != key and key != 'physio':  # physiotherapy keeps its own buttons but searches every department
+                if other != key:
                     for chip in chips:
                         self.assertNotContains(page, chip, msg_prefix=f'{key} must not see {other}')
         self.client.force_login(self.users['ot'][0])
