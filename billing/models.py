@@ -62,6 +62,11 @@ class BillingEntry(models.Model):
         return lines if lines and sum((l.price for l in lines), Decimal('0')) == self.rate else []
 
     @property
+    def advance_paid(self):
+        """How much of this bill was settled from the patient's advance balance."""
+        return sum((p.amount for p in self.payments.all() if p.payment_mode == ADVANCE), Decimal('0'))
+
+    @property
     def carried_over(self):
         """Extra cash the patient handed over on this bill that was kept as their advance (no change given back)."""
         return sum((m.amount for m in self.advance_moves.all() if m.kind == 'deposit' and m.amount > 0), Decimal('0'))

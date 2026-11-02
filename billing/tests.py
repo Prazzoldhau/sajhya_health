@@ -530,6 +530,15 @@ class AdvanceTests(BillingBase):
         tab = self.client.get(reverse('accounts:patient-detail', args=[self.patient.pk]) + '?tab=billing')
         self.assertContains(tab, 'Advance balance: NPR 0')
         self.assertContains(tab, 'Used for a bill')
+        self.assertContains(tab, 'Advance balance remaining: NPR 0')  # the balance is shown with the billing history too
+        self.assertContains(tab, 'NPR 700.00 paid from advance')  # and which bill drew on it
+
+    def test_the_billing_history_shows_the_advance_balance_left(self):
+        self.take('1000')
+        self.bill('800')
+        tab = self.client.get(reverse('accounts:patient-detail', args=[self.patient.pk]) + '?tab=billing')
+        self.assertContains(tab, 'Advance balance remaining: NPR 200')
+        self.assertContains(tab, 'NPR 800.00 paid from advance')
 
     def test_take_advance_can_clear_unpaid_bills_and_credit_can_be_received_from_the_advance(self):
         self.client.post(reverse('billing:patient-bill', args=[self.patient.pk]), {'entry_date': self.today.isoformat(), 'service': 'S', 'rate': '600', 'payment_mode': 'cash', 'payment_status': 'due'})
