@@ -13,7 +13,7 @@ def discipline_of(profile):
     """The discipline a professional works in, from their profession; None when it is not one of ours (clinic login, doctor, nurse...)."""
     profession = getattr(getattr(profile, 'account', None), 'profession', None)
     name = (getattr(profession, 'name', '') or '').lower()
-    for key, words in (('physio', ('physio',)), ('ot', ('occupational',)), ('speech', ('speech',)), ('behaviour', ('behav',))):
+    for key, words in (('physio', ('physio', 'physical therap')), ('ot', ('occupational',)), ('speech', ('speech',)), ('behaviour', ('behav',))):
         if any(word in name for word in words):
             return key
     return None
