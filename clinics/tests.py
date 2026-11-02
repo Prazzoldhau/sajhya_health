@@ -2200,3 +2200,33 @@ class OwnersPriceListReachesTheFrontDeskTests(Base):
         for url in (reverse('billing:billing'), reverse('clinics:desk') + '?tab=billing'):
             names = [s['name'] for s in self.client.get(url).context['service_catalog']]
             self.assertEqual(sorted(names), ['Clinic Hot Pack', 'Owner Consult'], url)
+
+
+class FrontDeskSellsTheOwnersProductsTests(Base):
+    """A tracked product on the owner's price list is counted when reception sells it on a bill."""
+    CREDS = StaffLoginTests.CREDS
+    add_staff = StaffLoginTests.add_staff
+    setup_desk = FrontDeskRegisteredByAndBillingTests.setup_desk
+    register = FrontDeskRegisteredByAndBillingTests.register
+
+    def test_reception_sale_takes_stock_and_is_refused_when_short(self):
+        import json
+        from billing.models import BillingEntry, ServiceItem
+        self.setup_desk()
+        self.as_user('owner')
+        self.client.post(reverse('billing:service-save', args=[0]), {'name': 'Knee brace', 'price': '1200', 'kind': 'product', 'product_type': 'orthosis', 'track_stock': 'on'})
+        brace = ServiceItem.objects.get(name='Knee brace')
+        self.client.post(reverse('billing:stock-adjust', args=[brace.pk]), {'action': 'receive', 'number': 2})
+        self.as_user('ram-desk')
+        self.register()
+        patient = Patient.objects.get(name='Walk In')
+
+        def bill(qty):
+            lines = json.dumps([{'id': -brace.pk, 'name': 'Knee brace', 'price': str(1200 * qty), 'product': True, 'qty': qty}])
+            return self.client.post(reverse('clinics:desk-bill-create'), {'patient_id': patient.pk, 'entry_date': timezone.localdate().isoformat(), 'service': 'Knee brace',
+                                                                          'rate': str(1200 * qty), 'payment_status': 'paid', 'payment_mode': 'cash', 'lines': lines})
+        bill(3)
+        self.assertEqual(BillingEntry.objects.count(), 0)  # only 2 in stock
+        bill(2)
+        brace.refresh_from_db()
+        self.assertEqual((BillingEntry.objects.count(), brace.stock), (1, 0))

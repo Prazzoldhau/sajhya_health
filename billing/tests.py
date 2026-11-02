@@ -1200,3 +1200,73 @@ class AidsAndProductsTests(BillingBase):
         entry = BillingEntry.objects.create(professional=self.profile, patient=self.patient, service='Consult + Pain oil', rate=450, entry_date=timezone.localdate())
         save_lines(entry, '[{"name": "Consult", "price": "200"}, {"name": "Pain oil", "price": "250", "product": true}]')
         self.assertEqual([(l.name, l.is_product) for l in entry.lines.all()], [('Consult', False), ('Pain oil', True)])
+
+
+class ProductStockTests(BillingBase):
+    """Products can be counted: a sale takes them off the stock, a cancelled bill puts them back, and every change is logged."""
+    def setUp(self):
+        super().setUp()
+        from .models import ServiceItem
+        self.client.post(reverse('billing:service-save', args=[0]), {'name': 'Pain oil', 'price': '250', 'kind': 'product', 'product_type': 'oil', 'track_stock': 'on'})
+        self.oil = ServiceItem.objects.get(name='Pain oil')
+
+    def stock(self, action, number, note=''):
+        return self.client.post(reverse('billing:stock-adjust', args=[self.oil.pk]), {'action': action, 'number': number, 'note': note})
+
+    def sell(self, qty, day=None):
+        import json
+        lines = json.dumps([{'id': self.oil.pk, 'name': 'Pain oil', 'price': str(250 * qty), 'product': True, 'qty': qty}])
+        return self.client.post(reverse('billing:patient-bill', args=[self.patient.pk]), {'entry_date': self.today.isoformat(), 'service': 'Pain oil', 'rate': str(250 * qty), 'payment_status': 'paid', 'payment_mode': 'cash', 'lines': lines})
+
+    def test_stock_is_received_removed_corrected_and_logged(self):
+        from .models import StockMove
+        self.stock('receive', 10, 'From supplier')
+        self.stock('remove', 2, 'Expired')
+        self.stock('set', 7, 'Counted')
+        self.oil.refresh_from_db()
+        self.assertEqual(self.oil.stock, 7)
+        self.assertEqual([(m.reason, m.change, m.balance) for m in StockMove.objects.order_by('id')], [('received', 10, 10), ('removed', -2, 8), ('adjust', -1, 7)])
+        self.assertContains(self.client.get(reverse('billing:services')), '7 in stock')
+        self.stock('receive', 0)  # nothing to receive
+        self.assertEqual(StockMove.objects.count(), 3)
+
+    def test_a_sale_takes_stock_and_a_cancelled_bill_puts_it_back(self):
+        self.stock('receive', 5)
+        self.sell(2)
+        self.oil.refresh_from_db()
+        entry = BillingEntry.objects.get()
+        self.assertEqual((self.oil.stock, entry.lines.get().qty), (3, 2))
+        self.client.post(reverse('billing:entry-cancel', args=[entry.pk]))
+        self.oil.refresh_from_db()
+        self.assertEqual(self.oil.stock, 5)
+        self.client.post(reverse('billing:entry-cancel', args=[entry.pk]))  # twice puts nothing more back
+        self.oil.refresh_from_db()
+        self.assertEqual(self.oil.stock, 5)
+        self.client.post(reverse('billing:entry-restore', args=[entry.pk]))
+        self.oil.refresh_from_db()
+        self.assertEqual(self.oil.stock, 3)
+
+    def test_more_than_is_in_stock_is_refused(self):
+        self.stock('receive', 1)
+        self.sell(2)
+        self.assertEqual(BillingEntry.objects.count(), 0)
+        self.oil.refresh_from_db()
+        self.assertEqual(self.oil.stock, 1)
+        self.sell(1)
+        self.assertEqual(BillingEntry.objects.count(), 1)
+        self.sell(1)  # now out of stock
+        self.assertEqual(BillingEntry.objects.count(), 1)
+        catalog = self.client.get(reverse('billing:billing')).context['service_catalog']
+        self.assertEqual([(c['track'], c['stock']) for c in catalog if c['name'] == 'Pain oil'], [(True, 0)])
+
+    def test_a_product_belongs_to_a_department_and_untracked_products_sell_freely(self):
+        from accounts.models import Department
+        from .models import ServiceItem
+        dept = Department.objects.create(professional=self.profile, name='Physical Therapy')
+        self.client.post(reverse('billing:service-save', args=[self.oil.pk]), {'name': 'Pain oil', 'price': '250', 'kind': 'product', 'product_type': 'oil', 'department': dept.pk})
+        self.oil.refresh_from_db()
+        self.assertEqual((self.oil.department, self.oil.track_stock), (dept, False))  # stock counting was unticked
+        self.sell(3)
+        self.assertEqual(BillingEntry.objects.count(), 1)  # nothing counted, nothing refused
+        self.oil.refresh_from_db()
+        self.assertEqual(self.oil.stock, 0)

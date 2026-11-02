@@ -15,6 +15,7 @@ Use inside the form with the form's id, as in the billing page: include this fil
   <div class="t">Services and products from your price list <select data-svc-dept hidden aria-label="Show the services of one department" style="height:28px;border:1px solid #cfe6d8;border-radius:8px;background:#fff;font-weight:700"></select> {% if not hide_prices %}<a href="{% url 'billing:services' %}" target="_blank" rel="noopener">edit prices</a>{% endif %}</div>
   {% if service_catalog %}
   <div class="g" data-svc-chips></div>
+  <div class="g" data-svc-qty></div>
   <div class="sum" data-svc-sum>Tap a service or add-on to fill in the bill. You can still change the text and amount.</div>
   {% else %}
   <div class="sum">No price list yet. {% if hide_prices %}Ask the manager to set up the services and add-ons.{% else %}<a href="{% url 'billing:services' %}" target="_blank" rel="noopener">Set up your services and add-ons</a> and they appear here as buttons.{% endif %}</div>
@@ -28,16 +29,28 @@ Use inside the form with the form's id, as in the billing page: include this fil
   var box = document.querySelector('.svc-picker[data-picker-for="{{ form_id }}"]'), form = document.getElementById("{{ form_id }}");
   if (!box || !form) return;
   var catalog = JSON.parse(document.getElementById('service-catalog').textContent), chips = box.querySelector('[data-svc-chips]'), sumEl = box.querySelector('[data-svc-sum]');
-  var linesInput = box.querySelector('input[name=lines]'), selected = {}, deptSelect = box.querySelector('[data-svc-dept]');
+  var linesInput = box.querySelector('input[name=lines]'), qtyBox = box.querySelector('[data-svc-qty]'), qtys = {}, selected = {}, deptSelect = box.querySelector('[data-svc-dept]');
   function money(n) { return (Math.round(n * 100) / 100).toString(); }
   function apply() {
-    var picked = catalog.filter(function (s) { return selected[s.id]; }), total = picked.reduce(function (a, s) { return a + parseFloat(s.price); }, 0);
-    linesInput.value = JSON.stringify(picked.map(function (s) { return { name: s.name, price: s.price, product: !!s.product }; }));
+    var picked = catalog.filter(function (s) { return selected[s.id]; });
+    function qty(s) { return s.product ? (qtys[s.id] || 1) : 1; }
+    function line(s) { return s.name + (qty(s) > 1 ? ' x' + qty(s) : ''); }
+    function cost(s) { return parseFloat(s.price) * qty(s); }
+    var total = picked.reduce(function (a, s) { return a + cost(s); }, 0);
+    linesInput.value = JSON.stringify(picked.map(function (s) { return { id: s.id, name: line(s), price: money(cost(s)), product: !!s.product, qty: qty(s) }; }));
+    qtyBox.innerHTML = '';
+    picked.filter(function (s) { return s.product; }).forEach(function (s) {
+      var l = document.createElement('label'); l.style.cssText = 'font-size:12px;display:flex;gap:5px;align-items:center';
+      l.appendChild(document.createTextNode(s.name + ' quantity'));
+      var i = document.createElement('input'); i.type = 'number'; i.min = 1; i.max = s.track ? Math.max(s.stock, 1) : 999; i.value = qty(s); i.style.cssText = 'width:64px;height:28px;border:1px solid #cfe6d8;border-radius:6px;padding:0 6px';
+      i.addEventListener('change', function () { var v = Math.max(1, parseInt(i.value, 10) || 1); if (s.track && v > s.stock) v = Math.max(s.stock, 1); qtys[s.id] = v; apply(); });
+      l.appendChild(i); qtyBox.appendChild(l);
+    });
     var service = form.elements['service'], rate = form.elements['rate'];
     if (picked.length) {
-      if (service) service.value = picked.map(function (s) { return s.name; }).join(' + ');
+      if (service) service.value = picked.map(line).join(' + ');
       if (rate) rate.value = money(total);
-      sumEl.textContent = picked.map(function (s) { return s.name + ' ' + s.price; }).join(' + ') + ' = NPR ' + money(total);
+      sumEl.textContent = picked.map(function (s) { return line(s) + ' ' + money(cost(s)); }).join(' + ') + ' = NPR ' + money(total);
     } else { sumEl.textContent = 'Tap a service or add-on to fill in the bill. You can still change the text and amount.'; }
   }
   // a department filter appears once some services belong to a department; services of every department are always shown
@@ -55,13 +68,15 @@ Use inside the form with the form's id, as in the billing page: include this fil
       if (deptSelect.value && s.dept && String(s.dept) !== deptSelect.value) return;
       if (s.product && !shownProducts++) { var h = document.createElement('div'); h.className = 'sub'; h.style.flexBasis = '100%'; h.textContent = 'Aids & products'; chips.appendChild(h); }
       var b = document.createElement('button'); b.type = 'button'; b.className = 'chip' + (s.addon ? ' addon' : '') + (s.product ? ' product' : '') + (selected[s.id] ? ' on' : '');
-      b.innerHTML = (s.addon ? '+ ' : '') + s.name.replace(/</g, '&lt;') + '<small>' + money(parseFloat(s.price)) + '</small>';
+      var out = s.product && s.track && s.stock <= 0;
+      b.innerHTML = (s.addon ? '+ ' : '') + s.name.replace(/</g, '&lt;') + '<small>' + money(parseFloat(s.price)) + (s.product && s.track ? (out ? ' · out of stock' : ' · ' + s.stock + ' left') : '') + '</small>';
+      if (out) { b.disabled = true; b.style.opacity = '.5'; b.style.cursor = 'not-allowed'; }
       b.addEventListener('click', function () { selected[s.id] = !selected[s.id]; b.classList.toggle('on', !!selected[s.id]); apply(); });
       chips.appendChild(b);
     });
   }
   render();
-  form.addEventListener('reset', function () { selected = {}; render(); setTimeout(apply, 0); });
+  form.addEventListener('reset', function () { selected = {}; qtys = {}; render(); setTimeout(apply, 0); });
 })();
 </script>
 {% endif %}

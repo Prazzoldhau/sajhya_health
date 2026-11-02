@@ -6,6 +6,9 @@
   .sv-row input[type=text], .sv-row input[type=number], .sv-row select { height: 36px; border: 1px solid var(--line); border-radius: 8px; padding: 0 9px; width: 100%; background: #fff; }
   .sv-row form { display: contents; } .sv-row.off { opacity: .55; }
   .sv-head { font-size: 10.5px; font-weight: 800; color: var(--muted); letter-spacing: .05em; text-transform: uppercase; display: grid; grid-template-columns: minmax(160px, 1fr) 110px 150px 130px auto auto; gap: 8px; padding-bottom: 6px; border-bottom: 1px solid var(--line); }
+  .stock-row { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; margin: 0 0 6px; padding: 6px 10px; background: #f6fbf8; border-radius: 8px; font-size: 12.5px; }
+  .stock-row select, .stock-row input { height: 32px; border: 1px solid var(--line); border-radius: 8px; padding: 0 8px; background: #fff; } .stock-row input[type=text] { flex: 1; min-width: 140px; }
+  .stock-row .low { color: #a15c00; } .stock-row .out { color: #b3261e; }
   @media (max-width: 800px) { .sv-row, .sv-head { grid-template-columns: 1fr 1fr; } .sv-head { display: none; } }
 {% endblock %}
 
@@ -46,26 +49,45 @@
   <div style="font-weight:800;margin-bottom:2px">Aids &amp; products</div>
   <p class="patient-id" style="margin:0 0 8px">Things you sell, not services: pain oil, dietary supplements, orthosis, prosthesis. They are listed apart and tapped the same way when billing.</p>
   {% for s in products %}
-  <div class="sv-row {% if not s.active %}off{% endif %}" style="grid-template-columns:minmax(160px,1fr) 110px 170px auto auto">
+  <div class="sv-row {% if not s.active %}off{% endif %}" style="grid-template-columns:minmax(150px,1fr) 100px 150px 150px auto auto auto">
     <form method="post" action="{% url 'billing:service-save' s.pk %}">{% csrf_token %}
       <input type="text" name="name" value="{{ s.name }}" maxlength="100" required>
       <input type="number" name="price" value="{{ s.price }}" step="0.01" min="0" required>
       <input type="hidden" name="kind" value="product">
-      <select name="product_type">{% for key, label in product_types %}<option value="{{ key }}" {% if s.product_type == key %}selected{% endif %}>{{ label }}</option>{% endfor %}</select>
+      <select name="product_type" aria-label="Type">{% for key, label in product_types %}<option value="{{ key }}" {% if s.product_type == key %}selected{% endif %}>{{ label }}</option>{% endfor %}</select>
+      <select name="department" aria-label="Department"><option value="">Every department</option>{% for d in departments %}<option value="{{ d.obj.pk }}" {% if s.department_id == d.obj.pk %}selected{% endif %}>{{ d.obj.name }}</option>{% endfor %}</select>
+      <label style="font-size:12px;display:flex;gap:5px;align-items:center;white-space:nowrap"><input type="checkbox" name="track_stock" {% if s.track_stock %}checked{% endif %}> Count stock</label>
       <label style="font-size:12px;display:flex;gap:5px;align-items:center;white-space:nowrap"><input type="checkbox" name="active" {% if s.active %}checked{% endif %}> In use</label>
       <button class="primary-btn" type="submit" style="height:34px">Save</button>
     </form>
   </div>
+  {% if s.track_stock %}
+  <form method="post" action="{% url 'billing:stock-adjust' s.pk %}" class="stock-row">{% csrf_token %}
+    <b class="{% if s.stock <= 0 %}out{% elif s.is_low %}low{% endif %}">{{ s.stock }} in stock{% if s.stock <= 0 %} · out of stock{% elif s.is_low %} · running low{% endif %}</b>
+    <select name="action"><option value="receive">Received</option><option value="remove">Remove (damaged / expired)</option><option value="set">Correct the count to</option></select>
+    <input type="number" name="number" min="0" placeholder="How many" required>
+    <input type="text" name="note" maxlength="200" placeholder="Note (supplier, reason...)">
+    <button class="secondary-btn" type="submit">Update stock</button>
+  </form>
+  {% else %}<p class="patient-id" style="margin:0 0 4px">Stock is not counted for {{ s.name }}. Tick <b>Count stock</b> and Save to start.</p>{% endif %}
   <form method="post" action="{% url 'billing:service-delete' s.pk %}" style="margin:0;text-align:right" onsubmit="return confirm('Remove {{ s.name|escapejs }} from the list? Bills already made keep it.')">{% csrf_token %}<button class="text-link" type="submit" style="font-size:11.5px">Remove {{ s.name }}</button></form>
   {% endfor %}
-  <form method="post" action="{% url 'billing:service-save' 0 %}" style="display:grid;grid-template-columns:minmax(160px,1fr) 130px 190px auto;gap:8px;align-items:center;margin-top:10px">{% csrf_token %}
+  <form method="post" action="{% url 'billing:service-save' 0 %}" style="display:grid;grid-template-columns:minmax(160px,1fr) 130px 170px 170px auto auto;gap:8px;align-items:center;margin-top:10px">{% csrf_token %}
     <input type="hidden" name="kind" value="product">
     <input type="text" name="name" placeholder="e.g. Knee brace" maxlength="100" required style="height:38px;border:1px solid var(--line);border-radius:8px;padding:0 10px">
     <input type="number" name="price" placeholder="Price" step="0.01" min="0" required style="height:38px;border:1px solid var(--line);border-radius:8px;padding:0 10px">
     <select name="product_type" style="height:38px;border:1px solid var(--line);border-radius:8px;padding:0 10px">{% for key, label in product_types %}<option value="{{ key }}">{{ label }}</option>{% endfor %}</select>
+    <select name="department" style="height:38px;border:1px solid var(--line);border-radius:8px;padding:0 10px"><option value="">Every department</option>{% for d in departments %}<option value="{{ d.obj.pk }}">{{ d.obj.name }}</option>{% endfor %}</select>
+    <label style="font-size:12px;display:flex;gap:5px;align-items:center;white-space:nowrap"><input type="checkbox" name="track_stock"> Count stock</label>
     <button class="primary-btn" type="submit">Add</button>
   </form>
   <form method="post" action="{% url 'billing:services-seed' %}" style="margin-top:8px">{% csrf_token %}<input type="hidden" name="products" value="1"><button class="secondary-btn" type="submit">＋ Add the suggested aids &amp; products</button></form>
+  {% if stock_moves %}
+  <div style="font-weight:800;margin:14px 0 4px">Recent stock changes</div>
+  <table style="width:100%;font-size:12.5px;border-collapse:collapse"><thead><tr style="text-align:left;color:var(--muted)"><th>WHEN</th><th>PRODUCT</th><th>CHANGE</th><th>LEFT</th><th>WHY</th><th>BY</th></tr></thead><tbody>
+    {% for m in stock_moves %}<tr style="border-top:1px solid #eef3ef"><td>{{ m.created_at|date:"M j, H:i" }}</td><td>{{ m.item.name }}</td><td><b>{{ m.change|stringformat:"+d" }}</b></td><td>{{ m.balance }}</td>
+      <td>{{ m.get_reason_display }}{% if m.bill %} · {{ m.bill.invoice_number }}{% endif %}{% if m.note %} · {{ m.note }}{% endif %}</td><td>{{ m.by_name }}{% if m.by_role %} ({{ m.by_role }}){% endif %}</td></tr>{% endfor %}
+  </tbody></table>{% endif %}
 </section>
 
 <section class="sv-card">

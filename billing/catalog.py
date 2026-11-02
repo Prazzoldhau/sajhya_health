@@ -6,7 +6,7 @@ list, its lines are kept too, so the invoice can show "Basic Physiotherapy 400 +
 import json
 from decimal import Decimal, InvalidOperation
 
-from .models import BillLine, ServiceItem
+from .models import BillLine, ServiceItem, StockMove
 
 MAX_LINES = 15
 # What many physiotherapy practices start from; the practice edits prices and names afterwards.
@@ -62,7 +62,7 @@ def catalog_for(profile, owner=None):
     A clinic's front desk bills in the clinic's own workspace, but the owner may keep the price list on their own professional workspace, so the
     owner's active services are offered too (the clinic workspace's own price wins for the same name)."""
     def rows(source, sign):
-        return [{'id': sign * s.pk, 'name': s.name, 'price': str(s.price), 'addon': s.is_addon, 'product': s.is_product, 'ptype': s.get_product_type_display() if s.product_type else '', 'dept': s.department_id or '', 'dept_name': s.department.name if s.department_id else ''}
+        return [{'id': sign * s.pk, 'name': s.name, 'price': str(s.price), 'addon': s.is_addon, 'product': s.is_product, 'track': s.track_stock, 'stock': s.stock, 'ptype': s.get_product_type_display() if s.product_type else '', 'dept': s.department_id or '', 'dept_name': s.department.name if s.department_id else ''}
                 for s in ServiceItem.objects.filter(professional=source, active=True).select_related('department')]
     out = rows(profile, 1)
     if owner is not None and owner.pk != profile.pk:
@@ -115,12 +115,68 @@ def parse_lines(raw):
             price = Decimal(str(row.get('price', '0')))
         except InvalidOperation:
             continue
+        try:
+            qty = min(max(int(row.get('qty', 1)), 1), 999)
+            item_id = abs(int(row.get('id') or 0))
+        except (TypeError, ValueError):
+            qty, item_id = 1, 0
         if name and price >= 0 and price < Decimal('10000000'):
-            lines.append((name, price.quantize(Decimal('0.01')), row.get('product') is True))
+            lines.append((name, price.quantize(Decimal('0.01')), row.get('product') is True, item_id, qty))
     return lines
+
+
+def _stock_items(profile, ids):
+    """The tracked products among these ids that this practice may sell: its own list, and its clinic owner's (a front desk bills in the clinic's workspace)."""
+    owners = [profile]
+    clinic = getattr(profile, 'clinic_workspace', None)
+    if clinic is not None:
+        owners.append(clinic.owner)
+    return {i.pk: i for i in ServiceItem.objects.filter(pk__in=ids, professional__in=owners, is_product=True, track_stock=True)}
+
+
+def stock_problem(profile, raw):
+    """A sentence saying which product is short, when the posted lines ask for more than is in stock; None when all is fine."""
+    wanted = {}
+    for _, _, product, item_id, qty in parse_lines(raw):
+        if product and item_id:
+            wanted[item_id] = wanted.get(item_id, 0) + qty
+    for pk, item in _stock_items(profile, list(wanted)).items():
+        if wanted[pk] > item.stock:
+            return f'Only {item.stock} {item.name} in stock, not {wanted[pk]}.' if item.stock else f'{item.name} is out of stock.'
+    return None
 
 
 def save_lines(entry, raw):
     """Keep the posted lines with a new bill. They are only a breakdown: the bill's own amount (which can be a discounted total) stays what counts."""
-    for order, (name, price, product) in enumerate(parse_lines(raw)):
-        BillLine.objects.create(entry=entry, name=name, price=price, is_product=product, order=order)
+    lines = parse_lines(raw)
+    tracked = _stock_items(entry.professional, [i for _, _, product, i, _ in lines if product and i])
+    for order, (name, price, product, item_id, qty) in enumerate(lines):
+        item = tracked.get(item_id) if product else None
+        line = BillLine.objects.create(entry=entry, name=name, price=price, is_product=product, item=item or (ServiceItem.objects.filter(pk=item_id).first() if product and item_id else None),
+                                       qty=qty, order=order)
+        if item is not None:
+            take_stock(line, entry.created_by_name, entry.created_by_role)
+
+
+def take_stock(line, name='', role=''):
+    """Take a sold product's quantity off its stock (never below zero)."""
+    if line.item_id and line.item.track_stock and line.stock_held == 0:
+        moved = -line.item.change_stock(-line.qty, StockMove.SOLD, name, role, bill=line.entry)
+        if moved:
+            line.stock_held = moved
+            line.save(update_fields=['stock_held'])
+
+
+def release_stock(entry, name='', role=''):
+    """A cancelled or deleted bill puts the products it took back on the shelf."""
+    for line in entry.lines.select_related('item'):
+        if line.stock_held and line.item_id:
+            line.item.change_stock(line.stock_held, StockMove.RETURNED, name, role, f'{entry.invoice_number} cancelled', bill=entry)
+            line.stock_held = 0
+            line.save(update_fields=['stock_held'])
+
+
+def retake_stock(entry, name='', role=''):
+    """A restored bill takes its products off the stock again."""
+    for line in entry.lines.select_related('item'):
+        take_stock(line, name, role)

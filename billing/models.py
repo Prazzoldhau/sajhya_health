@@ -182,6 +182,9 @@ class ServiceItem(models.Model):
     is_addon = models.BooleanField(default=False, help_text='An extra on top of a main service (shown with a +).')
     is_product = models.BooleanField(default=False, help_text='An aid or product sold to the patient (pain oil, supplement, orthosis, prosthesis...), not a service.')
     product_type = models.CharField(max_length=12, blank=True, choices=PRODUCT_TYPES)
+    track_stock = models.BooleanField(default=False, help_text='Count how many are in stock: each sale takes them off, a cancelled bill puts them back.')
+    stock = models.IntegerField(default=0)
+    low_stock_at = models.PositiveSmallIntegerField(default=3, help_text='Warn when this many or fewer are left.')
     active = models.BooleanField(default=True, help_text='Untick to stop offering it without losing it.')
     order = models.PositiveSmallIntegerField(default=0)
 
@@ -192,6 +195,45 @@ class ServiceItem(models.Model):
     def __str__(self):
         return f'{self.name} ({self.price})'
 
+    @property
+    def is_low(self):
+        return self.track_stock and self.stock <= self.low_stock_at
+
+    def change_stock(self, delta, reason, name='', role='', note='', bill=None):
+        """Move the stock by `delta` (never below zero) under a row lock and log it. Returns the amount actually moved."""
+        with transaction.atomic():
+            fresh = ServiceItem.objects.select_for_update().get(pk=self.pk)
+            moved = max(delta, -fresh.stock)
+            if moved == 0 and reason != StockMove.ADJUST:
+                return 0
+            fresh.stock += moved
+            fresh.save(update_fields=['stock'])
+            StockMove.objects.create(item=fresh, change=moved, reason=reason, balance=fresh.stock, bill=bill, note=(note or '')[:200],
+                                     by_name=(name or '')[:200], by_role=(role or '')[:40])
+        self.stock = fresh.stock
+        return moved
+
+
+class StockMove(models.Model):
+    """One change to a product's stock: received, sold on a bill, put back by a cancelled bill, or corrected by a count."""
+    RECEIVED, SOLD, RETURNED, REMOVED, ADJUST = 'received', 'sold', 'returned', 'removed', 'adjust'
+    REASON_CHOICES = [(RECEIVED, 'Received'), (SOLD, 'Sold'), (RETURNED, 'Put back'), (REMOVED, 'Removed (damaged / expired)'), (ADJUST, 'Count corrected')]
+    item = models.ForeignKey(ServiceItem, on_delete=models.CASCADE, related_name='moves')
+    change = models.IntegerField()
+    reason = models.CharField(max_length=10, choices=REASON_CHOICES)
+    balance = models.IntegerField(default=0, help_text='Stock after this change.')
+    bill = models.ForeignKey('BillingEntry', null=True, blank=True, on_delete=models.SET_NULL, related_name='stock_moves')
+    note = models.CharField(max_length=200, blank=True)
+    by_name = models.CharField(max_length=200, blank=True)
+    by_role = models.CharField(max_length=40, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['-created_at', '-id']
+
+    def __str__(self):
+        return f'{self.item.name} {self.change:+d} ({self.reason})'
+
 
 class BillLine(models.Model):
     """What a bill was made of: the services and add-ons picked from the price list, with the price each had on that day."""
@@ -199,6 +241,9 @@ class BillLine(models.Model):
     name = models.CharField(max_length=150)
     price = models.DecimalField(max_digits=10, decimal_places=2)
     is_product = models.BooleanField(default=False)
+    item = models.ForeignKey(ServiceItem, null=True, blank=True, on_delete=models.SET_NULL, related_name='bill_lines')
+    qty = models.PositiveSmallIntegerField(default=1)
+    stock_held = models.PositiveSmallIntegerField(default=0, help_text='How many of this line are currently taken off the product\'s stock.')
     order = models.PositiveSmallIntegerField(default=0)
 
     class Meta:

@@ -21,7 +21,7 @@ from accounts.messaging import channel_links
 from . import catalog, exports
 from . import invoice as inv
 from .forms import AdvanceForm, BillCorrectionForm, BillingEntryForm, EntryPaymentForm, PackagePaymentForm, PatientBillForm, PatientPackageForm
-from .models import PRODUCT_TYPES, PackageSession, package_session_rows, ServiceItem, ADVANCE, BillingEntry, EntryPayment, PackagePayment, PatientAdvance, PatientPackage, advance_balance, lock_patient
+from .models import PRODUCT_TYPES, StockMove, PackageSession, package_session_rows, ServiceItem, ADVANCE, BillingEntry, EntryPayment, PackagePayment, PatientAdvance, PatientPackage, advance_balance, lock_patient
 
 
 def revenue_for(profile, date):
@@ -150,6 +150,11 @@ def entry_save(request, pk=None):
             obj.contact_number = obj.contact_number or (patient.phone if can_see_contact(profile, patient) else '')
         if not pk:
             obj.created_by_name, obj.created_by_role = actor_of(request.user, profile)
+        if not pk:
+            short = catalog.stock_problem(profile, request.POST.get('lines'))
+            if short:
+                messages.error(request, short)
+                return redirect('billing:billing')
         obj.save()
         carried = None
         if not pk:
@@ -168,6 +173,10 @@ def patient_bill(request, patient_id):
     profile, patient = billing_patient(request, patient_id)
     back = redirect(_patient_page(request, patient))
     if request.method != 'POST':
+        return back
+    short = catalog.stock_problem(profile, request.POST.get('lines'))
+    if short:
+        messages.error(request, short)
         return back
     form = PatientBillForm(request.POST)
     if form.is_valid():
@@ -369,6 +378,7 @@ def entry_cancel(request, pk):
     returned = entry.release_advance(request.user)  # what was taken from an advance goes back to the patient's balance
     entry.cancelled_at, entry.cancel_reason = timezone.now(), request.POST.get('reason', '').strip()[:255]
     entry.save(update_fields=['cancelled_at', 'cancel_reason', 'updated_at'])
+    catalog.release_stock(entry, *actor_of(request.user, profile))
     note = (f' NPR {returned:g} went back to the patient\'s advance balance.' if returned else '') + (f' NPR {entry.amount_paid:g} that was received is no longer counted as money taken - refund it to the patient.' if entry.amount_paid else '')
     messages.success(request, f'{entry.invoice_number} cancelled.{note}')
     return back
@@ -383,6 +393,7 @@ def entry_restore(request, pk):
     if request.method == 'POST' and entry.is_cancelled:
         entry.cancelled_at, entry.cancel_reason = None, ''
         entry.save(update_fields=['cancelled_at', 'cancel_reason', 'updated_at'])
+        catalog.retake_stock(entry, *actor_of(request.user, profile))
         messages.success(request, f'{entry.invoice_number} restored.')
     return back
 
@@ -394,6 +405,8 @@ def entry_delete(request, pk):
     entry = get_object_or_404(BillingEntry, pk=pk, professional=profile)
     if request.method == 'POST':
         date = entry.entry_date
+        if not entry.is_cancelled:
+            catalog.release_stock(entry, *actor_of(request.user, profile))
         entry.delete()
         messages.success(request, 'Entry deleted.')
         return _back(date)
@@ -687,7 +700,8 @@ def services(request):
     context = billing_context(request, profile)
     departments = list(profile.departments.all())
     context.update({'active': 'billing', 'billing_tab': 'services', 'items': ServiceItem.objects.filter(professional=profile, is_product=False).select_related('department'),
-                    'products': ServiceItem.objects.filter(professional=profile, is_product=True), 'product_types': PRODUCT_TYPES,
+                    'products': ServiceItem.objects.filter(professional=profile, is_product=True).select_related('department'), 'product_types': PRODUCT_TYPES,
+                    'stock_moves': StockMove.objects.filter(item__professional=profile).select_related('item', 'bill')[:30],
                     'departments': [{'obj': d, 'kind': catalog.kind_of(d.name)} for d in departments],
                     'advance_held_total': PatientAdvance.objects.filter(professional=profile).aggregate(t=Sum('amount'))['t'] or 0})
     return render(request, 'billing/services.html', context)
@@ -722,12 +736,49 @@ def service_save(request, pk):
         item.active = request.POST.get('active') == 'on'
     kind = request.POST.get('kind')
     item.name, item.price, item.is_addon, item.is_product = name, price.quantize(Decimal('0.01')), kind == 'addon', kind == 'product'
+    if item.is_product:
+        item.track_stock = request.POST.get('track_stock') == 'on'
+        try:
+            item.low_stock_at = min(max(int(request.POST.get('low_stock_at', item.low_stock_at)), 0), 9999)
+        except ValueError:
+            pass
     ptype = request.POST.get('product_type', '')
     item.product_type = ptype if item.is_product and ptype in dict(PRODUCT_TYPES) else ''
     item.department = profile.departments.filter(pk=int(request.POST['department'])).first() if request.POST.get('department', '').isdigit() else None
     item.save()
     messages.success(request, f'{item.name} saved at NPR {item.price:g}.')
     return redirect('billing:services')
+
+
+@login_required
+def stock_adjust(request, pk):
+    """Receive stock, remove some (damaged, expired) or correct the count of a product; each change is logged with who made it."""
+    billing_manager(request)
+    profile = billing_profile(request)
+    if profile is None or request.method != 'POST':
+        return redirect('billing:services')
+    item = get_object_or_404(ServiceItem, pk=pk, professional=profile, is_product=True)
+    try:
+        number = int(request.POST.get('number', ''))
+    except ValueError:
+        number = -1
+    action = request.POST.get('action')
+    name, role = actor_of(request.user, profile)
+    note = request.POST.get('note', '').strip()
+    if number < 0 or number > 100000 or action not in ('receive', 'remove', 'set') or (action != 'set' and number == 0):
+        messages.error(request, 'Give a number of items.')
+    else:
+        if not item.track_stock:
+            item.track_stock = True
+            item.save(update_fields=['track_stock'])
+        if action == 'receive':
+            item.change_stock(number, StockMove.RECEIVED, name, role, note)
+        elif action == 'remove':
+            item.change_stock(-number, StockMove.REMOVED, name, role, note)
+        else:
+            item.change_stock(number - item.stock, StockMove.ADJUST, name, role, note)
+        messages.success(request, f'{item.name}: {item.stock} in stock.')
+    return redirect(reverse('billing:services') + '#products')
 
 
 @login_required

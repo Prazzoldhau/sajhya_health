@@ -214,3 +214,11 @@ Every calendar (the clinic login's Appointments page, the front desk's Schedule 
 For a clinic's packages (sold by the front desk, a manager or the clinic's own login), the sessions used are recorded on the **Billing, Patient packages** page, not counted when a therapist records a session. Each package card has a **Session used** form (date, optional note) and a dated log showing who recorded each session; **Undo** takes one back (it stays in the log, marked as taken back). The count and the *Completed* status follow from it, a session cannot be dated in the future or before the package started, and nothing more can be recorded once the package is complete, expired or cancelled. Reception, managers and the clinic's own login can do this; assistants and doctors cannot. A solo professional's packages are still counted automatically when they record a session. `billing 0015` adds the log.
 
 Each package session also appears in the **Daily billing record** of the day it was used (Billing, below the day's bills): a "Package sessions used today" list with the patient, the package, "3 of 10", who recorded it, the note and what a session is worth (the package price over its sessions). It is a done record, already paid through the package, so it adds nothing to the day's billed total. Searching a patient lists their package sessions on every date, a session taken back leaves the list, and the Excel export has a **Package sessions** sheet (date, patient, package, session number, recorded by, status).
+
+## Aids and products: stock and departments
+
+Aids and products (pain oil, supplements, orthosis, prosthesis) are listed apart from services on Services & prices. Each can belong to a department, like a service.
+Tick **Count stock** on a product to track it: receive stock, remove some (damaged / expired) or correct the count, each logged with who and why ("Recent stock changes").
+A sale on a bill (front desk or professional) takes the quantity off the stock; a bill for more than is in stock is refused; cancelling or deleting a bill puts the stock back
+and restoring it takes it again. The picker shows "N left" / "out of stock" and a quantity box for each product picked. Stock is counted on the list the product sits in
+(a front desk can sell the owner's products). Products you do not count sell freely.

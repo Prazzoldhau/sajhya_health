@@ -358,6 +358,10 @@ def bill_create(request, member):
     if patient is None:
         messages.error(request, 'Search and pick one of the clinic\'s patients to bill.')
         return _back('billing')
+    short = catalog.stock_problem(billing_owner(clinic), request.POST.get('lines'))
+    if short:
+        messages.error(request, short)
+        return _back('billing')
     form = PatientBillForm(request.POST)
     if not form.is_valid():
         messages.error(request, first_error(form))
