@@ -38,10 +38,24 @@ def kind_of(department_name):
     return None
 
 
-def catalog_for(profile):
-    """The active price list as plain dicts (for the bill forms' service picker). dept is the department's id, or '' for a service every department offers."""
-    return [{'id': s.pk, 'name': s.name, 'price': str(s.price), 'addon': s.is_addon, 'dept': s.department_id or '', 'dept_name': s.department.name if s.department_id else ''}
-            for s in ServiceItem.objects.filter(professional=profile, active=True).select_related('department')]
+def catalog_for(profile, owner=None):
+    """The active price list as plain dicts (for the bill forms' service picker). dept is the department's id, or '' for a service every department offers.
+    A clinic's front desk bills in the clinic's own workspace, but the owner may keep the price list on their own professional workspace, so the
+    owner's active services are offered too (the clinic workspace's own price wins for the same name)."""
+    def rows(source, sign):
+        return [{'id': sign * s.pk, 'name': s.name, 'price': str(s.price), 'addon': s.is_addon, 'dept': s.department_id or '', 'dept_name': s.department.name if s.department_id else ''}
+                for s in ServiceItem.objects.filter(professional=source, active=True).select_related('department')]
+    out = rows(profile, 1)
+    if owner is not None and owner.pk != profile.pk:
+        have = {r['name'].lower() for r in out}
+        depts = {d.name.lower(): d.pk for d in profile.departments.all()}
+        for r in rows(owner, -1):
+            if r['name'].lower() in have:
+                continue
+            if r['dept']:  # show it under the clinic workspace's department of the same name, if there is one
+                r['dept'] = depts.get(r['dept_name'].lower(), -r['dept'])
+            out.append(r)
+    return out
 
 
 def seed_suggested(profile, department=None):

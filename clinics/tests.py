@@ -2180,3 +2180,23 @@ class PackageSessionsInTheDailyRecordTests(Base):
         self.assertIn('Package sessions', book.sheetnames)
         rows = list(book['Package sessions'].iter_rows(min_row=2, values_only=True))
         self.assertEqual([(r[1], r[4], r[5], r[6], r[9]) for r in rows], [('Walk In', 1, 2, 'Ram', 'Used'), ('Walk In', 2, 2, 'Ram', 'Used')])
+
+
+class OwnersPriceListReachesTheFrontDeskTests(Base):
+    """Services the owner adds on /billing/services/ (their own workspace) also appear on the clinic's front desk billing pages."""
+    CREDS = StaffLoginTests.CREDS
+    add_staff = StaffLoginTests.add_staff
+    setup_desk = FrontDeskRegisteredByAndBillingTests.setup_desk
+
+    def test_owner_and_clinic_login_services_both_show_for_reception(self):
+        from billing.models import ServiceItem
+        clinic = self.setup_desk()
+        self.as_user('owner')
+        self.client.post(reverse('billing:service-save', args=[0]), {'name': 'Owner Consult', 'price': '700', 'kind': 'service'})
+        self.as_user('himal-clinic')
+        self.client.post(reverse('billing:service-save', args=[0]), {'name': 'Clinic Hot Pack', 'price': '200', 'kind': 'service'})
+        self.assertEqual(ServiceItem.objects.count(), 2)
+        self.as_user('ram-desk')
+        for url in (reverse('billing:billing'), reverse('clinics:desk') + '?tab=billing'):
+            names = [s['name'] for s in self.client.get(url).context['service_catalog']]
+            self.assertEqual(sorted(names), ['Clinic Hot Pack', 'Owner Consult'], url)

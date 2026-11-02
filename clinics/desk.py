@@ -273,7 +273,7 @@ def _billing_context(request, member):
     return {
         'selected': selected, 'today': today, 'prev_date': selected - datetime.timedelta(days=1), 'next_date': selected + datetime.timedelta(days=1),
         'day_bills': day, 'owed': owed, 'billed': sum((e.rate for e in day if not e.is_cancelled), 0), 'received': got,
-        'due_total': sum((e.amount_due for e in owed), 0), 'bill_form': PatientBillForm(initial={'entry_date': selected}), 'pay_form': EntryPaymentForm(), 'service_catalog': catalog.catalog_for(billing_owner(clinic)),
+        'due_total': sum((e.amount_due for e in owed), 0), 'bill_form': PatientBillForm(initial={'entry_date': selected}), 'pay_form': EntryPaymentForm(), 'service_catalog': catalog.catalog_for(billing_owner(clinic), clinic.owner),
         'can_bill': member.clinic.is_usable,
     }
 
