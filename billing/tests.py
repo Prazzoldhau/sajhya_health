@@ -1170,3 +1170,33 @@ class DepartmentServicesTests(BillingBase):
         self.assertContains(page, 'Speech Therapy services')  # the suggestion button
         self.assertNotContains(page, 'placeholder="e.g. Physiotherapy"')
         self.assertContains(self.client.get(reverse('billing:billing')), 'data-svc-dept')  # the department filter in the bill form's picker
+
+
+class AidsAndProductsTests(BillingBase):
+    """Pain oil, supplements, orthosis and prosthesis are on the price list as aids and products: a separate entity from services."""
+    def test_products_are_listed_apart_and_reach_the_bill_picker(self):
+        from .models import ServiceItem
+        self.client.post(reverse('billing:service-save', args=[0]), {'name': 'Knee brace', 'price': '1200', 'kind': 'product', 'product_type': 'orthosis'})
+        self.client.post(reverse('billing:service-save', args=[0]), {'name': 'Consult', 'price': '200', 'kind': 'main'})
+        brace = ServiceItem.objects.get(name='Knee brace')
+        self.assertEqual((brace.is_product, brace.product_type, brace.is_addon), (True, 'orthosis', False))
+        page = self.client.get(reverse('billing:services'))
+        self.assertEqual([i.name for i in page.context['items']], ['Consult'])
+        self.assertEqual([i.name for i in page.context['products']], ['Knee brace'])
+        self.assertContains(page, 'Aids &amp; products')
+        self.client.post(reverse('billing:services-seed'), {'products': '1'})
+        names = set(ServiceItem.objects.filter(is_product=True).values_list('name', flat=True))
+        self.assertTrue({'Pain relief oil', 'Dietary supplement (calcium + vitamin D)', 'Cervical collar', 'Artificial limb (prosthesis)'} <= names)
+        count = ServiceItem.objects.count()
+        self.client.post(reverse('billing:services-seed'), {'products': '1'})
+        self.assertEqual(ServiceItem.objects.count(), count)  # not twice
+        catalog = self.client.get(reverse('billing:billing')).context['service_catalog']
+        self.assertTrue(next(c for c in catalog if c['name'] == 'Knee brace')['product'])
+        self.assertFalse(next(c for c in catalog if c['name'] == 'Consult')['product'])
+
+    def test_a_bill_keeps_which_lines_were_products(self):
+        from .catalog import save_lines
+        self.client.post(reverse('billing:service-save', args=[0]), {'name': 'Consult', 'price': '200', 'kind': 'main'})
+        entry = BillingEntry.objects.create(professional=self.profile, patient=self.patient, service='Consult + Pain oil', rate=450, entry_date=timezone.localdate())
+        save_lines(entry, '[{"name": "Consult", "price": "200"}, {"name": "Pain oil", "price": "250", "product": true}]')
+        self.assertEqual([(l.name, l.is_product) for l in entry.lines.all()], [('Consult', False), ('Pain oil', True)])

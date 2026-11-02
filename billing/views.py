@@ -21,7 +21,7 @@ from accounts.messaging import channel_links
 from . import catalog, exports
 from . import invoice as inv
 from .forms import AdvanceForm, BillCorrectionForm, BillingEntryForm, EntryPaymentForm, PackagePaymentForm, PatientBillForm, PatientPackageForm
-from .models import PackageSession, package_session_rows, ServiceItem, ADVANCE, BillingEntry, EntryPayment, PackagePayment, PatientAdvance, PatientPackage, advance_balance, lock_patient
+from .models import PRODUCT_TYPES, PackageSession, package_session_rows, ServiceItem, ADVANCE, BillingEntry, EntryPayment, PackagePayment, PatientAdvance, PatientPackage, advance_balance, lock_patient
 
 
 def revenue_for(profile, date):
@@ -686,7 +686,8 @@ def services(request):
         return redirect('accounts:welcome')
     context = billing_context(request, profile)
     departments = list(profile.departments.all())
-    context.update({'active': 'billing', 'billing_tab': 'services', 'items': ServiceItem.objects.filter(professional=profile).select_related('department'),
+    context.update({'active': 'billing', 'billing_tab': 'services', 'items': ServiceItem.objects.filter(professional=profile, is_product=False).select_related('department'),
+                    'products': ServiceItem.objects.filter(professional=profile, is_product=True), 'product_types': PRODUCT_TYPES,
                     'departments': [{'obj': d, 'kind': catalog.kind_of(d.name)} for d in departments],
                     'advance_held_total': PatientAdvance.objects.filter(professional=profile).aggregate(t=Sum('amount'))['t'] or 0})
     return render(request, 'billing/services.html', context)
@@ -719,7 +720,10 @@ def service_save(request, pk):
         item.active = True
     else:
         item.active = request.POST.get('active') == 'on'
-    item.name, item.price, item.is_addon = name, price.quantize(Decimal('0.01')), request.POST.get('kind') == 'addon'
+    kind = request.POST.get('kind')
+    item.name, item.price, item.is_addon, item.is_product = name, price.quantize(Decimal('0.01')), kind == 'addon', kind == 'product'
+    ptype = request.POST.get('product_type', '')
+    item.product_type = ptype if item.is_product and ptype in dict(PRODUCT_TYPES) else ''
     item.department = profile.departments.filter(pk=int(request.POST['department'])).first() if request.POST.get('department', '').isdigit() else None
     item.save()
     messages.success(request, f'{item.name} saved at NPR {item.price:g}.')
@@ -744,6 +748,13 @@ def services_seed(request):
     if profile is None or request.method != 'POST':
         return redirect('billing:services')
     department = profile.departments.filter(pk=int(request.POST['department'])).first() if request.POST.get('department', '').isdigit() else None
+    if request.POST.get('products'):
+        added = catalog.seed_products(profile)
+        if added:
+            messages.success(request, f'{added} aids and products added. Change the prices to yours.')
+        else:
+            messages.info(request, 'Those aids and products are already on your list.')
+        return redirect('billing:services')
     added = catalog.seed_suggested(profile, department)
     if added:
         messages.success(request, f'{added} services added' + (f' for {department.name}' if department else '') + '. Change the prices to yours.')

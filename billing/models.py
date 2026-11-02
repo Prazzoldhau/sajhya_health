@@ -169,6 +169,9 @@ class BillingEntry(models.Model):
             self.save(update_fields=['amount_paid', 'updated_at'])
 
 
+PRODUCT_TYPES = [('oil', 'Pain oil / topical'), ('supplement', 'Dietary supplement'), ('orthosis', 'Orthosis'), ('prosthesis', 'Prosthesis'), ('other', 'Other aid')]
+
+
 class ServiceItem(models.Model):
     """One line of a practice's price list: a service (Basic Physiotherapy 400) or an add-on (Needling 300). The bill forms offer them as buttons."""
     professional = models.ForeignKey('accounts.ProfessionalProfile', on_delete=models.CASCADE, related_name='service_items')
@@ -177,11 +180,13 @@ class ServiceItem(models.Model):
     department = models.ForeignKey('accounts.Department', null=True, blank=True, on_delete=models.SET_NULL, related_name='service_items',
                                    help_text='The department this service belongs to (Speech Therapy...). Leave empty for a service every department offers.')
     is_addon = models.BooleanField(default=False, help_text='An extra on top of a main service (shown with a +).')
+    is_product = models.BooleanField(default=False, help_text='An aid or product sold to the patient (pain oil, supplement, orthosis, prosthesis...), not a service.')
+    product_type = models.CharField(max_length=12, blank=True, choices=PRODUCT_TYPES)
     active = models.BooleanField(default=True, help_text='Untick to stop offering it without losing it.')
     order = models.PositiveSmallIntegerField(default=0)
 
     class Meta:
-        ordering = ['is_addon', 'order', 'id']
+        ordering = ['is_product', 'is_addon', 'order', 'id']
         unique_together = [('professional', 'name')]
 
     def __str__(self):
@@ -193,6 +198,7 @@ class BillLine(models.Model):
     entry = models.ForeignKey(BillingEntry, on_delete=models.CASCADE, related_name='lines')
     name = models.CharField(max_length=150)
     price = models.DecimalField(max_digits=10, decimal_places=2)
+    is_product = models.BooleanField(default=False)
     order = models.PositiveSmallIntegerField(default=0)
 
     class Meta:

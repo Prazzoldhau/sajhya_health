@@ -28,6 +28,25 @@ SUGGESTED_BY_KIND = {
 }
 
 
+# Aids and products a physiotherapy practice sells; listed apart from the services. (name, price, product type)
+SUGGESTED_PRODUCTS = [('Pain relief oil', 250, 'oil'), ('Pain relief gel', 300, 'oil'), ('Dietary supplement (calcium + vitamin D)', 600, 'supplement'), ('Protein / nutrition supplement', 900, 'supplement'),
+                      ('Knee brace', 1200, 'orthosis'), ('Ankle support', 800, 'orthosis'), ('Lumbar belt', 1500, 'orthosis'), ('Cervical collar', 700, 'orthosis'),
+                      ('Wrist splint', 600, 'orthosis'), ('Foot insole (orthotic)', 1000, 'orthosis'), ('Artificial limb (prosthesis)', 15000, 'prosthesis')]
+
+
+def seed_products(profile):
+    """Add the suggested aids and products (skipping names already on the list). Returns how many were added."""
+    have = {n.lower() for n in ServiceItem.objects.filter(professional=profile).values_list('name', flat=True)}
+    order = ServiceItem.objects.filter(professional=profile).count()
+    added = 0
+    for name, price, ptype in SUGGESTED_PRODUCTS:
+        if name.lower() in have:
+            continue
+        ServiceItem.objects.create(professional=profile, name=name, price=Decimal(price), is_product=True, product_type=ptype, order=order + added)
+        added += 1
+    return added
+
+
 def kind_of(department_name):
     """Which suggested list suits a department, by its name; None for a name we do not recognise."""
     name = (department_name or '').lower()
@@ -43,7 +62,7 @@ def catalog_for(profile, owner=None):
     A clinic's front desk bills in the clinic's own workspace, but the owner may keep the price list on their own professional workspace, so the
     owner's active services are offered too (the clinic workspace's own price wins for the same name)."""
     def rows(source, sign):
-        return [{'id': sign * s.pk, 'name': s.name, 'price': str(s.price), 'addon': s.is_addon, 'dept': s.department_id or '', 'dept_name': s.department.name if s.department_id else ''}
+        return [{'id': sign * s.pk, 'name': s.name, 'price': str(s.price), 'addon': s.is_addon, 'product': s.is_product, 'ptype': s.get_product_type_display() if s.product_type else '', 'dept': s.department_id or '', 'dept_name': s.department.name if s.department_id else ''}
                 for s in ServiceItem.objects.filter(professional=source, active=True).select_related('department')]
     out = rows(profile, 1)
     if owner is not None and owner.pk != profile.pk:
@@ -97,11 +116,11 @@ def parse_lines(raw):
         except InvalidOperation:
             continue
         if name and price >= 0 and price < Decimal('10000000'):
-            lines.append((name, price.quantize(Decimal('0.01'))))
+            lines.append((name, price.quantize(Decimal('0.01')), row.get('product') is True))
     return lines
 
 
 def save_lines(entry, raw):
     """Keep the posted lines with a new bill. They are only a breakdown: the bill's own amount (which can be a discounted total) stays what counts."""
-    for order, (name, price) in enumerate(parse_lines(raw)):
-        BillLine.objects.create(entry=entry, name=name, price=price, order=order)
+    for order, (name, price, product) in enumerate(parse_lines(raw)):
+        BillLine.objects.create(entry=entry, name=name, price=price, is_product=product, order=order)

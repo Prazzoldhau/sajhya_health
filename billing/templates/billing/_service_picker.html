@@ -7,11 +7,12 @@ Use inside the form with the form's id, as in the billing page: include this fil
     .svc-picker .t a { font-weight: 700; text-transform: none; letter-spacing: 0; color: #116b43; }
     .svc-picker .g { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 6px; }
     .svc-picker .chip { border: 1px solid #cfe6d8; background: #fff; border-radius: 16px; padding: 5px 11px; font-size: 12px; font-weight: 700; color: #116b43; cursor: pointer; }
-    .svc-picker .chip.addon { border-style: dashed; } .svc-picker .chip.on { background: #168653; border-color: #168653; color: #fff; }
+    .svc-picker .chip.addon { border-style: dashed; } .svc-picker .chip.product { border-color: #e2c98a; color: #7a5a10; background: #fffaf0; } .svc-picker .chip.product.on { background: #b07d12; border-color: #b07d12; color: #fff; }
+    .svc-picker .sub { font-size: 10.5px; font-weight: 800; letter-spacing: .05em; text-transform: uppercase; color: #8a6d1d; margin: 6px 0 4px; } .svc-picker .chip.on { background: #168653; border-color: #168653; color: #fff; }
     .svc-picker .chip small { font-weight: 600; opacity: .8; margin-left: 4px; }
     .svc-picker .sum { font-size: 12px; color: #426052; }
   </style>
-  <div class="t">Services from your price list <select data-svc-dept hidden aria-label="Show the services of one department" style="height:28px;border:1px solid #cfe6d8;border-radius:8px;background:#fff;font-weight:700"></select> {% if not hide_prices %}<a href="{% url 'billing:services' %}" target="_blank" rel="noopener">edit prices</a>{% endif %}</div>
+  <div class="t">Services and products from your price list <select data-svc-dept hidden aria-label="Show the services of one department" style="height:28px;border:1px solid #cfe6d8;border-radius:8px;background:#fff;font-weight:700"></select> {% if not hide_prices %}<a href="{% url 'billing:services' %}" target="_blank" rel="noopener">edit prices</a>{% endif %}</div>
   {% if service_catalog %}
   <div class="g" data-svc-chips></div>
   <div class="sum" data-svc-sum>Tap a service or add-on to fill in the bill. You can still change the text and amount.</div>
@@ -31,7 +32,7 @@ Use inside the form with the form's id, as in the billing page: include this fil
   function money(n) { return (Math.round(n * 100) / 100).toString(); }
   function apply() {
     var picked = catalog.filter(function (s) { return selected[s.id]; }), total = picked.reduce(function (a, s) { return a + parseFloat(s.price); }, 0);
-    linesInput.value = JSON.stringify(picked.map(function (s) { return { name: s.name, price: s.price }; }));
+    linesInput.value = JSON.stringify(picked.map(function (s) { return { name: s.name, price: s.price, product: !!s.product }; }));
     var service = form.elements['service'], rate = form.elements['rate'];
     if (picked.length) {
       if (service) service.value = picked.map(function (s) { return s.name; }).join(' + ');
@@ -49,9 +50,11 @@ Use inside the form with the form's id, as in the billing page: include this fil
   }
   function render() {
     chips.innerHTML = '';
-    catalog.forEach(function (s) {
+    var shownProducts = 0;
+    catalog.slice().sort(function (a, b) { return (a.product ? 1 : 0) - (b.product ? 1 : 0); }).forEach(function (s) {
       if (deptSelect.value && s.dept && String(s.dept) !== deptSelect.value) return;
-      var b = document.createElement('button'); b.type = 'button'; b.className = 'chip' + (s.addon ? ' addon' : '') + (selected[s.id] ? ' on' : '');
+      if (s.product && !shownProducts++) { var h = document.createElement('div'); h.className = 'sub'; h.style.flexBasis = '100%'; h.textContent = 'Aids & products'; chips.appendChild(h); }
+      var b = document.createElement('button'); b.type = 'button'; b.className = 'chip' + (s.addon ? ' addon' : '') + (s.product ? ' product' : '') + (selected[s.id] ? ' on' : '');
       b.innerHTML = (s.addon ? '+ ' : '') + s.name.replace(/</g, '&lt;') + '<small>' + money(parseFloat(s.price)) + '</small>';
       b.addEventListener('click', function () { selected[s.id] = !selected[s.id]; b.classList.toggle('on', !!selected[s.id]); apply(); });
       chips.appendChild(b);

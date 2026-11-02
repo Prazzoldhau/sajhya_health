@@ -42,6 +42,32 @@
   {% if departments %}</div><p class="patient-id" style="margin:8px 0 0">Prices are only starting points: change them to yours. Services you tag with a department show up when you pick that department while billing.</p>{% endif %}
 </section>
 
+<section class="sv-card" id="products">
+  <div style="font-weight:800;margin-bottom:2px">Aids &amp; products</div>
+  <p class="patient-id" style="margin:0 0 8px">Things you sell, not services: pain oil, dietary supplements, orthosis, prosthesis. They are listed apart and tapped the same way when billing.</p>
+  {% for s in products %}
+  <div class="sv-row {% if not s.active %}off{% endif %}" style="grid-template-columns:minmax(160px,1fr) 110px 170px auto auto">
+    <form method="post" action="{% url 'billing:service-save' s.pk %}">{% csrf_token %}
+      <input type="text" name="name" value="{{ s.name }}" maxlength="100" required>
+      <input type="number" name="price" value="{{ s.price }}" step="0.01" min="0" required>
+      <input type="hidden" name="kind" value="product">
+      <select name="product_type">{% for key, label in product_types %}<option value="{{ key }}" {% if s.product_type == key %}selected{% endif %}>{{ label }}</option>{% endfor %}</select>
+      <label style="font-size:12px;display:flex;gap:5px;align-items:center;white-space:nowrap"><input type="checkbox" name="active" {% if s.active %}checked{% endif %}> In use</label>
+      <button class="primary-btn" type="submit" style="height:34px">Save</button>
+    </form>
+  </div>
+  <form method="post" action="{% url 'billing:service-delete' s.pk %}" style="margin:0;text-align:right" onsubmit="return confirm('Remove {{ s.name|escapejs }} from the list? Bills already made keep it.')">{% csrf_token %}<button class="text-link" type="submit" style="font-size:11.5px">Remove {{ s.name }}</button></form>
+  {% endfor %}
+  <form method="post" action="{% url 'billing:service-save' 0 %}" style="display:grid;grid-template-columns:minmax(160px,1fr) 130px 190px auto;gap:8px;align-items:center;margin-top:10px">{% csrf_token %}
+    <input type="hidden" name="kind" value="product">
+    <input type="text" name="name" placeholder="e.g. Knee brace" maxlength="100" required style="height:38px;border:1px solid var(--line);border-radius:8px;padding:0 10px">
+    <input type="number" name="price" placeholder="Price" step="0.01" min="0" required style="height:38px;border:1px solid var(--line);border-radius:8px;padding:0 10px">
+    <select name="product_type" style="height:38px;border:1px solid var(--line);border-radius:8px;padding:0 10px">{% for key, label in product_types %}<option value="{{ key }}">{{ label }}</option>{% endfor %}</select>
+    <button class="primary-btn" type="submit">Add</button>
+  </form>
+  <form method="post" action="{% url 'billing:services-seed' %}" style="margin-top:8px">{% csrf_token %}<input type="hidden" name="products" value="1"><button class="secondary-btn" type="submit">＋ Add the suggested aids &amp; products</button></form>
+</section>
+
 <section class="sv-card">
   <div style="font-weight:800;margin-bottom:8px">Add a service or add-on</div>
   <form method="post" action="{% url 'billing:service-save' 0 %}" style="display:grid;grid-template-columns:minmax(160px,1fr) 130px 170px 150px auto;gap:8px;align-items:center">{% csrf_token %}
