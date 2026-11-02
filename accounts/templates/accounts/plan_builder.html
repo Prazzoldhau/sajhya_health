@@ -86,6 +86,7 @@
 </div>
 
 <datalist id="dl-suggest">{% for s in suggestions %}<option value="{{ s }}">{% endfor %}</datalist>
+<datalist id="dl-dose"></datalist>
 {{ state|json_script:"plan-state" }}
 {% include 'accounts/_icd_picker.html' %}
 <script>
@@ -174,7 +175,7 @@
     phase.items.filter(function (i) { return i.kind === kind; }).forEach(function (it) {
       var row = el('div', { class: 'item-row' + (kind === 'hep' ? ' hep' : '') },
         input(it, 'text', { list: 'dl-suggest', placeholder: kind === 'hep' ? 'Exercise' : 'Intervention' }));
-      if (kind === 'hep') { var dose = input(it, 'dosage', { placeholder: 'e.g. 3x/day, 10 reps' }); row.appendChild(dose); libraryPick(row.firstChild, it, dose); }
+      if (kind === 'hep') { var dose = input(it, 'dosage', { list: 'dl-dose', autocomplete: 'off', placeholder: 'Dose: type or pick (3 sets x 10, hold 10s, 3x/day...)' }); row.appendChild(dose); libraryPick(row.firstChild, it, dose); }
       row.appendChild(delBtn(function () { phase.items.splice(phase.items.indexOf(it), 1); renderPhases(); }));
       wrap.appendChild(row);
     });
@@ -183,13 +184,29 @@
     return wrap;
   }
 
+  // doses are searchable too: type "3 sets", "hold", "daily"... and pick; the dose of any exercise picked is added to the list; free text still works
+  var DOSES = ['1 set x 10 reps', '2 sets x 10 reps', '3 sets x 10 reps', '3 sets x 12 reps', '3 sets x 15 reps', '4 sets x 10 reps', '5 reps', '10 reps', '15 reps', '20 reps',
+               'hold 5s', 'hold 10s', 'hold 15s', 'hold 30s', 'hold 60s', '2 min', '5 min', '10 min', '15 min', '20 min',
+               'once a day', 'twice a day', '3x/day', '4x/day', 'every hour', 'every 2 hours', 'alternate days', '3x/week', 'daily for 2 weeks', 'as tolerated, pain-free range'];
+  var doseList = document.getElementById('dl-dose');
+  function addDose(d) {
+    if (!d || DOSES.indexOf(d) !== -1) return;
+    DOSES.unshift(d); fillDoses();
+  }
+  function fillDoses() {
+    doseList.innerHTML = '';
+    DOSES.forEach(function (d) { var o = document.createElement('option'); o.value = d; doseList.appendChild(o); });
+  }
+  fillDoses();
+  S.phases.forEach(function (ph) { ph.items.forEach(function (it) { if (it.kind === 'hep') addDose(it.dosage); }); });
+
   // home-exercise rows search the exercise library as you type; picking one fills name + default dose
   var LIB_URL = "{% url 'exercises:search' %}";
   function libraryPick(nameInput, item, doseInput) {
     SajhyaUI.picker(nameInput, {
       url: LIB_URL,
       render: function (r) { return '<span class="ex-cell">' + SajhyaUI.thumb(r.name, r.cover) + '<span><b>' + SajhyaUI.esc(r.name) + '</b> <span style="color:#7c9186">' + SajhyaUI.esc(r.dose) + '</span></span></span>'; },
-      onPick: function (r) { item.text = r.name; item.dosage = r.dose; nameInput.value = r.name; doseInput.value = r.dose; },
+      onPick: function (r) { item.text = r.name; item.dosage = r.dose; nameInput.value = r.name; doseInput.value = r.dose; addDose(r.dose); },
     });
   }
 
