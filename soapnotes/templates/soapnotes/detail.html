@@ -17,6 +17,7 @@
     <button type="button" class="secondary-btn" onclick="window.print()">Print</button>
   </span>
 </div>
+{% if last_share %}<p class="hint no-print">✉ Last e-mailed to {{ last_share.address }} on {{ last_share.sent_at|date:"j M Y, H:i" }}{% if last_share.sent_by_name %} by {{ last_share.sent_by_name }}{% endif %}.</p>{% endif %}
 {% if note.finalized_at %}<p class="hint">Finalised {{ note.finalized_at|date:"M j, Y H:i" }} - locked; changes are recorded as addenda below.</p>{% endif %}
 
 {% include 'soapnotes/_note_body.html' %}

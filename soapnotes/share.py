@@ -179,3 +179,25 @@ def build_pdf(note, online_url=''):
     story.append(Paragraph('This note is confidential and was prepared for the patient named above. ' + (f'Online copy: {escape(online_url)}' if online_url else ''), ParagraphStyle('f', parent=body, fontSize=8, textColor=muted)))
     doc.build(story, onFirstPage=page, onLaterPages=page)
     return buf.getvalue()
+
+
+def email_html(note, profile, url, message):
+    """The e-mail body as a designed page: a header band with the practice, a greeting, a button to the PDF, and the confidentiality note.
+    Inline styles only, because mail programs ignore style sheets. The plain-text message is sent alongside as the fallback."""
+    name = escape(profile.practice_name or profile.full_name)
+    sub = escape(' · '.join(x for x in (profile.practice_address, profile.practice_phone or profile.mobile) if x))
+    body = escape(message).replace('\n', '<br>')
+    link = escape(url, {'"': '&quot;'})
+    return (
+        '<div style="background:#f3f7f4;padding:24px 12px;font-family:Arial,Helvetica,sans-serif;color:#18352b">'
+        '<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:560px;margin:0 auto;background:#ffffff;border-radius:10px;overflow:hidden;border:1px solid #d7e6dc">'
+        f'<tr><td style="background:#116b43;padding:20px 24px;color:#ffffff"><div style="font-size:19px;font-weight:bold">{name}</div>'
+        f'<div style="font-size:12px;opacity:.9;margin-top:3px">{sub}</div></td></tr>'
+        '<tr><td style="padding:22px 24px 6px">'
+        '<div style="font-size:11px;letter-spacing:.06em;color:#6c8178;font-weight:bold;text-transform:uppercase">Your physiotherapy note</div>'
+        f'<div style="font-size:16px;font-weight:bold;margin:4px 0 12px">{escape(note.patient.name)} &middot; {note.note_date:%d %b %Y}</div>'
+        f'<div style="font-size:14px;line-height:1.6">{body}</div></td></tr>'
+        f'<tr><td style="padding:12px 24px 8px"><a href="{link}" style="display:inline-block;background:#116b43;color:#ffffff;text-decoration:none;font-weight:bold;font-size:14px;padding:11px 20px;border-radius:8px">Open the note (PDF)</a></td></tr>'
+        f'<tr><td style="padding:6px 24px 20px;font-size:12px;color:#6c8178;line-height:1.5">The note is also attached to this e-mail as a PDF. The link works for {LINK_DAYS} days.<br>'
+        'This e-mail is confidential and was prepared for the patient named above. If it reached you by mistake, please delete it.</td></tr>'
+        '</table></div>')

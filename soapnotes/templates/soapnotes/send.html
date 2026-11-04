@@ -59,8 +59,14 @@
     <form method="post" action="{% url 'soapnotes:email' note.pk %}">{% csrf_token %}
       <label style="font-size:12px;font-weight:700;color:var(--muted)">E-mail the PDF</label>
       <input type="email" name="email" value="{{ email }}" placeholder="patient@example.com" required>
+      {% if patient_has_email and email %}<span class="hint">Filled in from the patient's record.</span>
+      {% elif can_save_email and not patient_has_email %}<label style="font-size:12px;display:flex;gap:6px;align-items:center"><input type="checkbox" name="save_email" value="1" checked> Save this e-mail on the patient's record</label>
+      <span class="hint">This patient has no e-mail on record yet.</span>{% endif %}
       <button class="btn" type="submit">✉ Send by e-mail</button>
     </form>
+    {% if shares %}<div class="sep"></div>
+    <div><div style="font-size:12px;font-weight:800;color:var(--muted);margin-bottom:4px">SENT BY E-MAIL</div>
+      {% for sh in shares %}<div class="hint" style="margin:0 0 3px"><b>{{ sh.sent_at|date:"j M Y, H:i" }}</b> · {{ sh.address }}{% if sh.sent_by_name %} · {{ sh.sent_by_name }}{% endif %}</div>{% endfor %}</div>{% endif %}
     <p class="hint">The link works without signing in for {{ link_days }} days. Anyone with it can open this note, so send it only to the patient. The PDF leaves out text in other scripts (such as Nepali): use the picture for those notes.</p>
   </aside>
 </div>

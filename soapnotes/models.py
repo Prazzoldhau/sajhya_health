@@ -100,3 +100,18 @@ class SoapAddendum(models.Model):
 
     class Meta:
         ordering = ['created_at', 'id']
+
+
+class SoapShare(models.Model):
+    """A record that a finalised note was e-mailed to a patient: when, to which address, by whom."""
+    note = models.ForeignKey(SoapNote, on_delete=models.CASCADE, related_name='shares')
+    channel = models.CharField(max_length=10, default='email')
+    address = models.CharField(max_length=254)
+    sent_by_name = models.CharField(max_length=200, blank=True)
+    sent_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['-sent_at', '-id']
+
+    def __str__(self):
+        return f'{self.note_id} -> {self.address}'

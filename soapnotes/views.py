@@ -2,7 +2,7 @@ from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.db import transaction
 from django.core.exceptions import ValidationError
-from django.core.mail import EmailMessage
+from django.core.mail import EmailMultiAlternatives
 from django.core.validators import validate_email
 from django.http import Http404, HttpResponse
 from django.shortcuts import get_object_or_404, redirect, render
@@ -19,7 +19,7 @@ from billing.invoice import whatsapp_chat
 
 from . import presets, share
 from .clean import TEXT_FIELDS, _json_list, clean_note
-from .models import SoapAddendum, SoapNote
+from .models import SoapAddendum, SoapNote, SoapShare
 
 VISIT_TYPE = {SoapNote.INITIAL: Visit.INITIAL, SoapNote.FOLLOW_UP: Visit.TREATMENT, SoapNote.REASSESSMENT: Visit.FOLLOW_UP, SoapNote.DISCHARGE: Visit.FOLLOW_UP}
 
@@ -136,7 +136,7 @@ def detail(request, note_id):
     context = workspace_context(request.user, profile)
     flag_names = dict(presets.RED_FLAGS)
     context.update({'active': 'patients', 'patient': patient, 'note': note, 'addenda': note.addenda.all(), 'is_author': note.author_id == profile.pk,
-                    'flag_labels': [flag_names[k] for k in note.red_flags if k in flag_names], 'tab_url': tab_url(patient)})
+                    'flag_labels': [flag_names[k] for k in note.red_flags if k in flag_names], 'tab_url': tab_url(patient), 'last_share': note.shares.first()})
     return render(request, 'soapnotes/detail.html', context)
 
 
@@ -200,6 +200,7 @@ def send(request, note_id):
     context = workspace_context(request.user, profile)
     context.update({
         'active': 'patients', 'patient': patient, 'note': note, 'addenda': note.addenda.all(), 'flag_labels': [flag_names[k] for k in note.red_flags if k in flag_names],
+        'shares': note.shares.all()[:10], 'patient_has_email': bool(patient.email), 'can_save_email': can_see_contact(profile, patient),
         'public_url': public_url, 'message': message, 'phone': phone, 'email': email, 'link_days': share.LINK_DAYS, 'file_name': share.file_name(note),
         'links': channel_links(phone, message, patient.messaging_app, profile.whatsapp_web), 'whatsapp_chat': whatsapp_chat(phone, profile.whatsapp_web),
         'practice': {'name': profile.practice_name or profile.full_name, 'address': profile.practice_address, 'phone': profile.practice_phone or profile.mobile},
@@ -234,13 +235,21 @@ def email(request, note_id):
         return back
     url = request.build_absolute_uri(reverse('soapnotes:public', args=[share.note_token(note)]))
     practice = profile.practice_name or profile.full_name
-    mail = EmailMessage(subject=f'Your physiotherapy note from {practice} ({note.note_date:%d %b %Y})', body=share.share_message(note, profile, url) + '\n\nThe note is attached as a PDF.\n\n' + practice,
-                        to=[address], reply_to=[e for e in [profile.account.user.email] if e])
+    message = share.share_message(note, profile, url)
+    mail = EmailMultiAlternatives(subject=f'Your physiotherapy note from {practice} ({note.note_date:%d %b %Y})', body=message + '\n\nThe note is attached as a PDF.\n\n' + practice,
+                                  to=[address], reply_to=[e for e in [profile.account.user.email] if e])
+    mail.attach_alternative(share.email_html(note, profile, url, message), 'text/html')
     mail.attach(share.file_name(note), share.build_pdf(note, url), 'application/pdf')
     try:
         mail.send()
     except Exception:  # the mail server is outside our control: say so plainly instead of a server error
         messages.error(request, 'The e-mail could not be sent right now. Use WhatsApp or the PDF download instead, or try again later.')
         return back
-    messages.success(request, f'The note was e-mailed to {address}.')
+    SoapShare.objects.create(note=note, address=address, sent_by_name=profile.full_name)
+    saved = ''
+    if request.POST.get('save_email') and not patient.email and can_see_contact(profile, patient):  # keep a typed address on the patient's record for next time
+        patient.email = address
+        patient.save(update_fields=['email'])
+        saved = " and saved on the patient's record"
+    messages.success(request, f'The note was e-mailed to {address}{saved}.')
     return back

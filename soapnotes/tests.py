@@ -284,3 +284,48 @@ class SendToPatientTests(Base):
         self.assertEqual((sent.attachments[0][2], sent.attachments[0][1][:4]), ('application/pdf', b'%PDF'))
         self.client.post(reverse('soapnotes:email', args=[note.pk]), {'email': 'nonsense'})
         self.assertEqual(len(mail.outbox), 1)
+
+
+class EmailedNoteTests(Base):
+    """The e-mail is a designed page with the PDF attached, every send is recorded, and the patient's address is used when there is one."""
+    def final(self):
+        return self.create(action='final')
+
+    def test_the_email_has_an_html_page_with_the_practice_header_button_and_the_pdf_attached(self):
+        from django.core import mail
+        note = self.final()
+        self.client.post(reverse('soapnotes:email', args=[note.pk]), {'email': 'patient@example.com'})
+        sent = mail.outbox[0]
+        html = sent.alternatives[0][0]
+        self.assertEqual(sent.alternatives[0][1], 'text/html')
+        for text in ('Your physiotherapy note', 'Open the note (PDF)', 'Soap Patient', '#116b43', '/shared/'):
+            self.assertIn(text, html)
+        self.assertIn('Soap Patient', sent.body)  # the plain-text version is still there
+        self.assertEqual(sent.attachments[0][0], f'SOAP-note-{note.note_date:%Y-%m-%d}-{note.patient.patient_code}.pdf')
+
+    def test_every_send_is_recorded_and_shown_on_the_note_and_the_send_page(self):
+        from .models import SoapShare
+        note = self.final()
+        self.client.post(reverse('soapnotes:email', args=[note.pk]), {'email': 'patient@example.com'})
+        share = SoapShare.objects.get()
+        self.assertEqual((share.address, share.channel, share.note_id), ('patient@example.com', 'email', note.pk))
+        self.assertTrue(share.sent_by_name)
+        self.assertContains(self.client.get(reverse('soapnotes:detail', args=[note.pk])), 'Last e-mailed to patient@example.com')
+        self.assertContains(self.client.get(reverse('soapnotes:send', args=[note.pk])), 'SENT BY E-MAIL')
+        self.client.post(reverse('soapnotes:email', args=[note.pk]), {'email': 'bad'})  # a failed send is not recorded
+        self.assertEqual(SoapShare.objects.count(), 1)
+
+    def test_the_patients_email_is_filled_in_and_a_typed_one_can_be_saved_on_the_record(self):
+        note = self.final()
+        page = self.client.get(reverse('soapnotes:send', args=[note.pk]))
+        self.assertContains(page, 'has no e-mail on record yet')
+        self.assertContains(page, 'Save this e-mail on the patient')
+        self.client.post(reverse('soapnotes:email', args=[note.pk]), {'email': 'new@example.com', 'save_email': '1'})
+        self.patient.refresh_from_db()
+        self.assertEqual(self.patient.email, 'new@example.com')
+        page = self.client.get(reverse('soapnotes:send', args=[note.pk]))
+        self.assertContains(page, 'value="new@example.com"')
+        self.assertContains(page, "Filled in from the patient's record")
+        self.client.post(reverse('soapnotes:email', args=[note.pk]), {'email': 'other@example.com', 'save_email': '1'})
+        self.patient.refresh_from_db()
+        self.assertEqual(self.patient.email, 'new@example.com')  # an address on record is never overwritten
