@@ -152,3 +152,14 @@ def clean_whatsapp_number(value):
     if re.search(r'[^\d+\-\s()]', value) or len(re.sub(r'\D', '', value)) < 8:
         raise ValueError('Enter a WhatsApp number with the country code, for example +977 970-2235789.')
     return value[:20]
+
+
+def email_ready():
+    """False when the server only prints e-mails to its log (the console or dummy backend), so nothing really leaves it. Pages that send e-mail check this
+    first, rather than saying "sent" for a message nobody will receive."""
+    from django.conf import settings
+    backend = settings.EMAIL_BACKEND.lower()
+    return not ('console' in backend or 'dummy' in backend)
+
+
+EMAIL_NOT_SET_UP = 'E-mail is not set up on this server yet, so nothing was sent. Ask the administrator to set up e-mail sending, or use the PDF download or WhatsApp instead.'

@@ -16,7 +16,7 @@ from django.utils import timezone
 from accounts.access import actor_of, can_see_contact, first_error
 from .access import billing_context, billing_manager, billing_patient, billing_profile, billing_require, staff_member
 
-from accounts.messaging import channel_links
+from accounts.messaging import EMAIL_NOT_SET_UP, channel_links, email_ready
 
 from . import catalog, exports
 from . import invoice as inv
@@ -617,6 +617,9 @@ def invoice_email(request, pk):
     entry = get_object_or_404(BillingEntry, pk=pk, professional=profile)
     back = redirect('billing:invoice', pk=entry.pk)
     if request.method != 'POST':
+        return back
+    if not email_ready():
+        messages.error(request, EMAIL_NOT_SET_UP)
         return back
     address = request.POST.get('email', '').strip()
     try:

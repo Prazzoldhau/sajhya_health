@@ -11,7 +11,7 @@ from django.utils import timezone
 from django.views.decorators.http import require_POST
 
 from accounts.access import can_see_contact, own_patient, workspace_context
-from accounts.messaging import channel_links
+from accounts.messaging import EMAIL_NOT_SET_UP, channel_links, email_ready
 from accounts.models import Visit
 from accounts.services import record_visit
 
@@ -227,6 +227,9 @@ def public(request, token):
 def email(request, note_id):
     profile, patient, note = _final_note_for(request, note_id)
     back = redirect('soapnotes:send', note_id=note.pk)
+    if not email_ready():
+        messages.error(request, EMAIL_NOT_SET_UP)
+        return back
     address = request.POST.get('email', '').strip()
     try:
         validate_email(address)

@@ -329,3 +329,16 @@ class EmailedNoteTests(Base):
         self.client.post(reverse('soapnotes:email', args=[note.pk]), {'email': 'other@example.com', 'save_email': '1'})
         self.patient.refresh_from_db()
         self.assertEqual(self.patient.email, 'new@example.com')  # an address on record is never overwritten
+
+
+class EmailNotSetUpTests(Base):
+    """On a server that only prints e-mail to its log, the page says so instead of reporting "sent"."""
+    def test_a_console_mail_server_gives_an_honest_message_and_records_nothing(self):
+        from django.core import mail
+        from django.test import override_settings
+        from .models import SoapShare
+        note = self.create(action='final')
+        with override_settings(EMAIL_BACKEND='django.core.mail.backends.console.EmailBackend'):
+            r = self.client.post(reverse('soapnotes:email', args=[note.pk]), {'email': 'patient@example.com'}, follow=True)
+        self.assertContains(r, 'not set up on this server')
+        self.assertEqual((SoapShare.objects.count(), len(mail.outbox)), (0, 0))
