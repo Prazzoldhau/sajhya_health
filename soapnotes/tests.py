@@ -219,3 +219,68 @@ class AccessTests(Base):
         # and the colleague can write their own note on the shared patient
         r = self.client.post(reverse('soapnotes:new', args=[self.patient.pk]), full_note(action='final'))
         self.assertEqual(SoapNote.objects.filter(author=physio).count(), 1)
+
+
+class SendToPatientTests(Base):
+    """A finalised note can be sent to the patient: PDF, picture, a message with a signed link, e-mail."""
+    def final(self, **extra):
+        return self.create(action='final', **extra)
+
+    def test_only_a_finalised_note_can_be_sent_and_the_button_appears_after_finalising(self):
+        draft = self.create()
+        self.assertNotContains(self.client.get(reverse('soapnotes:detail', args=[draft.pk])), 'Send to patient')
+        self.assertRedirects(self.client.get(reverse('soapnotes:send', args=[draft.pk])), reverse('soapnotes:detail', args=[draft.pk]), fetch_redirect_response=False)
+        self.assertEqual(self.client.get(reverse('soapnotes:pdf', args=[draft.pk])).status_code, 404)
+        note = self.final()
+        self.assertContains(self.client.get(reverse('soapnotes:detail', args=[note.pk])), 'Send to patient')
+
+    def test_the_send_page_has_the_picture_pdf_and_whatsapp_options_and_the_patients_number(self):
+        self.patient.phone = '9841234567'
+        self.patient.save()
+        note = self.final()
+        page = self.client.get(reverse('soapnotes:send', args=[note.pk]))
+        self.assertEqual(page.status_code, 200)
+        for text in ('Send as picture', 'WhatsApp: picture only', 'Download PDF', 'Subacromial impingement', 'wa.me/9779841234567'):
+            self.assertContains(page, text)
+        self.assertContains(page, 'Soap Patient')
+        self.assertIn('/shared/', page.context['public_url'])
+        self.assertIn('Soap Patient', page.context['message'])
+
+    def test_the_pdf_is_a_real_pdf_and_the_signed_link_works_without_signing_in(self):
+        note = self.final()
+        r = self.client.get(reverse('soapnotes:pdf', args=[note.pk]))
+        self.assertEqual((r.status_code, r['Content-Type']), (200, 'application/pdf'))
+        self.assertTrue(r.content.startswith(b'%PDF'))
+        self.assertIn('attachment', self.client.get(reverse('soapnotes:pdf', args=[note.pk]) + '?download=1')['Content-Disposition'])
+        from . import share
+        url = reverse('soapnotes:public', args=[share.note_token(note)])
+        self.client.logout()
+        public = self.client.get(url)
+        self.assertEqual((public.status_code, public['Content-Type']), (200, 'application/pdf'))
+        self.assertEqual(self.client.get(reverse('soapnotes:public', args=['not-a-real-link'])).status_code, 404)
+        self.assertEqual(self.client.get(reverse('soapnotes:pdf', args=[note.pk])).status_code, 302)  # the file itself needs a sign-in
+
+    def test_a_link_to_a_note_that_is_not_final_or_other_text_in_another_script_does_not_break(self):
+        from . import share
+        note = self.final(impression='तनाव संबन्धी समस्या')  # Nepali text
+        self.assertTrue(share.build_pdf(note).startswith(b'%PDF'))
+        draft = self.create()
+        self.assertIsNone(share.note_from_token(share.note_token(draft)))
+
+    def test_other_practices_cannot_open_the_send_page_or_the_pdf(self):
+        note = self.final()
+        make_professional('other-soap')
+        self.as_user('other-soap')
+        self.assertEqual(self.client.get(reverse('soapnotes:send', args=[note.pk])).status_code, 404)
+        self.assertEqual(self.client.get(reverse('soapnotes:pdf', args=[note.pk])).status_code, 404)
+
+    def test_the_note_can_be_e_mailed_as_a_pdf(self):
+        from django.core import mail
+        note = self.final()
+        self.client.post(reverse('soapnotes:email', args=[note.pk]), {'email': 'patient@example.com'})
+        self.assertEqual(len(mail.outbox), 1)
+        sent = mail.outbox[0]
+        self.assertEqual(sent.to, ['patient@example.com'])
+        self.assertEqual((sent.attachments[0][2], sent.attachments[0][1][:4]), ('application/pdf', b'%PDF'))
+        self.client.post(reverse('soapnotes:email', args=[note.pk]), {'email': 'nonsense'})
+        self.assertEqual(len(mail.outbox), 1)

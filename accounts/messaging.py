@@ -38,6 +38,11 @@ DEFAULTS = {
         'help': 'The text that goes with an invoice sent by WhatsApp or e-mail.',
         'body': ('Hello {patient},\nYour bill {invoice} from {practice} dated {date}: NPR {amount}.\n{due_line}\n{extra_line}\nInvoice: {link}'),
     },
+    'soap_note': {
+        'label': 'SOAP note message',
+        'help': 'The text that goes with a finalised SOAP note sent to a patient by WhatsApp or e-mail.',
+        'body': 'Hello {patient},\nYour physiotherapy note from {practice} dated {date}: {link}\nThe link works for {days} days.\nThank you.',
+    },
 }
 BUILT_IN_ORDER = list(DEFAULTS)
 
@@ -49,7 +54,7 @@ PLACEHOLDERS = [
 ]
 SAMPLE = {
     'patient': 'Sita Gurung', 'practice': 'Your Practice', 'therapist': 'Your Name', 'day': 'Tuesday', 'date': '27 Oct 2026', 'time': '3:00 PM',
-    'contact': 'WhatsApp +977 98xxxxxxx', 'address': 'Your address', 'invoice': 'BILL-1A2B3C4D', 'amount': '700', 'due_line': '', 'extra_line': '', 'link': 'https://...',
+    'contact': 'WhatsApp +977 98xxxxxxx', 'address': 'Your address', 'invoice': 'BILL-1A2B3C4D', 'amount': '700', 'due_line': '', 'extra_line': '', 'link': 'https://...', 'days': '30',
 }
 _TOKEN = re.compile(r'\{(\w+)\}')
 

@@ -1,17 +1,23 @@
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.db import transaction
-from django.http import Http404
+from django.core.exceptions import ValidationError
+from django.core.mail import EmailMessage
+from django.core.validators import validate_email
+from django.http import Http404, HttpResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
 from django.utils import timezone
 from django.views.decorators.http import require_POST
 
-from accounts.access import own_patient, workspace_context
+from accounts.access import can_see_contact, own_patient, workspace_context
+from accounts.messaging import channel_links
 from accounts.models import Visit
 from accounts.services import record_visit
 
-from . import presets
+from billing.invoice import whatsapp_chat
+
+from . import presets, share
 from .clean import TEXT_FIELDS, _json_list, clean_note
 from .models import SoapAddendum, SoapNote
 
@@ -159,3 +165,82 @@ def delete(request, note_id):
     note.delete()
     messages.success(request, 'Draft deleted.')
     return redirect(tab_url(patient))
+
+
+# ---------------------------------------------------------------------------
+# Sending a finalised note to the patient: PDF, picture, WhatsApp / SMS / Viber link, e-mail
+# ---------------------------------------------------------------------------
+
+def _pdf_response(note, online_url='', download=False):
+    response = HttpResponse(share.build_pdf(note, online_url), content_type='application/pdf')
+    response['Content-Disposition'] = f'{"attachment" if download else "inline"}; filename="{share.file_name(note)}"'
+    response['Cache-Control'] = 'private, no-store'
+    return response
+
+
+def _final_note_for(request, note_id):
+    profile, patient, note = _note_for(request, note_id)
+    if not note.is_final:
+        raise Http404  # only a finalised note is the record that goes to a patient
+    return profile, patient, note
+
+
+@login_required
+def send(request, note_id):
+    """The note laid out for sending: download the PDF, share it as a picture, open WhatsApp / Viber / SMS with the link, e-mail it."""
+    profile, patient, note = _note_for(request, note_id)
+    if not note.is_final:
+        messages.error(request, 'Finalise the note first: only a finalised note can be sent to a patient.')
+        return redirect('soapnotes:detail', note_id=note.pk)
+    public_url = request.build_absolute_uri(reverse('soapnotes:public', args=[share.note_token(note)]))
+    phone = patient.phone if can_see_contact(profile, patient) else ''
+    email = patient.email if can_see_contact(profile, patient) else ''
+    message = share.share_message(note, profile, public_url)
+    flag_names = dict(presets.RED_FLAGS)
+    context = workspace_context(request.user, profile)
+    context.update({
+        'active': 'patients', 'patient': patient, 'note': note, 'addenda': note.addenda.all(), 'flag_labels': [flag_names[k] for k in note.red_flags if k in flag_names],
+        'public_url': public_url, 'message': message, 'phone': phone, 'email': email, 'link_days': share.LINK_DAYS, 'file_name': share.file_name(note),
+        'links': channel_links(phone, message, patient.messaging_app, profile.whatsapp_web), 'whatsapp_chat': whatsapp_chat(phone, profile.whatsapp_web),
+        'practice': {'name': profile.practice_name or profile.full_name, 'address': profile.practice_address, 'phone': profile.practice_phone or profile.mobile},
+    })
+    return render(request, 'soapnotes/send.html', context)
+
+
+@login_required
+def pdf(request, note_id):
+    profile, patient, note = _final_note_for(request, note_id)
+    return _pdf_response(note, download=request.GET.get('download') == '1')
+
+
+def public(request, token):
+    """The link a patient receives: the PDF, no sign-in. It is signed, cannot be guessed, and expires."""
+    note = share.note_from_token(token)
+    if note is None:
+        raise Http404
+    return _pdf_response(note, request.build_absolute_uri(request.path))
+
+
+@login_required
+@require_POST
+def email(request, note_id):
+    profile, patient, note = _final_note_for(request, note_id)
+    back = redirect('soapnotes:send', note_id=note.pk)
+    address = request.POST.get('email', '').strip()
+    try:
+        validate_email(address)
+    except ValidationError:
+        messages.error(request, 'Enter a valid e-mail address.')
+        return back
+    url = request.build_absolute_uri(reverse('soapnotes:public', args=[share.note_token(note)]))
+    practice = profile.practice_name or profile.full_name
+    mail = EmailMessage(subject=f'Your physiotherapy note from {practice} ({note.note_date:%d %b %Y})', body=share.share_message(note, profile, url) + '\n\nThe note is attached as a PDF.\n\n' + practice,
+                        to=[address], reply_to=[e for e in [profile.account.user.email] if e])
+    mail.attach(share.file_name(note), share.build_pdf(note, url), 'application/pdf')
+    try:
+        mail.send()
+    except Exception:  # the mail server is outside our control: say so plainly instead of a server error
+        messages.error(request, 'The e-mail could not be sent right now. Use WhatsApp or the PDF download instead, or try again later.')
+        return back
+    messages.success(request, f'The note was e-mailed to {address}.')
+    return back

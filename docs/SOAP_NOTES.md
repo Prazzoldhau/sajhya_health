@@ -54,3 +54,8 @@ add addenda; only the author edits a draft. The note date cannot be in the futur
 - *Cannot finalise*: a note needs at least a complaint, history, observation, impression or treatment.
 - *Edit link gives 404*: only the author can edit a draft; finalised notes are locked (add an addendum).
 - *Plan did not pre-fill*: no SOAP note with metrics/goals exists for that patient, or `?from_soap=none` was used.
+
+## Sending a finalised note to the patient
+
+A finalised note has a **Send to patient** button. The send page shows the note as a document and offers: **Send as picture** (the phone's share sheet), **WhatsApp: picture only** (opens the patient's chat and copies the picture to paste), **Save picture**, **Download PDF**, **Print**, a message with the PDF link in the patient's own app (WhatsApp, Viber or SMS), **Copy link**, and **E-mail the PDF**.
+The link is signed and expires after 30 days; it needs no sign-in and anyone holding it can open the note, so it is for the patient only. The PDF uses Latin text only: text in another script (Nepali) is replaced by a pointer to the picture, which shows everything. Only finalised notes can be sent. The message wording can be changed under Messages ("SOAP note message").
