@@ -664,7 +664,7 @@ def sheet(request):
                    'amount': float(r['amount']), 'received': float(r['received']), 'due': float(r['due']), 'status': r['status'], 'mode': r['mode'], 'cancelled': r['status'] == 'Cancelled'}
                   for r in rows]
     context = billing_context(request, profile)
-    context.update({'sheet_data': sheet_data, 'sheet_range': {'start': f.start.isoformat(), 'end': f.end.isoformat()},
+    context.update({'month_nav': f.month_nav(), 'sheet_data': sheet_data, 'sheet_range': {'start': f.start.isoformat(), 'end': f.end.isoformat()},
                     'active': 'billing', 'billing_tab': 'sheet', 'f': f, 'qs': f.querystring(), 'rows': rows, 'totals': exports.totals(rows), 'truncated': truncated,
                     'shown': len(rows), 'statuses': exports.STATUSES, 'modes': exports.MODES, 'columns': [(h, key) for h, _, key in exports.BILL_COLUMNS],
                     'numeric': exports.NUMERIC,

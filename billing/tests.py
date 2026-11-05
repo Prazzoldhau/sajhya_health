@@ -1542,3 +1542,17 @@ class BillingSheetAtAGlanceTests(BillingBase):
         self.assertEqual(ws.cell(row=row[self.patient.name], column=2 + 2).value, 400)  # two days back, still due
         self.assertIn(ws.cell(row=row[self.patient.name], column=2 + 2).fill.fgColor.rgb[-6:], ('FBE3A6',))  # amber for due
         self.assertEqual(ws.cell(row=hari, column=yesterday_col).fill.fgColor.rgb[-6:], 'CDEBD9')  # green when paid
+
+
+class SheetMonthNavigationTests(TestCase):
+    def test_previous_and_next_month_cover_whole_months(self):
+        import datetime
+        from .exports import Filters
+        f = Filters(datetime.date(2026, 1, 1), datetime.date(2026, 1, 31), status='paid')
+        nav = f.month_nav()
+        self.assertEqual(nav['label'], 'January 2026')
+        self.assertIn('from=2025-12-01', nav['prev'])
+        self.assertIn('to=2025-12-31', nav['prev'])
+        self.assertIn('from=2026-02-01', nav['next'])
+        self.assertIn('to=2026-02-28', nav['next'])
+        self.assertIn('status=paid', nav['next'])

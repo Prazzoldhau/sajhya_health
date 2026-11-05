@@ -26,6 +26,11 @@
 <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:10px"><h1 style="margin:0;font-size:24px">Billing sheet</h1>
   <span class="patient-id" style="display:inline">Your bills at a glance: overview charts, a calendar, one card per patient, or the full table. Filter above, then download it as Excel.</span></div>
 
+<div class="no-print" style="display:flex;align-items:center;gap:8px;margin-bottom:8px">
+  <a class="secondary-btn mnav" href="?{{ month_nav.prev }}" style="text-decoration:none;display:inline-flex;align-items:center;height:34px">&lsaquo; {{ month_nav.prev_label }}</a>
+  <b style="min-width:150px;text-align:center">{{ month_nav.label }}</b>
+  <a class="secondary-btn mnav" href="?{{ month_nav.next }}" style="text-decoration:none;display:inline-flex;align-items:center;height:34px">{{ month_nav.next_label }} &rsaquo;</a>
+</div>
 <form method="get" class="sh-bar no-print">
   <label>From<input type="date" name="from" value="{{ f.start|date:'Y-m-d' }}"></label>
   <label>To<input type="date" name="to" value="{{ f.end|date:'Y-m-d' }}"></label>
@@ -71,6 +76,7 @@
   </table>
 </div>
 </div>
+<script>document.querySelectorAll('.mnav').forEach(function(a){a.addEventListener('click',function(){a.hash=location.hash;});});</script>
 {{ sheet_data|json_script:"sheetData" }}
 {{ sheet_range|json_script:"sheetRange" }}
 <script>

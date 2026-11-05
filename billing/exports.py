@@ -77,6 +77,21 @@ class Filters:
         return cls(start, end, query.get('status', '') if query.get('status', '') in dict(STATUSES) else '', query.get('mode', '') if query.get('mode', '') in dict(MODES) else '',
                    (query.get('q') or '').strip()[:100])
 
+    def month_nav(self):
+        """Links to the whole previous and next calendar month, keeping the other filters, plus the label of the month being looked at."""
+        from urllib.parse import urlencode
+        first = self.start.replace(day=1)
+
+        def month_query(day):
+            last = (day.replace(day=28) + datetime.timedelta(days=4)).replace(day=1) - datetime.timedelta(days=1)
+            parts = {'from': day.isoformat(), 'to': last.isoformat(), 'status': self.status, 'mode': self.mode, 'q': self.q}
+            return urlencode({k: v for k, v in parts.items() if v})
+        prev_first = (first - datetime.timedelta(days=1)).replace(day=1)
+        next_first = (first.replace(day=28) + datetime.timedelta(days=4)).replace(day=1)
+        whole = self.start == first and self.end == (next_first - datetime.timedelta(days=1))
+        return {'prev': month_query(prev_first), 'next': month_query(next_first), 'prev_label': f'{prev_first:%b %Y}', 'next_label': f'{next_first:%b %Y}',
+                'label': f'{first:%B %Y}' if whole else f'{self.start:%d %b} - {self.end:%d %b %Y}'}
+
     def querystring(self):
         parts = {'from': self.start.isoformat(), 'to': self.end.isoformat(), 'status': self.status, 'mode': self.mode, 'q': self.q}
         from urllib.parse import urlencode
