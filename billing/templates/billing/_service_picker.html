@@ -13,9 +13,10 @@ Use inside the form with the form's id, as in the billing page: include this fil
     .svc-picker td input { height: 28px; border: 1px solid #cfe6d8; border-radius: 6px; padding: 0 6px; width: 78px; text-align: right; } .svc-picker td input.qty { width: 54px; }
     .svc-picker .x { border: 0; background: none; color: #b83b3b; font-size: 18px; cursor: pointer; line-height: 1; }
     .svc-picker .tag { font-size: 10px; font-weight: 800; color: #8a6d1d; background: #fff3d6; border-radius: 8px; padding: 1px 6px; margin-left: 4px; }
+    .svc-compact:not(.svc-open) .svc-manual { display: none; } form:not(.svc-compact) .svc-more, .svc-open .svc-more { display: none; } .svc-more { font-size: 12px; font-weight: 700; color: #116b43; background: none; border: 0; padding: 2px 0 6px; cursor: pointer; text-decoration: underline; }
     .svc-picker .sum { font-size: 12.5px; color: #426052; margin-top: 6px; display: flex; justify-content: space-between; } .svc-picker .sum b { font-size: 14px; color: #116b43; }
   </style>
-  <div class="t">Services and products from your price list <select data-svc-dept hidden aria-label="Show the services of one department" style="height:28px"></select> {% if not hide_prices %}<a href="{% url 'billing:services' %}" target="_blank" rel="noopener">edit prices</a>{% endif %}</div>
+  <div class="t">Services and products from your price list <select data-svc-dept hidden aria-label="Show the services of one department" style="height:28px;width:auto;max-width:190px"></select> {% if not hide_prices %}<a href="{% url 'billing:services' %}" target="_blank" rel="noopener">edit prices</a>{% endif %}</div>
   {% if service_catalog %}
   <div class="addrow"><select data-svc-add aria-label="Add a service"></select></div>
   <table data-svc-table hidden><thead><tr><th>SERVICE</th><th class="r">QTY</th><th class="r">PRICE (NPR)</th><th class="r">AMOUNT</th><th></th></tr></thead><tbody data-svc-rows></tbody></table>
@@ -93,7 +94,20 @@ Use inside the form with the form's id, as in the billing page: include this fil
     else drawOptions();
   });
   drawOptions();
-  form.addEventListener('reset', function () { picked = []; qtys = {}; prices = {}; drawRows(); drawOptions(); setTimeout(sync, 0); });
+  // the Service and Amount boxes repeat the rows, so they stay behind a link; they open for a custom item, a changed total, or when left empty
+  var svcBox = null, rateBox = null, more = document.createElement('button');
+  function compact() {  // the boxes come after this picker in the page, so look for them once it has loaded
+    svcBox = form.elements['service']; rateBox = form.elements['rate'];
+    if (!(svcBox && rateBox && svcBox.closest('label') && rateBox.closest('label'))) return;
+    svcBox.closest('label').classList.add('svc-manual'); rateBox.closest('label').classList.add('svc-manual');
+    more.type = 'button'; more.className = 'svc-more svc-compact-only'; more.textContent = 'Add a custom item or change the total';
+    more.addEventListener('click', function () { form.classList.add('svc-open'); });
+    box.parentNode.insertBefore(more, box.nextSibling);
+    form.classList.add('svc-compact');
+    form.addEventListener('invalid', function () { form.classList.add('svc-open'); }, true);
+  }
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', compact); else compact();
+  form.addEventListener('reset', function () { picked = []; qtys = {}; prices = {}; form.classList.remove('svc-open'); if (svcBox) form.classList.add('svc-compact'); drawRows(); drawOptions(); setTimeout(sync, 0); });
 })();
 </script>
 {% endif %}

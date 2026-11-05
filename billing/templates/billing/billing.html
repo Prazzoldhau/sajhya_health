@@ -151,7 +151,7 @@
   });
   document.querySelectorAll('[data-edit]').forEach(function (b) {
     b.addEventListener('click', function () {
-      var d = b.dataset; form.action = d.url; $('entryTitle').textContent = 'Edit billing entry'; $('payFields').hidden = true; $('svcPicker').hidden = true; $('patientPick').hidden = true; $('detailsNote').hidden = true; lockDetails(false);
+      var d = b.dataset; form.action = d.url; $('entryTitle').textContent = 'Edit billing entry'; $('payFields').hidden = true; $('svcPicker').hidden = true; $('patientPick').hidden = true; $('detailsNote').hidden = true; lockDetails(false); form.classList.remove('svc-compact');
       f('patient').value = d.patient; f('patient_name').value = d.name; f('entry_date').value = d.date; f('age').value = d.age; f('sex').value = d.sex;
       f('contact_number').value = d.contact; f('service').value = d.service; f('rate').value = d.rate; f('payment_mode').value = d.mode; f('notes').value = d.notes; open();
     });
