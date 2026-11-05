@@ -87,12 +87,22 @@ class BillingEntryForm(PaymentStatusMixin, forms.ModelForm):
         super().__init__(*args, **kwargs)
         self.fields['patient'].queryset = profile.workspace_patients()  # a clinic login also bills the patients its front desk registered
         self.fields['patient'].required = False
+        self.fields['patient_name'].required = False  # filled in from the registered patient
 
     def clean_patient_name(self):
-        name = self.cleaned_data.get('patient_name', '').strip()
-        if len(name) < 2:
-            raise forms.ValidationError('Name must be at least 2 characters long.')
-        return name
+        return self.cleaned_data.get('patient_name', '').strip()
+
+    def clean(self):
+        data = super().clean()
+        patient = data.get('patient')
+        if patient is not None:
+            data['patient_name'] = patient.name  # the bill always carries the registered patient's own name
+        elif not self.instance.pk:
+            # a new bill is only for a registered patient, so everyone who is billed is on the patient list, the dashboard and the reports
+            self.add_error('patient', 'Search and pick a registered patient. If the patient is not registered yet, add them under Patients first.')
+        elif len(data.get('patient_name', '')) < 2:  # an old bill made for a typed name can still be corrected
+            self.add_error('patient_name', 'Name must be at least 2 characters long.')
+        return data
 
 class PatientBillForm(PaymentStatusMixin, forms.ModelForm):
     patient_linked = True

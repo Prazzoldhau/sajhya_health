@@ -38,6 +38,11 @@ DEFAULTS = {
         'help': 'The text that goes with an invoice sent by WhatsApp or e-mail.',
         'body': ('Hello {patient},\nYour bill {invoice} from {practice} dated {date}: NPR {amount}.\n{due_line}\n{extra_line}\nInvoice: {link}'),
     },
+    'payment_due': {
+        'label': 'Payment due reminder',
+        'help': 'A reminder for a patient who still owes money, sent from the Payments due page.',
+        'body': 'Hello {patient},\nA gentle reminder from {practice}: NPR {amount} is still due on your account.\nIf you have already paid, please ignore this message.\nTo pay or ask a question: {contact}',
+    },
     'package_invoice': {
         'label': 'Package invoice message',
         'help': 'The text that goes with a package invoice sent by WhatsApp or e-mail.',

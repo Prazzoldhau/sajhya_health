@@ -456,8 +456,11 @@ def packages(request):
 
 
 def _packages_back(request, patient=None):
-    if request.POST.get('next') == 'patient' and patient is not None:
+    nxt = request.POST.get('next', '')
+    if nxt == 'patient' and patient is not None:
         return redirect(_patient_page(request, patient))
+    if nxt.startswith('/') and not nxt.startswith('//'):  # e.g. back to the Payments due page
+        return redirect(nxt)
     return redirect('billing:packages')
 
 
@@ -657,8 +660,12 @@ def sheet(request):
     rows = exports.sheet_rows(scope, f, limit=exports.MAX_SHEET_ROWS + 1)
     truncated = len(rows) > exports.MAX_SHEET_ROWS
     rows = rows[:exports.MAX_SHEET_ROWS]
+    sheet_data = [{'date': r['date'].isoformat(), 'invoice': r['invoice'], 'patient': r['patient'], 'code': r['code'], 'phone': r['phone'], 'service': r['service'],
+                   'amount': float(r['amount']), 'received': float(r['received']), 'due': float(r['due']), 'status': r['status'], 'mode': r['mode'], 'cancelled': r['status'] == 'Cancelled'}
+                  for r in rows]
     context = billing_context(request, profile)
-    context.update({'active': 'billing', 'billing_tab': 'sheet', 'f': f, 'qs': f.querystring(), 'rows': rows, 'totals': exports.totals(rows), 'truncated': truncated,
+    context.update({'sheet_data': sheet_data, 'sheet_range': {'start': f.start.isoformat(), 'end': f.end.isoformat()},
+                    'active': 'billing', 'billing_tab': 'sheet', 'f': f, 'qs': f.querystring(), 'rows': rows, 'totals': exports.totals(rows), 'truncated': truncated,
                     'shown': len(rows), 'statuses': exports.STATUSES, 'modes': exports.MODES, 'columns': [(h, key) for h, _, key in exports.BILL_COLUMNS],
                     'numeric': exports.NUMERIC,
                     'advance_held_total': PatientAdvance.objects.filter(professional=profile).aggregate(t=Sum('amount'))['t'] or 0})
@@ -953,3 +960,80 @@ def package_receipt_email(request, pk):
     if request.method != 'POST':
         return back
     return _send_pdf_email(request, profile, payment.package, payment, back)
+
+
+# ---------------------------------------------------------------------------
+# Payments due: everything patients still owe, on a page of its own
+# ---------------------------------------------------------------------------
+
+DUE_FILTERS = [('', 'All'), ('bills', 'Bills only'), ('packages', 'Packages only'), ('week', 'Over 7 days'), ('old', 'Over 30 days')]
+
+
+def _due_groups(profile, today):
+    """Everyone who owes something, one entry per patient: their unpaid bills and package balances, the total, and how long the oldest has been waiting."""
+    from accounts import messaging
+    groups = {}
+
+    def group(patient, name, phone):
+        key = ('p', patient.pk) if patient is not None else ('n', name.lower())
+        if key not in groups:
+            groups[key] = {'patient': patient, 'name': name, 'code': patient.patient_code if patient is not None else '', 'phone': phone, 'bills': [], 'packages': [], 'total': Decimal('0'), 'oldest': today}
+        return groups[key]
+
+    bills = profile.billing_entries.filter(cancelled_at__isnull=True, amount_paid__lt=F('rate')).select_related('patient').order_by('entry_date', 'id')
+    for e in bills:
+        phone = (e.patient.phone if can_see_contact(profile, e.patient) else '') if e.patient_id else e.contact_number
+        g = group(e.patient, e.patient_name, phone or e.contact_number)
+        g['bills'].append(e)
+        g['total'] += e.amount_due
+        g['oldest'] = min(g['oldest'], e.entry_date)
+    for p in PatientPackage.objects.filter(professional=profile).exclude(status='cancelled').select_related('patient'):
+        if p.is_fully_paid:
+            continue
+        g = group(p.patient, p.patient.name, p.patient.phone if can_see_contact(profile, p.patient) else '')
+        g['packages'].append(p)
+        g['total'] += p.amount_due
+        g['oldest'] = min(g['oldest'], p.start_date)
+    out = list(groups.values())
+    for g in out:
+        g['days'] = (today - g['oldest']).days
+        g['band'] = 'old' if g['days'] > 30 else 'week' if g['days'] > 7 else 'new'
+        text = messaging.render(messaging.body_for(profile, 'payment_due'), {**messaging.practice_values(profile), 'patient': g['name'], 'amount': f"{g['total']:g}"})
+        g['reminder'] = messaging.whatsapp_url(g['phone'], text, profile.whatsapp_web)
+    return out
+
+
+@login_required
+def dues(request):
+    profile = billing_profile(request)
+    if profile is None:
+        return redirect('accounts:welcome')
+    today = timezone.localdate()
+    flt = request.GET.get('show', '')
+    text = request.GET.get('q', '').strip().lower()
+    sort = request.GET.get('sort', '')
+    everyone = _due_groups(profile, today)
+    summary = {'total': sum((g['total'] for g in everyone), Decimal('0')), 'patients': len(everyone), 'bills': sum((e.amount_due for g in everyone for e in g['bills']), Decimal('0')),
+               'packages': sum((p.amount_due for g in everyone for p in g['packages']), Decimal('0')), 'oldest': max((g['days'] for g in everyone), default=0)}
+    aging = [{'label': label, 'value': sum((g['total'] for g in everyone if g['band'] == band), Decimal('0')), 'count': sum(1 for g in everyone if g['band'] == band), 'band': band}
+             for band, label in (('new', 'Up to 7 days'), ('week', '8 to 30 days'), ('old', 'Over 30 days'))]
+    top = max((a['value'] for a in aging), default=0) or 1
+    for a in aging:
+        a['pct'] = round(100 * a['value'] / top) if a['value'] else 0
+    shown = everyone
+    if flt == 'bills':
+        shown = [g for g in shown if g['bills']]
+    elif flt == 'packages':
+        shown = [g for g in shown if g['packages']]
+    elif flt == 'week':
+        shown = [g for g in shown if g['days'] > 7]
+    elif flt == 'old':
+        shown = [g for g in shown if g['days'] > 30]
+    if text:
+        shown = [g for g in shown if text in g['name'].lower() or text in g['code'].lower() or text in (g['phone'] or '').lower()
+                 or any(text in e.invoice_number.lower() for e in g['bills'])]
+    shown = sorted(shown, key=(lambda g: -g['days']) if sort == 'oldest' else (lambda g: -g['total']))
+    context = billing_context(request, profile)
+    context.update({'active': 'billing', 'billing_tab': 'dues', 'groups': shown, 'summary': summary, 'aging': aging, 'filters': DUE_FILTERS, 'show': flt, 'q': request.GET.get('q', '').strip(),
+                    'sort': sort, 'pay_form': EntryPaymentForm(), 'shown_total': sum((g['total'] for g in shown), Decimal('0'))})
+    return render(request, 'billing/dues.html', context)

@@ -31,6 +31,7 @@ urlpatterns = [
     path('export.xlsx', views.export_xlsx, name='export-xlsx'),
     path('export.csv', views.export_csv, name='export-csv'),
     path('advances/', views.advances, name='advances'),
+    path('due/', views.dues, name='dues'),
     path('packages/', views.packages, name='packages'),
     path('packages/create/', views.package_create, name='package-create'),
     path('packages/<int:pk>/payment/', views.package_payment, name='package-payment'),

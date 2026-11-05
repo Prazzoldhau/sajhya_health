@@ -20,7 +20,13 @@ class BillingBase(TestCase):
         self.today = timezone.localdate()
 
     def entry(self, **extra):
-        data = {'entry_date': self.today.isoformat(), 'patient_name': 'Walk In', 'service': 'Consult', 'rate': '500', 'payment_mode': 'cash', **extra}
+        """A new bill is only for a registered patient: the patient named here is registered first (once), then billed."""
+        from accounts.models import Patient
+        name = extra.pop('patient_name', 'Walk In')
+        if 'patient' not in extra:
+            patient = Patient.objects.filter(professional=self.profile, name=name).first() or make_patient(self.profile, name)  # scope-ok
+            extra['patient'] = patient.pk
+        data = {'entry_date': self.today.isoformat(), 'patient_name': name, 'service': 'Consult', 'rate': '500', 'payment_mode': 'cash', **extra}
         return self.client.post(reverse('billing:entry-create'), data)
 
     def package(self, **extra):
@@ -49,9 +55,29 @@ class BillingEntryTests(BillingBase):
 
     def test_validation(self):
         self.entry(rate='-5')
-        self.entry(patient_name='X')
         self.entry(rate='')
         self.assertEqual(BillingEntry.objects.count(), 0)
+
+    def test_a_new_bill_needs_a_registered_patient(self):
+        data = {'entry_date': self.today.isoformat(), 'patient_name': 'Typed Name', 'service': 'Consult', 'rate': '500', 'payment_mode': 'cash'}
+        r = self.client.post(reverse('billing:entry-create'), data, follow=True)
+        self.assertEqual(BillingEntry.objects.count(), 0)  # a typed name is not enough
+        self.assertContains(r, 'registered patient')
+        theirs = make_professional('someone-else')[1]
+        other = make_patient(theirs, 'Not Mine')
+        self.client.post(reverse('billing:entry-create'), {**data, 'patient': other.pk})  # another practice's patient is not on this list
+        self.assertEqual(BillingEntry.objects.count(), 0)
+        self.client.post(reverse('billing:entry-create'), {**data, 'patient': self.patient.pk, 'patient_name': ''})
+        entry = BillingEntry.objects.get()
+        self.assertEqual((entry.patient, entry.patient_name), (self.patient, self.patient.name))  # the registered patient's own name is used
+        page = self.client.get(reverse('billing:billing'))
+        self.assertContains(page, 'Only registered patients can be billed')
+
+    def test_an_old_bill_made_for_a_typed_name_can_still_be_corrected(self):
+        old = BillingEntry.objects.create(professional=self.profile, patient_name='Old Walk In', service='Consult', rate=400, payment_mode='cash', entry_date=self.today)
+        r = self.client.post(reverse('billing:entry-edit', args=[old.pk]), {'entry_date': self.today.isoformat(), 'patient_name': 'Old Walk In', 'service': 'Consult', 'rate': '450', 'payment_mode': 'cash'})
+        old.refresh_from_db()
+        self.assertEqual(old.rate, 450)
 
     def test_linked_patient_fills_in_blank_details(self):
         self.entry(patient=self.patient.pk, patient_name=self.patient.name)
@@ -346,7 +372,8 @@ class CreditBillTests(BillingBase):
         self.client.post(reverse('billing:entry-payment', args=[entry.pk]), {'amount': '900', 'payment_mode': 'cash'})  # more than owed: capped
         entry.refresh_from_db()
         self.assertEqual((entry.amount_paid, entry.status_key, entry.payments.count()), (500, 'paid', 2))
-        self.assertEqual(revenue_for(self.profile, self.today), Decimal('500'))
+        self.assertEqual(revenue_for(self.profile, self.today), Decimal('1200'))  # the 500 owed, plus the 700 handed over beyond it, kept as the registered patient's advance
+        self.assertEqual(advance_balance(entry.patient_id), 700)
         self.assertEqual(revenue_for(self.profile, yesterday), 0)
         self.assertEqual(self.client.post(reverse('billing:entry-payment', args=[entry.pk]), {'amount': '10', 'payment_mode': 'cash'}).status_code, 302)
         self.assertEqual(entry.payments.count(), 2)  # already paid: nothing more recorded
@@ -620,10 +647,8 @@ class CarryOverTests(BillingBase):
     def test_validation_and_walk_ins(self):
         self.bill('700', payment_status='paid', amount_given='500')  # less than the bill
         self.assertEqual(BillingEntry.objects.count(), 0)
-        self.entry(patient_name='Walk', rate='700', amount_given='1000')  # walk-in cannot carry over
-        self.assertEqual(BillingEntry.objects.count(), 0)
-        self.entry(patient_name='Walk', rate='700', amount_given='700')
-        self.assertEqual(BillingEntry.objects.get().status_key, 'paid')
+        self.bill('700', amount_given='1000')  # a registered patient carries the extra over
+        self.assertEqual(advance_balance(self.patient.pk), 300)
 
     def test_receiving_a_due_bill_with_more_cash_carries_the_extra(self):
         self.bill('400', payment_status='due')
@@ -908,7 +933,9 @@ class BillingSheetTests(BillingBase):
     def bill(self, name=None, rate='500', status='paid', day=None, **extra):
         data = {'entry_date': (day or self.today).isoformat(), 'service': 'Therapy', 'rate': rate, 'payment_mode': 'cash', 'payment_status': status, **extra}
         if name:
-            self.client.post(reverse('billing:entry-create'), {**data, 'patient_name': name})
+            from accounts.models import Patient
+            person = Patient.objects.filter(professional=self.profile, name=name).first() or make_patient(self.profile, name)  # scope-ok
+            self.client.post(reverse('billing:entry-create'), {**data, 'patient': person.pk, 'patient_name': name})
         else:
             self.client.post(reverse('billing:patient-bill', args=[self.patient.pk]), data)
         return BillingEntry.objects.latest('id')
@@ -944,7 +971,7 @@ class BillingSheetTests(BillingBase):
         self.bill(rate='700', status='due')
         self.client.post(reverse('billing:advance-add', args=[self.patient.pk]), {'amount': '1000', 'payment_mode': 'online'})
         wb = self.workbook()
-        self.assertEqual(wb.sheetnames, ['Summary', 'Bills', 'Payments received', 'Advances', 'Packages', 'Package sessions', 'By service'])
+        self.assertEqual(wb.sheetnames, ['Summary', 'By patient', 'Calendar', 'Bills', 'Payments received', 'Advances', 'Packages', 'Package sessions', 'By service'])
         bills = wb['Bills']
         self.assertEqual([c.value for c in bills[1]][:9], ['Date', 'Invoice', 'Patient', 'Patient ID', 'Phone', 'Service', 'Amount (NPR)', 'Received (NPR)', 'Due (NPR)'])
         self.assertEqual((bills['A2'].value.date() if hasattr(bills['A2'].value, 'date') else bills['A2'].value), self.today)
@@ -1091,9 +1118,9 @@ class PriceListTests(BillingBase):
         for page in (self.client.get(reverse('billing:billing')), self.client.get(reverse('accounts:patient-detail', args=[self.patient.pk]) + '?tab=billing')):
             self.assertContains(page, 'data-svc-chips')
             self.assertContains(page, 'Basic Physiotherapy')
-        self.client.post(reverse('billing:entry-create'), {'entry_date': self.today.isoformat(), 'patient_name': 'Walk In', 'service': 'X', 'rate': '100', 'payment_mode': 'cash', 'payment_status': 'paid',
+        self.client.post(reverse('billing:entry-create'), {'entry_date': self.today.isoformat(), 'patient': self.patient.pk, 'service': 'X', 'rate': '100', 'payment_mode': 'cash', 'payment_status': 'paid',
                                                            'lines': 'not json'})
-        self.client.post(reverse('billing:entry-create'), {'entry_date': self.today.isoformat(), 'patient_name': 'Walk Two', 'service': 'X', 'rate': '100', 'payment_mode': 'cash', 'payment_status': 'paid',
+        self.client.post(reverse('billing:entry-create'), {'entry_date': self.today.isoformat(), 'patient': self.patient.pk, 'service': 'X', 'rate': '100', 'payment_mode': 'cash', 'payment_status': 'paid',
                                                            'lines': '[{"name": "", "price": "5"}, {"name": "Neg", "price": "-1"}, {"name": "Junk", "price": "abc"}, "x", {"name": "Ok", "price": "100"}]'})
         self.assertEqual(BillingEntry.objects.count(), 2)
         self.assertEqual([(l.name, l.price) for l in BillLine.objects.all()], [('Ok', 100)])
@@ -1108,7 +1135,7 @@ class PriceListTests(BillingBase):
             self.client.post(reverse('billing:patient-bill', args=[self.patient.pk]), {'entry_date': self.today.isoformat(), 'service': ' + '.join(names), 'rate': rate, 'payment_mode': 'cash',
                                                                                      'payment_status': 'paid', 'lines': lines})
         wb = load_workbook(io.BytesIO(self.client.get(reverse('billing:export-xlsx')).content))
-        self.assertEqual(wb.sheetnames, ['Summary', 'Bills', 'Payments received', 'Advances', 'Packages', 'Package sessions', 'By service'])
+        self.assertEqual(wb.sheetnames, ['Summary', 'By patient', 'Calendar', 'Bills', 'Payments received', 'Advances', 'Packages', 'Package sessions', 'By service'])
         rows = {r[0].value: (r[1].value, r[2].value) for r in wb['By service'].iter_rows(min_row=2)}
         self.assertEqual(rows, {'Basic Physiotherapy': (2, 800), 'Needling': (1, 300)})
         stranger, _ = make_professional('stranger')
@@ -1403,3 +1430,115 @@ class PackageInvoiceListsEverySessionTests(BillingBase):
         rows = pdocs.session_rows(pkg)
         self.assertEqual([(n, d) for n, d, _, _ in rows], [(1, None), (2, None), (3, self.today)])
         self.assertContains(self.client.get(reverse('billing:package-invoice', args=[pkg.pk])), 'earlier (no date)')
+
+
+class PaymentsDuePageTests(BillingBase):
+    """Payments due has a page of its own: who owes what, how long it has waited, and a way to collect or remind."""
+    def setUp(self):
+        super().setUp()
+        self.other = make_patient(self.profile, 'Hari Karki')
+        old = self.today - datetime.timedelta(days=40)
+        week = self.today - datetime.timedelta(days=10)
+        self.client.post(reverse('billing:patient-bill', args=[self.patient.pk]), {'entry_date': old.isoformat(), 'service': 'Old session', 'rate': '600', 'payment_mode': 'cash', 'payment_status': 'due'})
+        self.client.post(reverse('billing:patient-bill', args=[self.patient.pk]), {'entry_date': self.today.isoformat(), 'service': 'New session', 'rate': '500', 'payment_mode': 'cash', 'payment_status': 'partial', 'amount_received': '200'})
+        self.client.post(reverse('billing:patient-bill', args=[self.other.pk]), {'entry_date': week.isoformat(), 'service': 'Week old', 'rate': '400', 'payment_mode': 'cash', 'payment_status': 'due'})
+        self.client.post(reverse('billing:package-create'), {'patient': self.other.pk, 'duration': '2_week', 'total_sessions': 3, 'total_amount': '3000', 'amount_paid_now': '1000', 'start_date': self.today.isoformat()})
+
+    def test_the_page_groups_everything_owed_by_patient_with_totals_and_aging(self):
+        page = self.client.get(reverse('billing:dues'))
+        self.assertEqual(page.status_code, 200)
+        groups = page.context['groups']
+        self.assertEqual([(g['name'], g['total']) for g in groups], [('Hari Karki', Decimal('2400')), (self.patient.name, Decimal('900'))])  # biggest debt first
+        self.assertEqual((len(groups[0]['bills']), len(groups[0]['packages'])), (1, 1))
+        self.assertEqual(page.context['summary']['total'], Decimal('3300'))
+        self.assertEqual((page.context['summary']['bills'], page.context['summary']['packages']), (Decimal('1300'), Decimal('2000')))
+        self.assertEqual(page.context['summary']['oldest'], 40)
+        self.assertEqual([(a['band'], a['count']) for a in page.context['aging']], [('new', 0), ('week', 1), ('old', 1)])
+        self.assertContains(page, 'Remind on WhatsApp')
+        self.assertContains(page, 'wa.me/')
+
+    def test_filters_search_and_sort_work(self):
+        url = reverse('billing:dues')
+        self.assertEqual([g['name'] for g in self.client.get(url, {'show': 'old'}).context['groups']], [self.patient.name])  # over 30 days
+        self.assertEqual([g['name'] for g in self.client.get(url, {'show': 'packages'}).context['groups']], ['Hari Karki'])
+        self.assertEqual(len(self.client.get(url, {'show': 'week'}).context['groups']), 2)
+        self.assertEqual([g['name'] for g in self.client.get(url, {'q': 'hari'}).context['groups']], ['Hari Karki'])
+        self.assertEqual([g['name'] for g in self.client.get(url, {'sort': 'oldest'}).context['groups']], [self.patient.name, 'Hari Karki'])
+
+    def test_payments_can_be_received_from_the_page_and_return_to_it(self):
+        from .models import PatientPackage
+        bill = BillingEntry.objects.get(service='Week old')
+        r = self.client.post(reverse('billing:entry-payment', args=[bill.pk]), {'amount': '400', 'payment_mode': 'cash', 'next': reverse('billing:dues')})
+        self.assertRedirects(r, reverse('billing:dues'), fetch_redirect_response=False)
+        package = PatientPackage.objects.get()
+        r = self.client.post(reverse('billing:package-payment', args=[package.pk]), {'amount': '2000', 'payment_mode': 'cash', 'next': reverse('billing:dues')})
+        self.assertRedirects(r, reverse('billing:dues'), fetch_redirect_response=False)
+        self.assertEqual([g['name'] for g in self.client.get(reverse('billing:dues')).context['groups']], [self.patient.name])  # Hari has paid everything
+
+    def test_the_tab_shows_the_total_and_the_daily_book_no_longer_lists_the_dues(self):
+        page = self.client.get(reverse('billing:billing'))
+        self.assertContains(page, 'Payments due')
+        self.assertContains(page, 'NPR 3300')  # the tab and the card say what is owed
+        self.assertContains(page, reverse('billing:dues'))
+        self.assertNotContains(page, 'id="dues"')
+        self.assertEqual(page.context['dues_total'], Decimal('3300'))
+
+    def test_nothing_due_says_so(self):
+        for e in BillingEntry.objects.all():
+            e.record_payment(e.amount_due)
+        from .models import PatientPackage
+        PatientPackage.objects.get().record_payment(2000)
+        page = self.client.get(reverse('billing:dues'))
+        self.assertContains(page, 'Nothing is due')
+
+
+class BillingSheetAtAGlanceTests(BillingBase):
+    """The sheet page shows the bills as an overview, a calendar and a card per patient, and the Excel file has the same views."""
+    def setUp(self):
+        super().setUp()
+        self.second = make_patient(self.profile, 'Hari Karki')
+        d = lambda back: (self.today - datetime.timedelta(days=back)).isoformat()
+        for patient, back, rate, status in ((self.patient, 0, '400', 'paid'), (self.patient, 2, '400', 'due'), (self.second, 1, '600', 'paid'), (self.second, 1, '300', 'paid')):
+            self.client.post(reverse('billing:patient-bill', args=[patient.pk]), {'entry_date': d(back), 'service': 'Therapy', 'rate': rate, 'payment_mode': 'cash', 'payment_status': status})
+
+    def test_the_page_offers_overview_calendar_patient_and_table_views_with_the_bills_as_data(self):
+        page = self.client.get(reverse('billing:sheet'), {'from': (self.today - datetime.timedelta(days=10)).isoformat(), 'to': self.today.isoformat()})
+        self.assertEqual(page.status_code, 200)
+        for text in ('data-view="overview"', 'data-view="calendar"', 'data-view="patients"', 'data-view="table"', 'id="sheetData"', 'id="viewCalendar"'):
+            self.assertContains(page, text)
+        data = page.context['sheet_data']
+        self.assertEqual(len(data), 4)
+        self.assertEqual({r['patient'] for r in data}, {self.patient.name, 'Hari Karki'})
+        self.assertEqual(sum(r['due'] for r in data), 400)
+        self.assertEqual(page.context['sheet_range']['end'], self.today.isoformat())
+        self.assertContains(page, 'id="sheet"')  # the full table is still there as one of the views
+
+    def test_the_excel_file_has_a_line_per_patient_with_every_visit_date(self):
+        import io
+        from openpyxl import load_workbook
+        book = load_workbook(io.BytesIO(self.client.get(reverse('billing:export-xlsx'), {'from': (self.today - datetime.timedelta(days=10)).isoformat(), 'to': self.today.isoformat()}).content))
+        rows = list(book['By patient'].iter_rows(min_row=2, values_only=True))
+        people = {r[0]: r for r in rows if r[0] and r[0] != 'Total'}
+        self.assertEqual(sorted(people), sorted([self.patient.name, 'Hari Karki']))
+        mine = people[self.patient.name]
+        self.assertEqual((mine[3], mine[6], mine[8]), (2, 800, 400))  # 2 visits, billed 800, due 400
+        self.assertIn('(400*)', mine[9])  # the visit that is still due is starred
+        self.assertEqual(people['Hari Karki'][3], 2)
+        self.assertEqual(rows[0][0], self.patient.name)  # who owes comes first
+
+    def test_the_calendar_sheet_is_a_patient_by_day_grid(self):
+        import io
+        from openpyxl import load_workbook
+        start = self.today - datetime.timedelta(days=4)
+        book = load_workbook(io.BytesIO(self.client.get(reverse('billing:export-xlsx'), {'from': start.isoformat(), 'to': self.today.isoformat()}).content))
+        ws = book['Calendar']
+        header = [c.value for c in ws[1]]
+        self.assertEqual(header[0], 'Patient')
+        self.assertEqual(len(header), 1 + 5 + 1)  # patient, five days, total
+        row = {ws.cell(row=r, column=1).value: r for r in range(2, ws.max_row + 1)}
+        hari = row['Hari Karki']
+        yesterday_col = 1 + 1 + 3  # patient column, then start + 3 days
+        self.assertEqual(ws.cell(row=hari, column=yesterday_col).value, 900)  # 600 + 300 billed that day
+        self.assertEqual(ws.cell(row=row[self.patient.name], column=2 + 2).value, 400)  # two days back, still due
+        self.assertIn(ws.cell(row=row[self.patient.name], column=2 + 2).fill.fgColor.rgb[-6:], ('FBE3A6',))  # amber for due
+        self.assertEqual(ws.cell(row=hari, column=yesterday_col).fill.fgColor.rgb[-6:], 'CDEBD9')  # green when paid

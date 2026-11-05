@@ -39,24 +39,9 @@
   <div class="kpi"><div class="k">Billed on {{ selected|date:"M j, Y" }}</div><div class="v">NPR {{ total }}</div><div class="n">{{ entries|length }} entr{{ entries|length|pluralize:"y,ies" }}</div></div>
   <div class="kpi"><div class="k">Received on {{ selected|date:"M j, Y" }}</div><div class="v">NPR {{ received_total }}</div><div class="n">Bills NPR {{ collected }} · advances NPR {{ advance_net }} · packages NPR {{ package_payments }}</div></div>
   <div class="kpi"><div class="k">{{ month_label }} billed</div><div class="v">NPR {{ month_total }}</div><div class="n">Billing entries only</div></div>
-  <div class="kpi"><div class="k">Credit due from patients</div><div class="v" style="color:#b78317">NPR {{ bills_due|add:packages_due }}</div><div class="n" style="color:#b78317">Bills NPR {{ bills_due }} · packages NPR {{ packages_due }}</div></div>
+  <a class="kpi" href="{% url 'billing:dues' %}" style="text-decoration:none;color:inherit" title="Open the payments due page"><div class="k">Credit due from patients</div><div class="v" style="color:#b78317">NPR {{ bills_due|add:packages_due }}</div><div class="n" style="color:#b78317">Bills NPR {{ bills_due }} · packages NPR {{ packages_due }} · <b>view who owes →</b></div></a>
   <a class="kpi" href="{% url 'billing:advances' %}" style="text-decoration:none;color:inherit" title="Open the advances tab"><div class="k">Advance held for patients</div><div class="v" style="color:#16834f">NPR {{ advance_held }}</div><div class="n">Paid ahead, not yet used · <b>view details →</b></div></a>
 </div>
-{% endif %}
-
-{% if owed %}
-<section class="panel" style="margin-bottom:14px" id="dues">
-  <div class="panel-header"><div class="panel-title"><span class="small-icon">◔</span>Payments due (credit)</div><span class="patient-id">{{ owed|length }} bill{{ owed|length|pluralize }} · NPR {{ bills_due }}</span></div>
-  <div class="table-wrap"><table>
-    <thead><tr><th>PATIENT</th><th>INVOICE</th><th>DATE</th><th style="text-align:right">BILLED</th><th style="text-align:right">PAID</th><th style="text-align:right">DUE</th><th class="no-print"></th></tr></thead>
-    <tbody>{% for e in owed %}<tr>
-      <td>{% if e.patient %}{% if staff_mode %}{{ e.patient_name }}{% else %}<a href="{% url 'accounts:patient-detail' e.patient.pk %}?tab=billing" style="color:inherit;text-decoration:none">{{ e.patient_name }}</a>{% endif %}{% else %}{{ e.patient_name }}{% endif %}{% if e.contact_number %}<div class="patient-id">{{ e.contact_number }}</div>{% endif %}</td>
-      <td>{{ e.invoice_number }}</td><td>{{ e.entry_date|date:"M j" }}</td>
-      <td style="text-align:right">NPR {{ e.rate }}</td><td style="text-align:right">NPR {{ e.amount_paid }}</td><td style="text-align:right"><b style="color:#b78317">NPR {{ e.amount_due }}</b></td>
-      <td class="no-print"><button type="button" class="table-action" data-pay data-url="{% url 'billing:entry-payment' e.pk %}" data-name="{{ e.patient_name }}" data-due="{{ e.amount_due }}" data-invoice="{{ e.invoice_number }}">Receive payment</button></td>
-    </tr>{% endfor %}</tbody>
-  </table></div>
-</section>
 {% endif %}
 
 <section class="panel">
@@ -127,14 +112,16 @@
     <div class="modal-head"><h2 id="entryTitle">New billing entry</h2><button type="button" class="modal-x" data-close aria-label="Close">×</button></div>
     <form method="post" action="{% url 'billing:entry-create' %}" class="mini-form" id="entryForm" data-create="{% url 'billing:entry-create' %}">
       {% csrf_token %}
-      <label>Patient (optional - search a registered patient)
+      <label id="patientPick">Patient (search a registered patient)
         <span style="position:relative;display:block"><input type="search" id="billSearch" placeholder="Search by name, phone or patient ID..." autocomplete="off"></span>
+        <span class="hint" id="patientHint">Only registered patients can be billed. Not on the list? {% if staff_mode %}Register the patient under <a href="{% url 'clinics:desk' %}?tab=register" style="color:#116b43;font-weight:700">Register patient</a> first.{% else %}<a href="{% url 'accounts:patient-add' %}" style="color:#116b43;font-weight:700">Add the patient first</a>.{% endif %}</span>
       </label>
       {{ form.patient }}
       <div id="svcPicker">{% include 'billing/_service_picker.html' with form_id='entryForm' %}</div>
       <div class="two"><label>Full name {{ form.patient_name }}</label><label>Date {{ form.entry_date }}</label></div>
       <div class="two"><label>Age {{ form.age }}</label><label>Sex {{ form.sex }}</label></div>
       <label>Contact number {{ form.contact_number }}</label>
+      <div class="hint" id="detailsNote" style="margin-top:-4px">Name, age, sex and contact come from the patient's record.</div>
       <div class="two"><label>Service {{ form.service }}</label><label>Amount (NPR) {{ form.rate }}</label></div>
       <div id="payFields">
         <div class="two"><label>Payment {{ form.payment_status }}</label><label>Payment mode {{ form.payment_mode }}</label></div>
@@ -159,17 +146,23 @@
   }
   f('payment_status').addEventListener('change', syncPay);
   $('newEntry').addEventListener('click', function () {
-    form.reset(); form.action = form.dataset.create; $('entryTitle').textContent = 'New billing entry'; $('payFields').hidden = false; $('svcPicker').hidden = false; syncPay(); f('patient').value = ''; f('entry_date').value = "{{ selected|date:'Y-m-d' }}"; open();
+    form.reset(); form.action = form.dataset.create; $('entryTitle').textContent = 'New billing entry'; $('payFields').hidden = false; $('svcPicker').hidden = false; syncPay(); f('patient').value = ''; f('entry_date').value = "{{ selected|date:'Y-m-d' }}";
+    $('patientPick').hidden = false; $('detailsNote').hidden = false; lockDetails(true); open();
   });
   document.querySelectorAll('[data-edit]').forEach(function (b) {
     b.addEventListener('click', function () {
-      var d = b.dataset; form.action = d.url; $('entryTitle').textContent = 'Edit billing entry'; $('payFields').hidden = true; $('svcPicker').hidden = true;
+      var d = b.dataset; form.action = d.url; $('entryTitle').textContent = 'Edit billing entry'; $('payFields').hidden = true; $('svcPicker').hidden = true; $('patientPick').hidden = true; $('detailsNote').hidden = true; lockDetails(false);
       f('patient').value = d.patient; f('patient_name').value = d.name; f('entry_date').value = d.date; f('age').value = d.age; f('sex').value = d.sex;
       f('contact_number').value = d.contact; f('service').value = d.service; f('rate').value = d.rate; f('payment_mode').value = d.mode; f('notes').value = d.notes; open();
     });
   });
 
-  // optional link to a registered patient: search, then pre-fill the details
+  // a new bill needs a registered patient, so the details are filled from the record and cannot be typed; an old unregistered bill can still be edited
+  function lockDetails(on) { ['patient_name', 'age', 'sex', 'contact_number'].forEach(function (n) { var el = f(n); if (el.tagName === 'SELECT') el.disabled = false; el.readOnly = on; el.style.background = on ? '#f3f7f4' : ''; if (el.tagName === 'SELECT') el.style.pointerEvents = on ? 'none' : ''; }); }
+  form.addEventListener('submit', function (ev) {
+    if (form.getAttribute('action') === form.dataset.create && !f('patient').value) { ev.preventDefault(); $('patientHint').style.color = '#b83b3b'; $('billSearch').focus(); }
+  });
+  // link to a registered patient: search, then pre-fill the details
   var input = $('billSearch');
   SajhyaUI.picker(input, {
     url: "{{ patient_search_url }}", emptyText: 'No matching patients',

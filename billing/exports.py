@@ -161,6 +161,99 @@ MONEY = '#,##0.00'
 DAY = 'yyyy-mm-dd'
 
 
+
+def _formula(ws, row, col, formula, number_format=None):
+    """A live Excel formula in a bold cell (unlike _put, which keeps text as text)."""
+    from openpyxl.styles import Font
+    cell = ws.cell(row=row, column=col)
+    cell.value = formula
+    if number_format:
+        cell.number_format = number_format
+    cell.font = Font(bold=True)
+    return cell
+
+
+def _patient_groups(rows):
+    """Bill rows grouped by patient (cancelled bills left out of every figure), most owing first."""
+    people = {}
+    for r in rows:
+        if r['status'] == 'Cancelled':
+            continue
+        key = r['code'] or r['patient'].lower()
+        p = people.setdefault(key, {'name': r['patient'], 'code': r['code'], 'phone': r['phone'], 'rows': [], 'amount': Decimal('0'), 'received': Decimal('0'), 'due': Decimal('0')})
+        p['rows'].append(r)
+        p['amount'] += r['amount']
+        p['received'] += r['received']
+        p['due'] += r['due']
+    return sorted(people.values(), key=lambda p: (-p['due'], -p['amount'], p['name'].lower()))
+
+
+def _add_patient_sheets(wb, rows, f):
+    """Two sheets that can be read at a glance: one line per patient with all their visit dates, and a patient-by-day calendar of what was billed."""
+    from openpyxl.styles import Alignment, Font, PatternFill
+    people = _patient_groups(rows)
+    green, amber, grey = PatternFill('solid', fgColor='CDEBD9'), PatternFill('solid', fgColor='FBE3A6'), PatternFill('solid', fgColor='E9F7EF')
+
+    ws = wb.create_sheet('By patient', 1)
+    _header(ws, ['Patient', 'Patient ID', 'Phone', 'Visits', 'First visit', 'Last visit', 'Billed (NPR)', 'Received (NPR)', 'Due (NPR)', 'Visit dates (amount)'], [26, 20, 15, 8, 12, 12, 14, 15, 12, 80])
+    for r, p in enumerate(people, 2):
+        dates = sorted(p['rows'], key=lambda x: x['date'])
+        listing = ', '.join(f"{x['date']:%d %b} ({float(x['amount']):g}{'*' if x['due'] > 0 else ''})" for x in dates)
+        for c, (value, fmt) in enumerate(((p['name'], None), (p['code'], None), (p['phone'], None), (len(dates), None), (dates[0]['date'], DAY), (dates[-1]['date'], DAY),
+                                           (p['amount'], MONEY), (p['received'], MONEY), (p['due'], MONEY), (listing + ('   (* = still due)' if any(x['due'] > 0 for x in dates) else ''), None)), 1):
+            cell = _put(ws, r, c, value, fmt)
+            if c == 9 and p['due'] > 0:
+                cell.fill, cell.font = amber, Font(bold=True)
+            if c == 10:
+                cell.alignment = Alignment(wrap_text=True, vertical='top')
+    if people:
+        last = len(people) + 1
+        _put(ws, last + 1, 1, 'Total', bold=True)
+        for c in (4, 7, 8, 9):
+            letter = ws.cell(row=1, column=c).column_letter
+            _formula(ws, last + 1, c, f'=SUM({letter}2:{letter}{last})', None if c == 4 else MONEY)
+
+    days = (f.end - f.start).days + 1
+    weekly = days > 62
+    import datetime
+    cols, index = [], {}
+    cursor = f.start
+    while cursor <= f.end:
+        key = cursor - datetime.timedelta(days=(cursor.weekday() + 1) % 7) if weekly else cursor  # weeks start on Sunday
+        key = max(key, f.start) if weekly else key
+        if key not in index:
+            index[key] = len(cols)
+            cols.append(key)
+        cursor += datetime.timedelta(days=1)
+    cal = wb.create_sheet('Calendar', 2)
+    heads = ['Patient'] + [(f'Week of {d:%d %b}' if weekly else f'{d:%a} {d:%d %b}') for d in cols] + ['Total (NPR)']
+    _header(cal, heads, [26] + [11 if weekly else 9] * len(cols) + [13])
+    for r, p in enumerate(people, 2):
+        _put(cal, r, 1, p['name'])
+        cells = {}
+        for x in p['rows']:
+            d = x['date']
+            key = d - datetime.timedelta(days=(d.weekday() + 1) % 7) if weekly else d
+            key = max(key, f.start) if weekly else key
+            cell = cells.setdefault(index[key], [Decimal('0'), Decimal('0')])
+            cell[0] += x['amount']
+            cell[1] += x['due']
+        for ci, (amount, due) in cells.items():
+            c = _put(cal, r, ci + 2, amount, '#,##0')
+            c.fill = amber if due > 0 else green
+        _put(cal, r, len(cols) + 2, p['amount'], MONEY, bold=True)
+    if people:
+        last = len(people) + 1
+        _put(cal, last + 1, 1, 'Total billed that ' + ('week' if weekly else 'day'), bold=True)
+        for ci in range(len(cols) + 1):
+            letter = cal.cell(row=1, column=ci + 2).column_letter
+            cell = _formula(cal, last + 1, ci + 2, f'=SUM({letter}2:{letter}{last})', MONEY if ci == len(cols) else '#,##0')
+            cell.fill = grey
+        _put(cal, last + 3, 1, 'Green = paid in full, amber = something still due. Blank = not billed.')
+    cal.freeze_panes = 'B2'
+    cal.auto_filter.ref = None
+
+
 def build_workbook(scope, f):
     """The Excel file: Bills (filtered), Payments received, Advances, Packages and a Summary. Returns bytes."""
     from openpyxl import Workbook
@@ -258,6 +351,8 @@ def build_workbook(scope, f):
     _put(summary, 11 + len(by_mode), 2, sum(by_mode.values(), Decimal('0')), MONEY, bold=True)
     summary.column_dimensions['A'].width = 62
     summary.column_dimensions['B'].width = 18
+
+    _add_patient_sheets(wb, rows, f)
 
     out = io.BytesIO()
     wb.save(out)

@@ -24,7 +24,7 @@
 {% block main %}
 {% include 'billing/_tabs.html' %}
 <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:10px"><h1 style="margin:0;font-size:24px">Billing sheet</h1>
-  <span class="patient-id" style="display:inline">Every bill as a row, like a spreadsheet. Filter, sort by any column, then download it as Excel.</span></div>
+  <span class="patient-id" style="display:inline">Your bills at a glance: overview charts, a calendar, one card per patient, or the full table. Filter above, then download it as Excel.</span></div>
 
 <form method="get" class="sh-bar no-print">
   <label>From<input type="date" name="from" value="{{ f.start|date:'Y-m-d' }}"></label>
@@ -50,6 +50,7 @@
 </div>
 {% if truncated %}<div class="no-print" style="background:#fff8e6;border:1px solid #f0d58a;color:#7a5a10;border-radius:10px;padding:8px 12px;margin-bottom:10px;font-size:12.5px">Showing the first {{ shown }} rows only. Narrow the dates, or download the Excel file for every row.</div>{% endif %}
 
+<div id="viewTable" hidden>
 <div class="no-print" style="margin-bottom:8px"><input type="search" class="sh-find" id="shFind" placeholder="Filter these rows as you type..." autocomplete="off"> <span class="patient-id" id="shCount" style="display:inline"></span></div>
 <div class="sheet-wrap">
   <table class="sheet" id="sheet">
@@ -69,6 +70,9 @@
     {% if rows %}<tfoot><tr><td colspan="6" style="text-align:right">Total of the rows shown <span id="shTotalNote"></span></td><td class="num" id="tAmount">{{ totals.amount }}</td><td class="num" id="tReceived">{{ totals.received }}</td><td class="num" id="tDue">{{ totals.due }}</td><td colspan="2"></td><td class="num" id="tCarried">{{ totals.carried }}</td><td colspan="2"></td></tr></tfoot>{% endif %}
   </table>
 </div>
+</div>
+{{ sheet_data|json_script:"sheetData" }}
+{{ sheet_range|json_script:"sheetRange" }}
 <script>
 (function () {
   var table = document.getElementById('sheet'), body = table.tBodies[0], heads = table.tHead.rows[0].cells, dir = {};
@@ -103,6 +107,193 @@
     var note = document.getElementById('shTotalNote'); if (note) note.textContent = q ? '(filtered)' : '';
   }
   find.addEventListener('input', refresh);
+})();
+</script>
+<style>
+  .vw-switch { display: flex; gap: 6px; flex-wrap: wrap; margin: 4px 0 12px; }
+  .vw-switch button { border: 1px solid #cfe6d8; background: #fff; color: var(--green-dark); border-radius: 18px; padding: 7px 16px; font-weight: 800; font-size: 13px; cursor: pointer; }
+  .vw-switch button.on { background: var(--green); border-color: var(--green); color: #fff; }
+  .vw-card { background: #fff; border: 1px solid var(--line); border-radius: 12px; padding: 14px 16px; margin-bottom: 12px; }
+  .vw-card h3 { margin: 0 0 4px; font-size: 14px; } .vw-card .sub { font-size: 11.5px; color: var(--muted); margin-bottom: 8px; }
+  .vw-grid2 { display: grid; grid-template-columns: repeat(auto-fit, minmax(360px, 1fr)); gap: 12px; }
+  .vw-legend { display: flex; gap: 14px; flex-wrap: wrap; font-size: 11.5px; color: var(--muted); margin-top: 6px; } .vw-legend i { display: inline-block; width: 11px; height: 11px; border-radius: 3px; margin-right: 5px; vertical-align: -1px; }
+  .hb { display: grid; grid-template-columns: 130px 1fr 96px; gap: 8px; align-items: center; font-size: 12px; margin: 5px 0; } .hb .t { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; } .meter-hb { height: 12px; background: #eef3ef; border-radius: 6px; overflow: hidden; } .meter-hb i { display: block; height: 100%; background: #3aa876; border-radius: 6px; } .hb b { text-align: right; font-variant-numeric: tabular-nums; }
+  .cal-nav { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; } .cal-nav b { font-size: 16px; min-width: 150px; text-align: center; } .cal-nav button { border: 1px solid #cfe6d8; background: #fff; border-radius: 50%; width: 32px; height: 32px; cursor: pointer; font-size: 16px; }
+  .cal { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 4px; } .cal .dow { font-size: 10.5px; font-weight: 800; color: var(--muted); text-align: center; text-transform: uppercase; padding: 4px 0; }
+  .cal .day { min-height: 78px; border: 1px solid #e3ede6; border-radius: 8px; padding: 5px 6px; background: #fafcfb; cursor: default; position: relative; overflow: hidden; }
+  .cal .day.has { cursor: pointer; } .cal .day.has:hover { box-shadow: 0 0 0 2px #116b43 inset; } .cal .day.sel { box-shadow: 0 0 0 2px #116b43 inset; }
+  .cal .day .n { font-size: 11px; color: var(--muted); font-weight: 700; } .cal .day .amt { font-size: 13px; font-weight: 800; margin-top: 3px; } .cal .day .meta { font-size: 10.5px; color: #3c5a4c; }
+  .cal .day.out { opacity: .35; } .cal .day .dot { position: absolute; top: 6px; right: 6px; width: 8px; height: 8px; border-radius: 50%; } .dot.due { background: #f0b429; } .dot.ok { background: #1a9850; }
+  .pt-tools { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; margin-bottom: 10px; } .pt-tools input { height: 36px; border: 1px solid var(--line); border-radius: 18px; padding: 0 14px; min-width: 240px; } .pt-tools select { height: 36px; border: 1px solid var(--line); border-radius: 8px; padding: 0 8px; background: #fff; }
+  .pt-card { background: #fff; border: 1px solid var(--line); border-left: 5px solid #1a9850; border-radius: 12px; padding: 11px 14px; margin-bottom: 9px; } .pt-card.due { border-left-color: #f0b429; }
+  .pt-top { display: flex; gap: 14px; flex-wrap: wrap; align-items: baseline; } .pt-top .nm { font-weight: 800; font-size: 14.5px; } .pt-top .figs { margin-left: auto; display: flex; gap: 16px; font-size: 12px; color: var(--muted); } .pt-top .figs b { color: var(--ink); font-size: 13.5px; }
+  .pt-chips { display: flex; gap: 5px; flex-wrap: wrap; margin-top: 8px; } .chip-v { font-size: 11px; font-weight: 700; padding: 3px 9px; border-radius: 12px; background: #e6f6ee; color: #16834f; border: 1px solid #c8ead7; } .chip-v.part { background: #fff3d6; color: #a97510; border-color: #f0d58a; } .chip-v.due { background: #fde8e8; color: #b83b3b; border-color: #f3c3c1; } .chip-v.cancelled { background: #eee; color: #888; text-decoration: line-through; border-color: #ddd; }
+  .day-detail table { width: 100%; border-collapse: collapse; font-size: 12.5px; } .day-detail th { text-align: left; font-size: 10.5px; color: var(--muted); padding: 5px 8px; border-bottom: 1px solid var(--line); } .day-detail td { padding: 6px 8px; border-bottom: 1px solid #f0f4f1; } .day-detail .r { text-align: right; }
+  .empty-v { padding: 28px; text-align: center; color: var(--muted); }
+  @media (max-width: 700px) { .hb { grid-template-columns: 90px 1fr 80px; } .cal .day { min-height: 62px; padding: 3px 4px; } .cal .day .meta { display: none; } }
+  @media print { .vw-switch { display: none; } }
+</style>
+<div class="vw-switch no-print" id="vwSwitch" role="tablist" aria-label="How to view the bills">
+  <button type="button" data-view="overview">📊 Overview</button>
+  <button type="button" data-view="calendar">📅 Calendar</button>
+  <button type="button" data-view="patients">👥 By patient</button>
+  <button type="button" data-view="table">▤ Table</button>
+</div>
+
+<div id="viewOverview" hidden>
+  <div class="vw-card"><h3>Money by day</h3><div class="sub" id="ovSub">Received and still due, for the bills in this period</div><div id="ovChart"></div>
+    <div class="vw-legend"><span><i style="background:#1a9850"></i>Received</span><span><i style="background:#f0b429"></i>Still due</span></div></div>
+  <div class="vw-grid2">
+    <div class="vw-card"><h3>Busiest services</h3><div class="sub">Billed amount</div><div id="ovServices"></div></div>
+    <div class="vw-card"><h3>How patients paid</h3><div class="sub">Billed amount by payment mode</div><div id="ovModes"></div></div>
+    <div class="vw-card"><h3>Who owes the most</h3><div class="sub">Still due in this period</div><div id="ovOwing"></div></div>
+    <div class="vw-card"><h3>Bill status</h3><div class="sub">Number of bills</div><div id="ovStatus"></div></div>
+  </div>
+</div>
+
+<div id="viewCalendar" hidden>
+  <div class="vw-card">
+    <div class="cal-nav"><button type="button" id="calPrev" aria-label="Previous month">‹</button><b id="calTitle"></b><button type="button" id="calNext" aria-label="Next month">›</button></div>
+    <div class="cal" id="calGrid"></div>
+    <div class="vw-legend"><span><i style="background:#1a9850"></i>All paid that day</span><span><i style="background:#f0b429"></i>Some still due</span><span>Darker green = more billed. Click a day to see its bills.</span></div>
+  </div>
+  <div class="vw-card day-detail" id="calDetail" hidden></div>
+</div>
+
+<div id="viewPatients" hidden>
+  <div class="pt-tools no-print"><input type="search" id="ptFind" placeholder="Find a patient..."><label style="font-size:12px;color:var(--muted)">Sort <select id="ptSort"><option value="due">Most due first</option><option value="total">Most billed first</option><option value="visits">Most visits first</option><option value="name">Name</option></select></label>
+    <span class="patient-id" id="ptCount" style="display:inline"></span></div>
+  <div id="ptList"></div>
+</div>
+
+<script>
+(function () {
+  var data = JSON.parse(document.getElementById('sheetData').textContent), range = JSON.parse(document.getElementById('sheetRange').textContent);
+  var live = data.filter(function (r) { return !r.cancelled; });
+  function $(id) { return document.getElementById(id); }
+  function esc(s) { var d = document.createElement('div'); d.textContent = s == null ? '' : s; return d.innerHTML; }
+  function fmt(n) { return (Math.round(n * 100) / 100).toLocaleString('en-US', { maximumFractionDigits: 2 }); }
+  function brief(n) { return n >= 100000 ? (n / 100000).toFixed(n % 100000 ? 1 : 0) + 'L' : n >= 1000 ? (n / 1000).toFixed(n % 1000 ? 1 : 0) + 'k' : String(Math.round(n)); }
+  var MON = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+  function parse(iso) { var p = iso.split('-'); return new Date(+p[0], +p[1] - 1, +p[2]); }
+  function iso(d) { return d.getFullYear() + '-' + ('0' + (d.getMonth() + 1)).slice(-2) + '-' + ('0' + d.getDate()).slice(-2); }
+  function statusClass(r) { return r.cancelled ? 'cancelled' : r.status === 'Paid' ? '' : r.status === 'Part paid' ? 'part' : 'due'; }
+
+  // ---------- overview ----------
+  function buckets() {
+    var start = parse(range.start), end = parse(range.end), days = Math.round((end - start) / 86400000) + 1, mode = days <= 62 ? 'day' : days <= 400 ? 'week' : 'month', out = [], map = {};
+    function key(d) {
+      if (mode === 'day') return iso(d);
+      if (mode === 'week') { var s = new Date(d); s.setDate(d.getDate() - d.getDay()); return iso(s); }
+      return d.getFullYear() + '-' + ('0' + (d.getMonth() + 1)).slice(-2);
+    }
+    function label(k) { if (mode === 'month') { var p = k.split('-'); return MON[+p[1] - 1] + ' ' + p[0].slice(2); } var d = parse(k); return d.getDate() + ' ' + MON[d.getMonth()]; }
+    var cur = new Date(start);
+    while (cur <= end) { var k = key(cur); if (!map[k]) { map[k] = { key: k, label: label(k), recv: 0, due: 0, n: 0 }; out.push(map[k]); } cur.setDate(cur.getDate() + 1); }
+    live.forEach(function (r) { var b = map[key(parse(r.date))]; if (b) { b.recv += r.received; b.due += r.due; b.n += 1; } });
+    return { list: out, mode: mode };
+  }
+  function renderChart() {
+    var b = buckets(), list = b.list, max = Math.max.apply(null, list.map(function (x) { return x.recv + x.due; }).concat([1]));
+    if (!live.length) { $('ovChart').innerHTML = '<div class="empty-v">No bills in this period.</div>'; return; }
+    var W = 760, H = 230, L = 44, B = 28, T = 10, bw = (W - L - 8) / list.length, gap = Math.min(4, bw * .2), svg = '';
+    for (var g = 0; g <= 4; g++) { var y = T + (H - T - B) * (1 - g / 4); svg += '<line x1="' + L + '" x2="' + W + '" y1="' + y + '" y2="' + y + '" stroke="#e6eee9"/><text x="' + (L - 6) + '" y="' + (y + 4) + '" font-size="10" fill="#6c8178" text-anchor="end">' + brief(max * g / 4) + '</text>'; }
+    var every = Math.ceil(list.length / 12);
+    list.forEach(function (x, i) {
+      var h1 = (H - T - B) * x.recv / max, h2 = (H - T - B) * x.due / max, bx = L + i * bw + gap / 2, w = Math.max(bw - gap, 2), yb = H - B;
+      svg += '<g><title>' + x.label + ': received NPR ' + fmt(x.recv) + ', due NPR ' + fmt(x.due) + ', ' + x.n + ' bill' + (x.n === 1 ? '' : 's') + '</title>' +
+        (x.recv ? '<rect x="' + bx + '" y="' + (yb - h1) + '" width="' + w + '" height="' + h1 + '" fill="#1a9850" rx="2"/>' : '') +
+        (x.due ? '<rect x="' + bx + '" y="' + (yb - h1 - h2) + '" width="' + w + '" height="' + h2 + '" fill="#f0b429" rx="2"/>' : '') + '</g>';
+      if (i % every === 0) svg += '<text x="' + (bx + w / 2) + '" y="' + (H - 9) + '" font-size="10" fill="#6c8178" text-anchor="middle">' + x.label + '</text>';
+    });
+    $('ovChart').innerHTML = '<svg viewBox="0 0 ' + W + ' ' + H + '" style="width:100%;height:auto;display:block">' + svg + '</svg>';
+    $('ovSub').textContent = 'Received and still due, by ' + (b.mode === 'day' ? 'day' : b.mode === 'week' ? 'week' : 'month') + ' - hover a bar for the figures';
+  }
+  function hbars(el, items, valueText) {
+    var max = Math.max.apply(null, items.map(function (i) { return i.v; }).concat([1]));
+    el.innerHTML = items.length ? items.map(function (i) { return '<div class="hb"><span class="t" title="' + esc(i.k) + '">' + esc(i.k) + '</span><div class="meter-hb"><i style="width:' + Math.round(100 * i.v / max) + '%;' + (i.color ? 'background:' + i.color : '') + '"></i></div><b>' + valueText(i) + '</b></div>'; }).join('') : '<div class="empty-v" style="padding:8px">Nothing to show.</div>';
+  }
+  function group(rows, keyFn, valFn) { var m = {}; rows.forEach(function (r) { var k = keyFn(r) || '-'; m[k] = (m[k] || 0) + valFn(r); }); return Object.keys(m).map(function (k) { return { k: k, v: m[k] }; }).sort(function (a, b) { return b.v - a.v; }); }
+  function renderOverview() {
+    renderChart();
+    hbars($('ovServices'), group(live, function (r) { return r.service; }, function (r) { return r.amount; }).slice(0, 7), function (i) { return 'NPR ' + fmt(i.v); });
+    hbars($('ovModes'), group(live, function (r) { return r.mode; }, function (r) { return r.amount; }), function (i) { return 'NPR ' + fmt(i.v); });
+    hbars($('ovOwing'), group(live.filter(function (r) { return r.due > 0; }), function (r) { return r.patient; }, function (r) { return r.due; }).slice(0, 7).map(function (i) { i.color = '#f0b429'; return i; }), function (i) { return 'NPR ' + fmt(i.v); });
+    var counts = [['Paid', '#1a9850'], ['Part paid', '#f0b429'], ['Due', '#d9534f'], ['Cancelled', '#9aa8a0']].map(function (s) { return { k: s[0], color: s[1], v: data.filter(function (r) { return r.status === s[0]; }).length }; }).filter(function (i) { return i.v; });
+    hbars($('ovStatus'), counts, function (i) { return i.v + ' bill' + (i.v === 1 ? '' : 's'); });
+  }
+
+  // ---------- calendar ----------
+  var byDay = {};
+  data.forEach(function (r) { (byDay[r.date] = byDay[r.date] || []).push(r); });
+  var months = [], seen = {};
+  (function () { var s = parse(range.start), e = parse(range.end), c = new Date(s.getFullYear(), s.getMonth(), 1); while (c <= e) { months.push(new Date(c)); c.setMonth(c.getMonth() + 1); } })();
+  var monthIdx = months.length - 1, selDay = null;
+  function dayTotals(rows) { var t = { amount: 0, due: 0, n: rows.length }; rows.forEach(function (r) { if (!r.cancelled) { t.amount += r.amount; t.due += r.due; } }); return t; }
+  var maxDay = Math.max.apply(null, Object.keys(byDay).map(function (k) { return dayTotals(byDay[k]).amount; }).concat([1]));
+  function renderCalendar() {
+    var m = months[monthIdx], first = new Date(m.getFullYear(), m.getMonth(), 1), last = new Date(m.getFullYear(), m.getMonth() + 1, 0), html = '';
+    $('calTitle').textContent = MON[m.getMonth()] + ' ' + m.getFullYear();
+    $('calPrev').disabled = monthIdx === 0; $('calNext').disabled = monthIdx === months.length - 1;
+    ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].forEach(function (d) { html += '<div class="dow">' + d + '</div>'; });
+    for (var i = 0; i < first.getDay(); i++) html += '<div></div>';
+    for (var d = 1; d <= last.getDate(); d++) {
+      var key = iso(new Date(m.getFullYear(), m.getMonth(), d)), rows = byDay[key] || [], t = dayTotals(rows), has = rows.length > 0, shade = has && t.amount ? Math.min(0.55, 0.12 + 0.43 * t.amount / maxDay) : 0;
+      var inRange = key >= range.start && key <= range.end;
+      html += '<div class="day' + (has ? ' has' : '') + (key === selDay ? ' sel' : '') + (inRange ? '' : ' out') + '" data-day="' + key + '" style="' + (shade ? 'background:rgba(26,152,80,' + shade + ')' : '') + '">' +
+        '<div class="n">' + d + '</div>' + (has ? '<span class="dot ' + (t.due > 0 ? 'due' : 'ok') + '"></span><div class="amt">' + (t.amount ? brief(t.amount) : '-') + '</div><div class="meta">' + t.n + ' bill' + (t.n === 1 ? '' : 's') + (t.due > 0 ? '<br>due ' + brief(t.due) : '') + '</div>' : '') + '</div>';
+    }
+    $('calGrid').innerHTML = html;
+    Array.prototype.forEach.call($('calGrid').querySelectorAll('.day.has'), function (el) { el.addEventListener('click', function () { selDay = el.dataset.day; renderCalendar(); showDay(selDay); }); });
+  }
+  function showDay(key) {
+    var rows = byDay[key] || [], box = $('calDetail'), p = key.split('-');
+    box.hidden = !rows.length;
+    if (!rows.length) return;
+    var t = dayTotals(rows);
+    box.innerHTML = '<h3>' + (+p[2]) + ' ' + MON[+p[1] - 1] + ' ' + p[0] + ' - NPR ' + fmt(t.amount) + ' billed' + (t.due ? ', NPR ' + fmt(t.due) + ' still due' : '') + '</h3><table><thead><tr><th>PATIENT</th><th>SERVICE</th><th class="r">BILLED</th><th class="r">PAID</th><th class="r">DUE</th><th>STATUS</th><th>MODE</th></tr></thead><tbody>' +
+      rows.map(function (r) { return '<tr' + (r.cancelled ? ' style="opacity:.5"' : '') + '><td><b>' + esc(r.patient) + '</b><div class="patient-id">' + esc(r.code) + '</div></td><td>' + esc(r.service) + '</td><td class="r">' + fmt(r.amount) + '</td><td class="r">' + fmt(r.received) + '</td><td class="r">' + (r.due ? '<b style="color:#b78317">' + fmt(r.due) + '</b>' : '-') + '</td><td><span class="chip-v ' + statusClass(r) + '">' + esc(r.status) + '</span></td><td>' + esc(r.mode) + '</td></tr>'; }).join('') + '</tbody></table>';
+    box.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+  }
+  $('calPrev').addEventListener('click', function () { if (monthIdx > 0) { monthIdx--; renderCalendar(); } });
+  $('calNext').addEventListener('click', function () { if (monthIdx < months.length - 1) { monthIdx++; renderCalendar(); } });
+
+  // ---------- by patient ----------
+  var people = (function () {
+    var m = {};
+    data.forEach(function (r) {
+      var k = r.code || ('n:' + r.patient.toLowerCase()), p = m[k] || (m[k] = { name: r.patient, code: r.code, phone: r.phone, rows: [], amount: 0, received: 0, due: 0 });
+      p.rows.push(r); if (!r.cancelled) { p.amount += r.amount; p.received += r.received; p.due += r.due; }
+    });
+    return Object.keys(m).map(function (k) { var p = m[k]; p.rows.sort(function (a, b) { return a.date < b.date ? -1 : 1; }); p.visits = p.rows.filter(function (r) { return !r.cancelled; }).length; return p; });
+  })();
+  function renderPatients() {
+    var q = $('ptFind').value.trim().toLowerCase(), sort = $('ptSort').value;
+    var list = people.filter(function (p) { return !q || (p.name + ' ' + p.code + ' ' + p.phone).toLowerCase().indexOf(q) !== -1; });
+    list.sort(function (a, b) { return sort === 'name' ? a.name.localeCompare(b.name) : sort === 'total' ? b.amount - a.amount : sort === 'visits' ? b.visits - a.visits : (b.due - a.due) || (b.amount - a.amount); });
+    $('ptCount').textContent = list.length + ' of ' + people.length + ' patients';
+    $('ptList').innerHTML = list.length ? list.map(function (p) {
+      var chips = p.rows.map(function (r) { var d = parse(r.date); return '<span class="chip-v ' + statusClass(r) + '" title="' + esc(r.invoice + ' - ' + r.service + ' - ' + r.status) + '">' + d.getDate() + ' ' + MON[d.getMonth()] + ' · ' + brief(r.amount) + '</span>'; }).join('');
+      return '<div class="pt-card' + (p.due > 0 ? ' due' : '') + '"><div class="pt-top"><span class="nm">' + esc(p.name) + '</span><span class="patient-id" style="display:inline">' + esc(p.code) + (p.phone ? ' · ' + esc(p.phone) : '') + '</span>' +
+        '<span class="figs"><span><b>' + p.visits + '</b> visit' + (p.visits === 1 ? '' : 's') + '</span><span>Billed <b>NPR ' + fmt(p.amount) + '</b></span><span>Received <b style="color:#16834f">NPR ' + fmt(p.received) + '</b></span><span>Due <b style="color:' + (p.due ? '#b78317' : '#16834f') + '">NPR ' + fmt(p.due) + '</b></span></span></div><div class="pt-chips">' + chips + '</div></div>';
+    }).join('') : '<div class="vw-card empty-v">No patients match.</div>';
+  }
+  $('ptFind').addEventListener('input', renderPatients); $('ptSort').addEventListener('change', renderPatients);
+
+  // ---------- switching ----------
+  var views = { overview: $('viewOverview'), calendar: $('viewCalendar'), patients: $('viewPatients'), table: $('viewTable') }, drawn = {};
+  function show(name) {
+    if (!views[name]) name = 'overview';
+    Object.keys(views).forEach(function (k) { if (views[k]) views[k].hidden = k !== name; });
+    Array.prototype.forEach.call($('vwSwitch').querySelectorAll('button'), function (b) { b.classList.toggle('on', b.dataset.view === name); });
+    if (!drawn[name]) { drawn[name] = true; if (name === 'overview') renderOverview(); if (name === 'calendar') renderCalendar(); if (name === 'patients') renderPatients(); }
+    try { localStorage.setItem('billingSheetView', name); } catch (e) {}
+    if (history.replaceState) history.replaceState(null, '', '#' + name);
+  }
+  Array.prototype.forEach.call($('vwSwitch').querySelectorAll('button'), function (b) { b.addEventListener('click', function () { show(b.dataset.view); }); });
+  var start = location.hash.replace('#', '');
+  if (!views[start]) { try { start = localStorage.getItem('billingSheetView') || 'overview'; } catch (e) { start = 'overview'; } }
+  show(start);
 })();
 </script>
 {% endblock %}

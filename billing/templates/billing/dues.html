@@ -1,0 +1,79 @@
+{% extends base_template|default:'accounts/pro_base.html' %}
+{% block title %}Payments due | Sajhya Health{% endblock %}
+{% block extra_css %}
+  .du-kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 10px; margin-bottom: 14px; }
+  .du-kpi { background: #fff; border: 1px solid var(--line); border-radius: 12px; padding: 12px 14px; }
+  .du-kpi .k { font-size: 10px; font-weight: 800; letter-spacing: .05em; text-transform: uppercase; color: var(--muted); } .du-kpi .v { font-size: 22px; font-weight: 800; margin-top: 3px; } .du-kpi .n { font-size: 11.5px; color: var(--muted); }
+  .du-age { background: #fff; border: 1px solid var(--line); border-radius: 12px; padding: 14px 16px; margin-bottom: 14px; display: grid; gap: 8px; }
+  .du-age .row { display: grid; grid-template-columns: 110px 1fr 150px; gap: 10px; align-items: center; font-size: 12.5px; } .du-age .meter { height: 14px; background: #eef3ef; border-radius: 7px; overflow: hidden; } .du-age .meter i { display: block; height: 100%; border-radius: 7px; }
+  .b-new i { background: #6cc496; } .b-week i { background: #f0b429; } .b-old i { background: #d9534f; }
+  .du-bar { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; margin-bottom: 12px; }
+  .du-bar input[type=search] { height: 36px; border: 1px solid #b9dcc9; border-radius: 18px; padding: 0 14px; min-width: 250px; background: #fff; }
+  .chips2 { display: flex; gap: 6px; flex-wrap: wrap; } .chips2 a { border: 1px solid #cfe6d8; background: #fff; color: var(--green-dark); border-radius: 15px; padding: 5px 12px; font-size: 12px; font-weight: 700; text-decoration: none; } .chips2 a.on { background: var(--green); border-color: var(--green); color: #fff; }
+  .du-card { background: #fff; border: 1px solid var(--line); border-left: 5px solid #6cc496; border-radius: 12px; margin-bottom: 12px; overflow: hidden; }
+  .du-card.week { border-left-color: #f0b429; } .du-card.old { border-left-color: #d9534f; }
+  .du-head { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; padding: 12px 16px; background: #fafcfb; }
+  .du-head .who { font-weight: 800; font-size: 15px; } .du-head .who a { color: inherit; text-decoration: none; } .du-head .amt { margin-left: auto; text-align: right; font-weight: 800; font-size: 18px; color: #b78317; }
+  .du-chip { font-size: 11px; font-weight: 800; padding: 3px 10px; border-radius: 12px; background: #e6f6ee; color: #16834f; } .du-chip.week { background: #fff3d6; color: #a97510; } .du-chip.old { background: #fde8e8; color: #b83b3b; }
+  .du-card table { width: 100%; border-collapse: collapse; font-size: 12.5px; } .du-card th { text-align: left; font-size: 10.5px; color: var(--muted); letter-spacing: .04em; padding: 6px 16px; border-top: 1px solid var(--line); } .du-card td { padding: 7px 16px; border-top: 1px solid #f0f4f1; }
+  .du-card th.r, .du-card td.r { text-align: right; }
+  @media (max-width: 700px) { .du-age .row { grid-template-columns: 90px 1fr; } .du-age .row b { grid-column: 2; } }
+  @media print { .no-print { display: none !important; } }
+{% endblock %}
+
+{% block main %}
+{% include 'billing/_tabs.html' %}
+<div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:10px"><h1 style="margin:0;font-size:24px">Payments due</h1>
+  <span class="patient-id" style="display:inline">Credit still to collect from patients: bills left unpaid and package balances.</span>
+  <button type="button" class="pill no-print" style="margin-left:auto" onclick="window.print()">Print</button></div>
+
+<div class="du-kpis">
+  <div class="du-kpi"><div class="k">Total due</div><div class="v" style="color:#b78317">NPR {{ summary.total }}</div><div class="n">{{ summary.patients }} patient{{ summary.patients|pluralize }} owing</div></div>
+  <div class="du-kpi"><div class="k">From bills</div><div class="v">NPR {{ summary.bills }}</div><div class="n">Left on credit or part paid</div></div>
+  <div class="du-kpi"><div class="k">From packages</div><div class="v">NPR {{ summary.packages }}</div><div class="n">Package balances</div></div>
+  <div class="du-kpi"><div class="k">Longest wait</div><div class="v" style="color:{% if summary.oldest > 30 %}#b83b3b{% elif summary.oldest > 7 %}#a97510{% else %}#16834f{% endif %}">{{ summary.oldest }} day{{ summary.oldest|pluralize }}</div><div class="n">Since the oldest unpaid item</div></div>
+</div>
+
+{% if summary.total %}
+<div class="du-age"><b style="font-size:12px;color:var(--muted);letter-spacing:.05em;text-transform:uppercase">How long it has been waiting</b>
+  {% for a in aging %}<div class="row b-{{ a.band }}"><span>{{ a.label }}</span><div class="meter"><i style="width:{{ a.pct }}%"></i></div><b>NPR {{ a.value }} · {{ a.count }} patient{{ a.count|pluralize }}</b></div>{% endfor %}</div>
+{% endif %}
+
+<form method="get" class="du-bar no-print">
+  <input type="search" name="q" value="{{ q }}" placeholder="Search a patient, phone or invoice...">
+  {% if show %}<input type="hidden" name="show" value="{{ show }}">{% endif %}
+  <button class="primary-btn" type="submit" style="height:36px">Search</button>
+  <div class="chips2">{% for key, label in filters %}<a href="?{% if key %}show={{ key }}&{% endif %}{% if q %}q={{ q|urlencode }}&{% endif %}{% if sort %}sort={{ sort }}{% endif %}" class="{% if show == key %}on{% endif %}">{{ label }}</a>{% endfor %}</div>
+  <span class="chips2"><a href="?{% if show %}show={{ show }}&{% endif %}{% if q %}q={{ q|urlencode }}&{% endif %}sort={% if sort == 'oldest' %}amount{% else %}oldest{% endif %}" class="{% if sort == 'oldest' %}on{% endif %}">{% if sort == 'oldest' %}Sorted: oldest first{% else %}Sort: oldest first{% endif %}</a></span>
+</form>
+{% if q or show %}<p class="patient-id no-print" style="margin:-4px 0 10px">Showing {{ groups|length }} of {{ summary.patients }} patients · NPR {{ shown_total }} · <a href="{% url 'billing:dues' %}" style="color:#116b43;font-weight:700">Clear</a></p>{% endif %}
+
+{% for g in groups %}
+<article class="du-card {{ g.band }}">
+  <div class="du-head">
+    <div><div class="who">{% if g.patient and not staff_mode %}<a href="{% url 'accounts:patient-detail' g.patient.pk %}?tab=billing">{{ g.name }}</a>{% else %}{{ g.name }}{% endif %} <span class="patient-id" style="display:inline">{{ g.code }}</span></div>
+      <div class="patient-id">{% if g.phone %}{{ g.phone }} · {% endif %}{{ g.bills|length }} bill{{ g.bills|length|pluralize }}{% if g.packages %} · {{ g.packages|length }} package{{ g.packages|length|pluralize }}{% endif %}</div></div>
+    <span class="du-chip {{ g.band }}">{% if g.days == 0 %}today{% else %}{{ g.days }} day{{ g.days|pluralize }} waiting{% endif %}</span>
+    <a class="table-action no-print" href="{{ g.reminder }}" target="_blank" rel="noopener" style="text-decoration:none" title="Open WhatsApp with a payment reminder ready to send">Remind on WhatsApp</a>
+    <div class="amt">NPR {{ g.total }}<div class="patient-id" style="font-weight:400">due</div></div>
+  </div>
+  <table>
+    <thead><tr><th>ITEM</th><th>DATE</th><th class="r">BILLED</th><th class="r">PAID</th><th class="r">DUE</th><th class="no-print"></th></tr></thead>
+    <tbody>
+    {% for e in g.bills %}<tr><td><a href="{% url 'billing:invoice' e.pk %}" style="color:inherit">{{ e.invoice_number }}</a> · {{ e.service|truncatechars:40 }}</td><td>{{ e.entry_date|date:"M j" }}</td>
+      <td class="r">NPR {{ e.rate }}</td><td class="r">NPR {{ e.amount_paid }}</td><td class="r"><b style="color:#b78317">NPR {{ e.amount_due }}</b></td>
+      <td class="no-print r"><button type="button" class="table-action" data-pay data-url="{% url 'billing:entry-payment' e.pk %}" data-name="{{ g.name }}" data-due="{{ e.amount_due }}" data-invoice="{{ e.invoice_number }}" data-next="{{ request.get_full_path }}">Receive</button></td></tr>{% endfor %}
+    {% for p in g.packages %}<tr><td><a href="{% url 'billing:package-invoice' p.pk %}" style="color:inherit">{{ p.get_duration_display }} package</a> · {{ p.sessions_used }} of {{ p.total_sessions }} sessions used</td><td>{{ p.start_date|date:"M j" }}</td>
+      <td class="r">NPR {{ p.total_amount }}</td><td class="r">NPR {{ p.amount_paid }}</td><td class="r"><b style="color:#b78317">NPR {{ p.amount_due }}</b></td>
+      <td class="no-print r"><button type="button" class="table-action" data-pay data-url="{% url 'billing:package-payment' p.pk %}" data-name="{{ g.name }}" data-due="{{ p.amount_due }}" data-invoice="{{ p.get_duration_display }} package" data-hint="Package balance. A payment cannot be more than the balance." data-next="{{ request.get_full_path }}">Receive</button></td></tr>{% endfor %}
+    </tbody>
+  </table>
+</article>
+{% empty %}
+<div class="panel" style="padding:34px;text-align:center;color:var(--muted)">{% if q or show %}Nobody matches that.{% else %}Nothing is due. Every bill and package is paid.{% endif %}</div>
+{% endfor %}
+{% endblock %}
+
+{% block modals %}
+{% include 'billing/_pay_modal.html' %}
+{% endblock %}

@@ -61,12 +61,25 @@ def billing_manager(request):
         raise Http404
 
 
+def dues_total(profile):
+    """What patients owe this workspace in all: unpaid bill balances plus package balances (cancelled ones do not count)."""
+    from decimal import Decimal
+
+    from django.db.models import F, Sum
+
+    from .models import BillingEntry, PatientPackage
+    bills = BillingEntry.objects.filter(professional=profile, cancelled_at__isnull=True, amount_paid__lt=F('rate')).aggregate(t=Sum(F('rate') - F('amount_paid')))['t'] or Decimal('0')
+    packages = PatientPackage.objects.filter(professional=profile, amount_paid__lt=F('total_amount')).exclude(status='cancelled').aggregate(t=Sum(F('total_amount') - F('amount_paid')))['t'] or Decimal('0')
+    return bills + packages
+
+
 def billing_context(request, profile):
     """The template context of every billing page: the workspace context, plus the front-desk layout for staff."""
     from clinics.desk import TABS
     context = workspace_context(request.user, profile)
     member = staff_member(request)
     context['patient_search_url'] = reverse('accounts:appointment-patient-search')
+    context['dues_total'] = dues_total(profile)  # the "Payments due" tab shows what is owed
     if member is not None:
         name = member.name or request.user.get_username()
         context.update({
