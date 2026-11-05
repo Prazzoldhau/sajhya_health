@@ -863,7 +863,7 @@ def _doc_page(request, profile, package, payment=None):
     due, paid = pdocs.balance_after(payment) if payment else (package.amount_due, package.amount_paid)
     context.update({
         'active': 'billing', 'kind': kind, 'package': package, 'payment': payment, 'number': number, 'practice': pdocs.practice_of(package.professional), 'patient': patient,
-        'facts': pdocs.invoice_lines(package), 'payments': sorted(package.payments.all(), key=lambda x: (x.created_at, x.pk)), 'due_after': due, 'paid_so_far': paid,
+        'facts': pdocs.invoice_lines(package), 'sessions': pdocs.session_rows(package), 'payments': sorted(package.payments.all(), key=lambda x: (x.created_at, x.pk)), 'due_after': due, 'paid_so_far': paid,
         'public_url': public_url, 'message': message, 'phone': phone, 'email': email, 'urls': urls, 'link_days': pdocs.LINK_DAYS,
         'links': channel_links(phone, message, patient.messaging_app, profile.whatsapp_web), 'whatsapp_chat': inv.whatsapp_chat(phone, profile.whatsapp_web),
         'file_name': number, 'back': reverse('billing:packages'),

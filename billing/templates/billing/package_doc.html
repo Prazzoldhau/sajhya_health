@@ -62,6 +62,9 @@
     </div>
     {% if payments %}<div class="inv-pays"><div class="l">Payments received</div>
       {% for p in payments %}<div class="row"><span>{{ p.created_at|date:"j M Y" }} · {{ p.get_payment_mode_display }}{% if p.notes %} · {{ p.notes }}{% endif %} <span style="color:var(--muted)">({{ p.receipt_number }})</span></span><span>NPR {{ p.amount }}</span></div>{% endfor %}</div>{% endif %}
+    <div class="inv-pays"><div class="l">Sessions used ({{ sessions|length }} of {{ package.total_sessions }})</div>
+      {% for n, d, who, text in sessions %}<div class="row"><span><b>{{ n }} of {{ package.total_sessions }}</b> · {% if d %}{{ d|date:"j M Y" }}{% else %}earlier (no date){% endif %}{% if who %} · {{ who }}{% endif %}{% if text %} · {{ text }}{% endif %}</span></div>
+      {% empty %}<div class="row"><span style="color:var(--muted)">No session has been used yet.</span></div>{% endfor %}</div>
     {% endif %}
     <div class="inv-foot">Thank you. Please keep this {% if kind == 'receipt' %}receipt{% else %}invoice{% endif %} for your records.</div>
   </article>

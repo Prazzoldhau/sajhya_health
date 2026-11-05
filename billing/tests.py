@@ -1364,3 +1364,42 @@ class PackageInvoiceAndReceiptTests(BillingBase):
         migration.number_existing(apps, None)
         self.assertTrue(PatientPackage.objects.get().invoice_number.startswith('PKG-'))
         self.assertFalse(PackagePayment.objects.filter(receipt_number__isnull=True).exists())
+
+
+class PackageInvoiceListsEverySessionTests(BillingBase):
+    """The package invoice lists every session used: number, date, who recorded it and the note."""
+    def test_sessions_used_are_listed_on_the_page_and_pdf_and_taken_back_ones_are_not(self):
+        from . import package_docs as pdocs
+        self.package()
+        pkg = PatientPackage.objects.get()
+        yesterday = self.today - datetime.timedelta(days=1)
+        pkg.start_date = yesterday
+        pkg.save()
+        pkg.use_session(yesterday, 'Asha', 'Therapist', 'First visit')
+        wrong = pkg.use_session(self.today, 'Ram', 'Receptionist', 'Mistake')
+        pkg.use_session(self.today, 'Asha', 'Therapist', 'Back exercises')
+        pkg.undo_session(wrong, 'Ram')
+        pkg.refresh_from_db()
+        rows = pdocs.session_rows(pkg)
+        self.assertEqual([(n, who, note) for n, _, who, note in rows], [(1, 'Asha (Therapist)', 'First visit'), (2, 'Asha (Therapist)', 'Back exercises')])
+        page = self.client.get(reverse('billing:package-invoice', args=[pkg.pk]))
+        self.assertContains(page, 'Sessions used (2 of 3)')
+        self.assertContains(page, 'First visit')
+        self.assertContains(page, 'Back exercises')
+        self.assertNotContains(page, 'Mistake')
+        self.assertTrue(pdocs.build_invoice_pdf(pkg).startswith(b'%PDF'))
+
+    def test_a_solo_professionals_automatic_sessions_are_logged_and_sessions_before_the_log_still_count(self):
+        from . import package_docs as pdocs
+        self.package()
+        pkg = PatientPackage.objects.get()
+        self.client.post(reverse('accounts:patient-visit-add', args=[self.patient.pk]), {'date': self.today.isoformat(), 'session_type': 'treatment', 'notes': ''})
+        pkg.refresh_from_db()
+        self.assertEqual(pkg.sessions_used, 1)
+        entry = pkg.session_log.get()
+        self.assertEqual((entry.date, entry.note), (self.today, 'Counted from the recorded session'))
+        PatientPackage.objects.filter(pk=pkg.pk).update(sessions_used=3)  # two older sessions were counted before the log existed
+        pkg.refresh_from_db()
+        rows = pdocs.session_rows(pkg)
+        self.assertEqual([(n, d) for n, d, _, _ in rows], [(1, None), (2, None), (3, self.today)])
+        self.assertContains(self.client.get(reverse('billing:package-invoice', args=[pkg.pk])), 'earlier (no date)')

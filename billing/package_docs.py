@@ -84,6 +84,17 @@ def balance_after(payment):
     return max(Decimal('0'), package.total_amount - paid), paid
 
 
+def session_rows(package):
+    """The sessions used, oldest first: [(number, date, recorded by, note)], taken-back ones left out. Sessions counted before the dated log existed
+    come first as plain numbers, so the numbering still adds up."""
+    unlogged = package.unlogged_sessions
+    rows = [(i, None, '', '') for i in range(1, unlogged + 1)]
+    for i, entry in enumerate(package.active_log, unlogged + 1):
+        who = entry.recorded_by_name + (f' ({entry.recorded_by_role})' if entry.recorded_by_role else '')
+        rows.append((i, entry.date, who, entry.note))
+    return rows
+
+
 def invoice_lines(package):
     """[(label, text)] facts for the package invoice."""
     return [('Package', f'{package.get_duration_display()}, {package.total_sessions} sessions'), ('Valid', f'{package.start_date:%d %b %Y} to {package.end_date:%d %b %Y}'),
@@ -91,7 +102,7 @@ def invoice_lines(package):
 
 
 # ---------------------------------------------------------------- PDF
-def _build(title, number, practice, patient_block, rows, totals, payments_title, payments, note, online_url, label='INVOICE', stamp=''):
+def _build(title, number, practice, patient_block, rows, totals, payments_title, payments, note, online_url, label='INVOICE', stamp='', sessions=None, total_sessions=0):
     from reportlab.lib import colors
     from reportlab.lib.pagesizes import A4
     from reportlab.lib.styles import ParagraphStyle
@@ -148,6 +159,16 @@ def _build(title, number, practice, patient_block, rows, totals, payments_title,
         pt = Table([[Paragraph(_p(a), body), Paragraph(_p(b), body), Paragraph(_p(c), ParagraphStyle('pr', parent=body, alignment=2))] for a, b, c in payments], colWidths=[40 * mm, 80 * mm, 50 * mm])
         pt.setStyle(TableStyle([('LINEBELOW', (0, 0), (-1, -1), 0.3, colors.HexColor('#e1ebe5')), ('TOPPADDING', (0, 0), (-1, -1), 3), ('BOTTOMPADDING', (0, 0), (-1, -1), 3), ('LEFTPADDING', (0, 0), (-1, -1), 0)]))
         story += [pt]
+    if sessions is not None:
+        story += [Spacer(1, 6 * mm), Paragraph(f'SESSIONS USED ({len(sessions)} OF {total_sessions})', head)]
+        if sessions:
+            data = [[Paragraph(f'{n} of {total_sessions}', bold), Paragraph(d.strftime('%d %b %Y') if d else 'earlier (no date)', body), Paragraph(_p(who), body), Paragraph(_p(text), body)] for n, d, who, text in sessions]
+            st = Table(data, colWidths=[22 * mm, 32 * mm, 52 * mm, 64 * mm])
+            st.setStyle(TableStyle([('LINEBELOW', (0, 0), (-1, -1), 0.3, colors.HexColor('#e1ebe5')), ('TOPPADDING', (0, 0), (-1, -1), 3), ('BOTTOMPADDING', (0, 0), (-1, -1), 3),
+                                    ('LEFTPADDING', (0, 0), (-1, -1), 0), ('VALIGN', (0, 0), (-1, -1), 'TOP')]))
+            story += [st]
+        else:
+            story += [Paragraph('No session has been used yet.', small)]
     if note:
         story += [Spacer(1, 6 * mm), Paragraph(_p(note), small)]
     doc.build(story, onFirstPage=page, onLaterPages=page)
@@ -164,7 +185,7 @@ def build_invoice_pdf(package, online_url=''):
               ('Balance due', f'NPR {package.amount_due:,.2f}' if package.amount_due > 0 else 'Fully paid')]
     note = package.notes
     return _build(f'Package invoice {package.invoice_number}', package.invoice_number, practice, block, rows, totals, 'Payments received', payments, note, online_url,
-                  stamp='CANCELLED' if package.status == package.CANCELLED else '')
+                  stamp='CANCELLED' if package.status == package.CANCELLED else '', sessions=session_rows(package), total_sessions=package.total_sessions)
 
 
 def build_receipt_pdf(payment, online_url=''):

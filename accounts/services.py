@@ -20,7 +20,7 @@ def record_visit(patient, therapist, date, session_type=Visit.TREATMENT, progres
     patient.touch()
     if professional is not None:
         calendar_entry_for_session(patient, professional, date, session_type, notes)
-    return visit, use_package_session(patient)
+    return visit, use_package_session(patient, date, therapist, recorded_by_role)
 
 
 def calendar_entry_for_session(patient, professional, date, session_type, notes=''):

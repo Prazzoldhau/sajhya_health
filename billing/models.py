@@ -560,12 +560,12 @@ class PackagePayment(models.Model):
         super().save(*args, **kwargs)
 
 
-def use_package_session(patient):
+def use_package_session(patient, date=None, name='', role=''):
     """Called when a visit is recorded: counts one session against the patient's active package, if any. A clinic's packages are not counted here: the
     front desk or the clinic's login records those on the billing page."""
     for package in patient.packages.filter(status=PatientPackage.ACTIVE).select_related('professional').order_by('created_at'):
-        if not package.counted_at_billing:
-            return package.record_session()
+        if not package.counted_at_billing:  # a solo professional's package: counted when a session is recorded, and logged so the invoice can list it
+            return package.use_session(date, name, role, 'Counted from the recorded session') is not None
     return False
 
 
