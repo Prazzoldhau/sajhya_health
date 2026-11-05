@@ -1279,3 +1279,88 @@ class ProductStockTests(BillingBase):
         self.assertEqual(BillingEntry.objects.count(), 1)  # nothing counted, nothing refused
         self.oil.refresh_from_db()
         self.assertEqual(self.oil.stock, 0)
+
+
+class PackageInvoiceAndReceiptTests(BillingBase):
+    """A package has an invoice, and each payment on it has a receipt: page, PDF, signed link, e-mail."""
+    def setUp(self):
+        super().setUp()
+        from .models import PatientPackage
+        self.package()
+        self.pkg = PatientPackage.objects.get()
+        self.pkg.record_payment(Decimal('500'), 'online', 'Second instalment')
+        self.pkg.refresh_from_db()
+
+    def test_numbers_are_made_and_the_packages_page_has_the_buttons(self):
+        from .models import PackagePayment
+        self.assertTrue(self.pkg.invoice_number.startswith('PKG-'))
+        receipts = list(PackagePayment.objects.order_by('pk'))
+        self.assertEqual(len(receipts), 2)
+        self.assertTrue(all(r.receipt_number.startswith('RCT-') for r in receipts))
+        self.assertEqual(len({r.receipt_number for r in receipts}), 2)
+        page = self.client.get(reverse('billing:packages'))
+        self.assertContains(page, reverse('billing:package-invoice', args=[self.pkg.pk]))
+        self.assertContains(page, reverse('billing:package-receipt', args=[receipts[0].pk]))
+        tab = self.client.get(reverse('accounts:patient-detail', args=[self.patient.pk]) + '?tab=billing')
+        self.assertContains(tab, reverse('billing:package-invoice', args=[self.pkg.pk]))
+        self.assertContains(tab, reverse('billing:package-receipt', args=[receipts[1].pk]))
+
+    def test_the_invoice_page_shows_price_payments_balance_and_send_options(self):
+        page = self.client.get(reverse('billing:package-invoice', args=[self.pkg.pk]))
+        self.assertEqual(page.status_code, 200)
+        for text in (self.pkg.invoice_number, 'Send as picture', 'Download PDF', 'Balance due', 'Payments received', 'RCT-'):
+            self.assertContains(page, text)
+        self.assertContains(page, 'NPR 3000')
+        self.assertContains(page, '1500')  # price 3000, paid 1000 + 500
+        self.assertEqual(page.context['kind'], 'invoice')
+
+    def test_each_receipt_shows_its_amount_and_the_balance_after_it(self):
+        from .models import PackagePayment
+        first, second = PackagePayment.objects.order_by('pk')
+        r1 = self.client.get(reverse('billing:package-receipt', args=[first.pk]))
+        self.assertEqual((r1.context['due_after'], r1.context['paid_so_far']), (Decimal('2000'), Decimal('1000')))
+        r2 = self.client.get(reverse('billing:package-receipt', args=[second.pk]))
+        self.assertEqual((r2.context['due_after'], r2.context['paid_so_far']), (Decimal('1500'), Decimal('1500')))
+        self.assertContains(r2, second.receipt_number)
+        self.assertContains(r2, 'RECEIPT')
+
+    def test_the_pdfs_are_real_and_the_signed_links_work_without_signing_in(self):
+        from . import package_docs as pdocs
+        from .models import PackagePayment
+        payment = PackagePayment.objects.first()
+        for url in (reverse('billing:package-invoice-pdf', args=[self.pkg.pk]), reverse('billing:package-receipt-pdf', args=[payment.pk])):
+            r = self.client.get(url)
+            self.assertEqual((r.status_code, r['Content-Type']), (200, 'application/pdf'))
+            self.assertTrue(r.content.startswith(b'%PDF'))
+        inv_url = reverse('billing:package-invoice-public', args=[pdocs.invoice_token(self.pkg)])
+        rct_url = reverse('billing:package-receipt-public', args=[pdocs.receipt_token(payment)])
+        self.client.logout()
+        for url in (inv_url, rct_url):
+            self.assertEqual(self.client.get(url)['Content-Type'], 'application/pdf')
+        self.assertEqual(self.client.get(reverse('billing:package-invoice-public', args=['nope'])).status_code, 404)
+        self.assertEqual(self.client.get(reverse('billing:package-invoice-pdf', args=[self.pkg.pk])).status_code, 302)
+
+    def test_other_practices_cannot_open_them_and_the_documents_can_be_e_mailed(self):
+        from django.core import mail
+        from .models import PackagePayment
+        payment = PackagePayment.objects.first()
+        self.client.post(reverse('billing:package-invoice-email', args=[self.pkg.pk]), {'email': 'patient@example.com'})
+        self.client.post(reverse('billing:package-receipt-email', args=[payment.pk]), {'email': 'patient@example.com'})
+        self.assertEqual(len(mail.outbox), 2)
+        self.assertTrue(all(m.attachments[0][1][:4] == b'%PDF' for m in mail.outbox))
+        self.assertIn(self.pkg.invoice_number, mail.outbox[0].subject)
+        other, _ = make_professional('far-pkg')
+        self.client.force_login(other)
+        self.assertEqual(self.client.get(reverse('billing:package-invoice', args=[self.pkg.pk])).status_code, 404)
+        self.assertEqual(self.client.get(reverse('billing:package-receipt-pdf', args=[payment.pk])).status_code, 404)
+
+    def test_packages_made_before_invoices_got_numbers_from_the_migration_step(self):
+        import importlib
+        from django.apps import apps
+        from .models import PackagePayment, PatientPackage
+        PatientPackage.objects.filter(pk=self.pkg.pk).update(invoice_number=None)
+        PackagePayment.objects.update(receipt_number=None)
+        migration = importlib.import_module('billing.migrations.0018_package_invoice_numbers')
+        migration.number_existing(apps, None)
+        self.assertTrue(PatientPackage.objects.get().invoice_number.startswith('PKG-'))
+        self.assertFalse(PackagePayment.objects.filter(receipt_number__isnull=True).exists())

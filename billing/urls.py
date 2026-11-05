@@ -36,5 +36,13 @@ urlpatterns = [
     path('packages/<int:pk>/payment/', views.package_payment, name='package-payment'),
     path('packages/<int:pk>/use/', views.package_use, name='package-use'),
     path('packages/<int:pk>/sessions/<int:entry_id>/undo/', views.package_session_undo, name='package-session-undo'),
+    path('packages/<int:pk>/invoice/', views.package_invoice, name='package-invoice'),
+    path('packages/<int:pk>/invoice.pdf', views.package_invoice_pdf, name='package-invoice-pdf'),
+    path('packages/<int:pk>/invoice/email/', views.package_invoice_email, name='package-invoice-email'),
+    path('package-invoice/<str:token>/', views.package_invoice_public, name='package-invoice-public'),
+    path('packages/payments/<int:pk>/receipt/', views.package_receipt, name='package-receipt'),
+    path('packages/payments/<int:pk>/receipt.pdf', views.package_receipt_pdf, name='package-receipt-pdf'),
+    path('packages/payments/<int:pk>/receipt/email/', views.package_receipt_email, name='package-receipt-email'),
+    path('package-receipt/<str:token>/', views.package_receipt_public, name='package-receipt-public'),
     path('packages/<int:pk>/cancel/', views.package_cancel, name='package-cancel'),
 ]

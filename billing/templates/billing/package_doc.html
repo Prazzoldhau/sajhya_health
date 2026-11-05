@@ -1,0 +1,147 @@
+{% extends base_template|default:'accounts/pro_base.html' %}
+{% load static %}
+{% block title %}{% if kind == 'receipt' %}Receipt{% else %}Package invoice{% endif %} {{ number }} | Sajhya Health{% endblock %}
+{% block extra_css %}
+  .inv-wrap { display: grid; grid-template-columns: minmax(0, 1fr) 340px; gap: 16px; align-items: start; }
+  .inv { background: #fff; border: 1px solid var(--line); border-radius: 12px; overflow: hidden; position: relative; }
+  .inv-head { background: #116b43; color: #fff; padding: 20px 26px; display: flex; justify-content: space-between; gap: 16px; flex-wrap: wrap; }
+  .inv-head h2 { margin: 0 0 4px; font-size: 20px; } .inv-head .sub { font-size: 12.5px; opacity: .9; }
+  .inv-head .right { text-align: right; } .inv-head .right b { font-size: 24px; letter-spacing: 1px; display: block; }
+  .inv-meta { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; padding: 20px 26px 6px; }
+  .inv-meta .l { font-size: 10px; letter-spacing: .06em; color: var(--muted); font-weight: 800; text-transform: uppercase; margin-bottom: 4px; }
+  .inv-meta .n { font-weight: 800; font-size: 15px; } .inv-meta div > div { font-size: 12.5px; line-height: 1.6; }
+  .inv-table { width: 100%; border-collapse: collapse; margin: 14px 0 0; }
+  .inv-table th { text-align: left; background: #e9f7ef; color: #116b43; font-size: 11px; padding: 9px 26px; } .inv-table th:last-child, .inv-table td:last-child { text-align: right; }
+  .inv-table td { padding: 12px 26px; border-bottom: 1px solid #eef3ef; }
+  .inv-totals { margin: 14px 26px 0 auto; width: 300px; font-size: 13px; } .inv-totals div { display: flex; justify-content: space-between; padding: 5px 0; }
+  .inv-totals .due { font-weight: 800; font-size: 15px; border-top: 1px solid var(--line); margin-top: 4px; padding-top: 9px; }
+  .inv-pays { padding: 14px 26px 6px; font-size: 12.5px; } .inv-pays .l { font-size: 10px; letter-spacing: .06em; color: var(--muted); font-weight: 800; text-transform: uppercase; margin-bottom: 4px; }
+  .inv-pays div.row { display: flex; justify-content: space-between; gap: 12px; padding: 3px 0; max-width: 520px; } .inv-pays a { color: #116b43; font-weight: 700; text-decoration: none; }
+  .inv-foot { padding: 18px 26px 22px; font-size: 12px; color: var(--muted); }
+  .stamp { position: absolute; top: 45%; left: 50%; transform: translate(-50%, -50%) rotate(-18deg); font-size: 64px; font-weight: 800; color: rgba(184, 59, 59, .2); border: 6px solid rgba(184, 59, 59, .2); padding: 0 20px; border-radius: 10px; pointer-events: none; }
+  .share { background: #fff; border: 1px solid var(--line); border-radius: 12px; padding: 16px; display: grid; gap: 10px; position: sticky; top: 90px; }
+  .share h3 { margin: 0; font-size: 15px; } .share .hint { font-size: 11.5px; color: var(--muted); margin: 0; }
+  .share .btn { display: flex; align-items: center; justify-content: center; gap: 8px; height: 40px; border-radius: 9px; border: 1px solid #cfe6d8; background: #fff; color: var(--green-dark); font-weight: 700; text-decoration: none; cursor: pointer; font-size: 13px; padding: 0 10px; }
+  .share .btn.wa { background: #25d366; border-color: #25d366; color: #fff; } .share .btn.main { background: var(--green); border-color: var(--green); color: #fff; }
+  .share form { display: grid; gap: 8px; margin: 0; } .share input[type=email] { height: 38px; border: 1px solid var(--line); border-radius: 8px; padding: 0 10px; width: 100%; }
+  .share .sep { border-top: 1px solid var(--line); }
+  @media (max-width: 960px) { .inv-wrap { grid-template-columns: 1fr; } .share { position: static; order: -1; } }
+  @media print { .no-print, .share { display: none !important; } .inv-wrap { display: block; } .inv { border: 0; } main { padding: 0 !important; } }
+{% endblock %}
+
+{% block main %}
+<div class="no-print" style="margin-bottom:12px"><a class="text-link" href="{{ back }}" style="text-decoration:none">← Back to packages</a></div>
+<div class="inv-wrap">
+  <article class="inv" id="invoice">
+    {% if kind == 'invoice' and package.status == 'cancelled' %}<div class="stamp">CANCELLED</div>{% endif %}
+    <div class="inv-head">
+      <div><h2>{{ practice.name }}</h2><div class="sub">{{ practice.address }}{% if practice.address and practice.phone %} · {% endif %}{{ practice.phone }}{% if practice.whatsapp %}{% if practice.address or practice.phone %} · {% endif %}WhatsApp {{ practice.whatsapp }}{% endif %}</div></div>
+      <div class="right"><b>{% if kind == 'receipt' %}RECEIPT{% else %}INVOICE{% endif %}</b><span class="sub">{{ number }}</span></div>
+    </div>
+    <div class="inv-meta">
+      <div><div class="l">{% if kind == 'receipt' %}Received from{% else %}Billed to{% endif %}</div><div class="n">{{ patient.name }}</div><div>Patient ID {{ patient.patient_code }}</div></div>
+      <div><div class="l">{% if kind == 'receipt' %}Receipt details{% else %}Package details{% endif %}</div>
+        <div>{% if kind == 'receipt' %}Date: <b>{{ payment.created_at|date:"j M Y" }}</b><br>Paid by: {{ payment.get_payment_mode_display }}<br>Package invoice: {{ package.invoice_number }}<br>{% else %}Date: <b>{{ package.created_at|date:"j M Y" }}</b><br>{% endif %}
+          {% for k, v in facts %}{% if kind == 'invoice' or k == 'Package' %}{{ k }}: <b>{{ v }}</b><br>{% endif %}{% endfor %}</div></div>
+    </div>
+    {% if kind == 'receipt' %}
+    <table class="inv-table"><thead><tr><th>PAYMENT</th><th>AMOUNT (NPR)</th></tr></thead>
+      <tbody><tr><td><b>Payment towards the {{ package.get_duration_display }} package</b>{% if payment.notes %}<div style="font-size:12px;color:var(--muted);margin-top:3px">{{ payment.notes }}</div>{% endif %}</td><td>{{ payment.amount }}</td></tr></tbody></table>
+    <div class="inv-totals">
+      <div><span>Amount received</span><b>NPR {{ payment.amount }}</b></div>
+      <div><span>Total paid on this package so far</span><span>NPR {{ paid_so_far }}</span></div>
+      <div class="due"><span>Balance due after this payment</span><span{% if due_after %} style="color:#b78317"{% endif %}>{% if due_after %}NPR {{ due_after }}{% else %}Fully paid{% endif %}</span></div>
+    </div>
+    {% else %}
+    <table class="inv-table"><thead><tr><th>PACKAGE</th><th>AMOUNT (NPR)</th></tr></thead>
+      <tbody><tr><td><b>{{ package.get_duration_display }} package, {{ package.total_sessions }} sessions</b><div style="font-size:12px;color:var(--muted);margin-top:3px">{{ package.start_date|date:"j M Y" }} to {{ package.end_date|date:"j M Y" }} · {{ package.sessions_used }} of {{ package.total_sessions }} sessions used{% if package.notes %} · {{ package.notes }}{% endif %}</div></td><td>{{ package.total_amount }}</td></tr></tbody></table>
+    <div class="inv-totals">
+      <div><span>Package price</span><b>NPR {{ package.total_amount }}</b></div>
+      <div><span>Received</span><span>NPR {{ package.amount_paid }}</span></div>
+      <div class="due"><span>Balance due</span><span{% if package.amount_due %} style="color:#b78317"{% endif %}>{% if package.amount_due %}NPR {{ package.amount_due }}{% else %}Fully paid{% endif %}</span></div>
+    </div>
+    {% if payments %}<div class="inv-pays"><div class="l">Payments received</div>
+      {% for p in payments %}<div class="row"><span>{{ p.created_at|date:"j M Y" }} · {{ p.get_payment_mode_display }}{% if p.notes %} · {{ p.notes }}{% endif %} <span style="color:var(--muted)">({{ p.receipt_number }})</span></span><span>NPR {{ p.amount }}</span></div>{% endfor %}</div>{% endif %}
+    {% endif %}
+    <div class="inv-foot">Thank you. Please keep this {% if kind == 'receipt' %}receipt{% else %}invoice{% endif %} for your records.</div>
+  </article>
+
+  <aside class="share no-print">
+    <h3>Send this {% if kind == 'receipt' %}receipt{% else %}invoice{% endif %}</h3>
+    <button type="button" class="btn main" id="picShare">🖼 Send as picture</button>
+    <button type="button" class="btn wa" id="picWa" data-chat="{{ whatsapp_chat }}">WhatsApp: picture only{% if phone %} · {{ phone }}{% endif %}</button>
+    <button type="button" class="btn" id="picSave">⬇ Save picture (PNG)</button>
+    <p class="hint" id="picNote"><b>Send as picture</b> opens your phone's share sheet, where you choose the person. <b>WhatsApp: picture only</b> opens this patient's chat and copies the picture to paste.</p>
+    <div class="sep"></div>
+    <a class="btn" href="{{ urls.pdf }}?download=1">⬇ Download PDF</a>
+    <button type="button" class="btn" onclick="window.print()">🖨 Print / save as PDF</button>
+    <div class="hint" style="margin:0">Send the message with the PDF link:</div>
+    {% for l in links %}<a class="btn{% if l.preferred %} main{% endif %}" href="{{ l.url }}" {% if l.key != 'sms' %}target="_blank" rel="noopener"{% endif %} {% if l.copy %}data-copy="{{ l.copy }}"{% endif %}>{{ l.label }}{% if l.preferred %} (patient's app){% endif %}</a>{% endfor %}
+    <button type="button" class="btn" id="shareBtn" hidden>↗ Share the PDF…</button>
+    <button type="button" class="btn" id="copyBtn">⧉ Copy link</button>
+    <div class="sep"></div>
+    <form method="post" action="{{ urls.email }}">{% csrf_token %}
+      <label style="font-size:12px;font-weight:700;color:var(--muted)">E-mail the PDF</label>
+      <input type="email" name="email" value="{{ email }}" placeholder="patient@example.com" required>
+      <button class="btn" type="submit">✉ Send by e-mail</button>
+    </form>
+    <p class="hint">The link works without signing in for {{ link_days }} days. Anyone with it can open this {% if kind == 'receipt' %}receipt{% else %}invoice{% endif %}, so send it only to the patient.</p>
+  </aside>
+</div>
+<script src="{% static 'vendor/html2canvas/html2canvas.min.js' %}"></script>
+<script>
+(function () {
+  var note = document.getElementById('picNote'), name = "{{ file_name|escapejs }}.png";
+  function say(t) { note.textContent = t; }
+  // drawn by the browser, so Nepali and other scripts show correctly
+  function picture() {
+    return new Promise(function (resolve, reject) {
+      if (typeof html2canvas === 'undefined') { reject(new Error('library missing')); return; }
+      var timer = setTimeout(function () { reject(new Error('timeout')); }, 20000);
+      try {
+        html2canvas(document.getElementById('invoice'), { scale: 2, backgroundColor: '#ffffff', useCORS: true, logging: false }).then(function (canvas) {
+          canvas.toBlob(function (b) { clearTimeout(timer); b ? resolve(b) : reject(new Error('no image')); }, 'image/png');
+        }, function (e) { clearTimeout(timer); reject(e); });
+      } catch (e) { clearTimeout(timer); reject(e); }
+    });
+  }
+  function save(blob) { var a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = name; document.body.appendChild(a); a.click(); a.remove(); setTimeout(function () { URL.revokeObjectURL(a.href); }, 4000); }
+  var fail = 'The picture could not be made. Use the PDF instead.';
+  document.getElementById('picSave').addEventListener('click', function () { say('Making the picture...'); picture().then(function (b) { save(b); say('Picture saved. Attach it in WhatsApp, Messenger or any app.'); }).catch(function () { say(fail); }); });
+  document.getElementById('picShare').addEventListener('click', function () {
+    say('Making the picture...');
+    picture().then(function (blob) {
+      var file = new File([blob], name, { type: 'image/png' });
+      if (navigator.canShare && navigator.canShare({ files: [file] })) { return navigator.share({ files: [file] }).then(function () { say('Shared.'); }); }
+      save(blob); say('Picture saved (this browser cannot open the share sheet). Attach it in your app.');
+    }).catch(function (e) { if (e && e.name === 'AbortError') { say(''); } else { say(fail); } });
+  });
+  document.getElementById('picWa').addEventListener('click', function () {
+    window.open(this.dataset.chat, '_blank', 'noopener');
+    say('Making the picture...');
+    picture().then(function (blob) {
+      if (navigator.clipboard && window.ClipboardItem) {
+        return navigator.clipboard.write([new ClipboardItem({ 'image/png': blob })]).then(function () { say('Picture copied. In the WhatsApp chat that just opened, paste it (Ctrl+V, or press and hold the message box and tap Paste) and send.'); }, function () { save(blob); say('Picture saved. In the WhatsApp chat that just opened, tap the paperclip and attach it.'); });
+      }
+      save(blob); say('Picture saved. In the WhatsApp chat that just opened, tap the paperclip and attach it.');
+    }).catch(function () { say(fail); });
+  });
+  var link = "{{ public_url|escapejs }}", msg = "{{ message|escapejs }}", copy = document.getElementById('copyBtn');
+  copy.addEventListener('click', function () {
+    function done() { copy.textContent = '✓ Link copied'; setTimeout(function () { copy.textContent = '⧉ Copy link'; }, 2000); }
+    if (navigator.clipboard) navigator.clipboard.writeText(link).then(done, function () { window.prompt('Copy this link', link); });
+    else window.prompt('Copy this link', link);
+  });
+  var share = document.getElementById('shareBtn');
+  if (navigator.share && navigator.canShare) {
+    share.hidden = false;
+    share.addEventListener('click', function () {
+      fetch("{{ urls.pdf|escapejs }}", { credentials: 'same-origin' }).then(function (r) { return r.blob(); }).then(function (blob) {
+        var file = new File([blob], "{{ file_name|escapejs }}.pdf", { type: 'application/pdf' });
+        return navigator.share(navigator.canShare({ files: [file] }) ? { files: [file], text: msg } : { text: msg, url: link });
+      }).catch(function () {});
+    });
+  }
+})();
+</script>
+{% endblock %}

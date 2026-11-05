@@ -48,6 +48,7 @@
     <span class="patient-id" style="display:inline">{{ pk.start_date|date:"M j" }} – {{ pk.end_date|date:"M j, Y" }}</span>
     <span class="st {{ pk.effective_status }}">{{ pk.effective_status_display }}</span>
     <div class="acts no-print">
+      <a class="table-action" href="{% url 'billing:package-invoice' pk.pk %}" style="text-decoration:none" title="Package invoice: PDF, WhatsApp, e-mail">Invoice</a>
       {% if not pk.is_fully_paid and pk.status != 'cancelled' %}<button type="button" class="table-action" data-pay="{% url 'billing:package-payment' pk.pk %}" data-due="{{ pk.amount_due }}" data-who="{{ pk.patient.name }}">Record payment</button>{% endif %}
       {% if pk.status == 'active' %}<form method="post" action="{% url 'billing:package-cancel' pk.pk %}" onsubmit="return confirm('Cancel this package?')">{% csrf_token %}<button class="table-action" type="submit">Cancel</button></form>{% endif %}
     </div>
@@ -78,7 +79,7 @@
     </ol>
   </div>
   {% else %}<div class="pk-foot hint">Counted automatically each time a session is recorded for this patient.</div>{% endif %}
-  {% if pk.payments.all or pk.notes %}<div class="pk-foot">{% if pk.notes %}{{ pk.notes }}{% endif %}{% if pk.payments.all %}{% if pk.notes %} · {% endif %}Payments: {% for pay in pk.payments.all %}{{ pay.created_at|date:"M j" }} NPR {{ pay.amount }} ({{ pay.get_payment_mode_display }}){% if not forloop.last %} · {% endif %}{% endfor %}{% endif %}</div>{% endif %}
+  {% if pk.payments.all or pk.notes %}<div class="pk-foot">{% if pk.notes %}{{ pk.notes }}{% endif %}{% if pk.payments.all %}{% if pk.notes %} · {% endif %}Payments: {% for pay in pk.payments.all %}{{ pay.created_at|date:"M j" }} NPR {{ pay.amount }} ({{ pay.get_payment_mode_display }}) <a href="{% url 'billing:package-receipt' pay.pk %}" style="color:#116b43;font-weight:700;text-decoration:none">Receipt</a>{% if not forloop.last %} · {% endif %}{% endfor %}{% endif %}</div>{% endif %}
 </article>
 {% empty %}
 <div class="panel" style="padding:36px;text-align:center;color:var(--muted)">{% if show %}No packages match this filter.{% else %}No packages yet. Click <b>Start package</b> to sell a patient a 1, 2, 3 or 4 week package with a set number of sessions.{% endif %}</div>

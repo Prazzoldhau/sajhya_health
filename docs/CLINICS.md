@@ -222,3 +222,7 @@ Tick **Count stock** on a product to track it: receive stock, remove some (damag
 A sale on a bill (front desk or professional) takes the quantity off the stock; a bill for more than is in stock is refused; cancelling or deleting a bill puts the stock back
 and restoring it takes it again. The picker shows "N left" / "out of stock" and a quantity box for each product picked. Stock is counted on the list the product sits in
 (a front desk can sell the owner's products). Products you do not count sell freely.
+
+## Package invoice and payment receipts
+
+Every package has an **Invoice** (number PKG-...) and every payment on it a **Receipt** (RCT-...), on the Packages page, the patient's Billing tab and the front desk (same screens as bills). The invoice shows the package, dates, sessions used, price, payments received and balance; a receipt shows one payment and the balance after it. Both can be printed, saved as PDF or a picture, sent as a link by WhatsApp / Viber / SMS, or e-mailed (the PDF is attached). Links are signed, work without sign-in and expire after 90 days. They are documents only: no totals change. Packages and payments made before this existed got their numbers in migration `billing 0018`. Message wording can be changed under Messages ("Package invoice message", "Package payment receipt message").

@@ -19,6 +19,7 @@ from .access import billing_context, billing_manager, billing_patient, billing_p
 from accounts.messaging import EMAIL_NOT_SET_UP, channel_links, email_ready
 
 from . import catalog, exports
+from . import package_docs as pdocs
 from . import invoice as inv
 from .forms import AdvanceForm, BillCorrectionForm, BillingEntryForm, EntryPaymentForm, PackagePaymentForm, PatientBillForm, PatientPackageForm
 from .models import PRODUCT_TYPES, StockMove, PackageSession, package_session_rows, ServiceItem, ADVANCE, BillingEntry, EntryPayment, PackagePayment, PatientAdvance, PatientPackage, advance_balance, lock_patient
@@ -815,3 +816,140 @@ def services_seed(request):
     else:
         messages.info(request, 'Those services are already on your price list.' if department else 'Your price list already has services.')
     return redirect('billing:services')
+
+
+# ---------------------------------------------------------------------------
+# A package as documents: the package invoice and a receipt for each payment
+# ---------------------------------------------------------------------------
+
+def _package_for(request, pk):
+    profile = billing_profile(request)
+    if profile is None:
+        raise Http404
+    package = get_object_or_404(PatientPackage.objects.select_related('patient', 'professional').prefetch_related('payments', 'session_log'), pk=pk, professional=profile)
+    return profile, package
+
+
+def _payment_for(request, pk):
+    profile = billing_profile(request)
+    if profile is None:
+        raise Http404
+    payment = get_object_or_404(PackagePayment.objects.select_related('package__patient', 'package__professional'), pk=pk, package__professional=profile)
+    return profile, payment
+
+
+def _pkg_pdf(content, name, download=False):
+    response = HttpResponse(content, content_type='application/pdf')
+    response['Content-Disposition'] = f'{"attachment" if download else "inline"}; filename="{name}.pdf"'
+    response['Cache-Control'] = 'private, no-store'
+    return response
+
+
+def _doc_page(request, profile, package, payment=None):
+    """The package invoice (payment None) or a payment's receipt, laid out for printing and for sending."""
+    kind = 'receipt' if payment else 'invoice'
+    if payment:
+        public_url = request.build_absolute_uri(reverse('billing:package-receipt-public', args=[pdocs.receipt_token(payment)]))
+        message = pdocs.receipt_message(payment, public_url)
+        number, urls = payment.receipt_number, {'pdf': reverse('billing:package-receipt-pdf', args=[payment.pk]), 'email': reverse('billing:package-receipt-email', args=[payment.pk])}
+    else:
+        public_url = request.build_absolute_uri(reverse('billing:package-invoice-public', args=[pdocs.invoice_token(package)]))
+        message = pdocs.invoice_message(package, public_url)
+        number, urls = package.invoice_number, {'pdf': reverse('billing:package-invoice-pdf', args=[package.pk]), 'email': reverse('billing:package-invoice-email', args=[package.pk])}
+    patient = package.patient
+    phone = patient.phone if can_see_contact(profile, patient) else ''
+    email = patient.email if can_see_contact(profile, patient) else ''
+    context = billing_context(request, profile)
+    due, paid = pdocs.balance_after(payment) if payment else (package.amount_due, package.amount_paid)
+    context.update({
+        'active': 'billing', 'kind': kind, 'package': package, 'payment': payment, 'number': number, 'practice': pdocs.practice_of(package.professional), 'patient': patient,
+        'facts': pdocs.invoice_lines(package), 'payments': sorted(package.payments.all(), key=lambda x: (x.created_at, x.pk)), 'due_after': due, 'paid_so_far': paid,
+        'public_url': public_url, 'message': message, 'phone': phone, 'email': email, 'urls': urls, 'link_days': pdocs.LINK_DAYS,
+        'links': channel_links(phone, message, patient.messaging_app, profile.whatsapp_web), 'whatsapp_chat': inv.whatsapp_chat(phone, profile.whatsapp_web),
+        'file_name': number, 'back': reverse('billing:packages'),
+    })
+    return render(request, 'billing/package_doc.html', context)
+
+
+@login_required
+def package_invoice(request, pk):
+    profile, package = _package_for(request, pk)
+    return _doc_page(request, profile, package)
+
+
+@login_required
+def package_invoice_pdf(request, pk):
+    profile, package = _package_for(request, pk)
+    return _pkg_pdf(pdocs.build_invoice_pdf(package), package.invoice_number, request.GET.get('download') == '1')
+
+
+def package_invoice_public(request, token):
+    package = pdocs.package_from_token(token)
+    if package is None:
+        raise Http404
+    return _pkg_pdf(pdocs.build_invoice_pdf(package, request.build_absolute_uri(request.path)), package.invoice_number)
+
+
+@login_required
+def package_receipt(request, pk):
+    profile, payment = _payment_for(request, pk)
+    return _doc_page(request, profile, payment.package, payment)
+
+
+@login_required
+def package_receipt_pdf(request, pk):
+    profile, payment = _payment_for(request, pk)
+    return _pkg_pdf(pdocs.build_receipt_pdf(payment), payment.receipt_number, request.GET.get('download') == '1')
+
+
+def package_receipt_public(request, token):
+    payment = pdocs.payment_from_token(token)
+    if payment is None:
+        raise Http404
+    return _pkg_pdf(pdocs.build_receipt_pdf(payment, request.build_absolute_uri(request.path)), payment.receipt_number)
+
+
+def _send_pdf_email(request, profile, package, payment, back):
+    if not email_ready():
+        messages.error(request, EMAIL_NOT_SET_UP)
+        return back
+    address = request.POST.get('email', '').strip()
+    try:
+        validate_email(address)
+    except ValidationError:
+        messages.error(request, 'Enter a valid e-mail address.')
+        return back
+    practice = pdocs.practice_of(package.professional)['name']
+    if payment:
+        url = request.build_absolute_uri(reverse('billing:package-receipt-public', args=[pdocs.receipt_token(payment)]))
+        subject, text, name, content = f'Receipt {payment.receipt_number} from {practice}', pdocs.receipt_message(payment, url), payment.receipt_number, pdocs.build_receipt_pdf(payment, url)
+    else:
+        url = request.build_absolute_uri(reverse('billing:package-invoice-public', args=[pdocs.invoice_token(package)]))
+        subject, text, name, content = f'Package invoice {package.invoice_number} from {practice}', pdocs.invoice_message(package, url), package.invoice_number, pdocs.build_invoice_pdf(package, url)
+    mail = EmailMessage(subject=subject, body=text + f'\n\nThe document is attached as a PDF.\n\n{practice}', to=[address], reply_to=[e for e in [profile.account.user.email] if e])
+    mail.attach(f'{name}.pdf', content, 'application/pdf')
+    try:
+        mail.send()
+    except Exception:  # the mail server is the one thing we cannot control: say so plainly instead of a server error
+        messages.error(request, 'The e-mail could not be sent right now. Use WhatsApp or the PDF download instead, or try again later.')
+        return back
+    messages.success(request, f'Sent by e-mail to {address}.')
+    return back
+
+
+@login_required
+def package_invoice_email(request, pk):
+    profile, package = _package_for(request, pk)
+    back = redirect('billing:package-invoice', pk=package.pk)
+    if request.method != 'POST':
+        return back
+    return _send_pdf_email(request, profile, package, None, back)
+
+
+@login_required
+def package_receipt_email(request, pk):
+    profile, payment = _payment_for(request, pk)
+    back = redirect('billing:package-receipt', pk=payment.pk)
+    if request.method != 'POST':
+        return back
+    return _send_pdf_email(request, profile, payment.package, payment, back)

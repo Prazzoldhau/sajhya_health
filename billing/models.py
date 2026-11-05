@@ -371,6 +371,7 @@ class PatientPackage(models.Model):
     start_date = models.DateField(default=timezone.localdate)
     status = models.CharField(max_length=10, choices=STATUS_CHOICES, default=ACTIVE)
     notes = models.CharField(max_length=255, blank=True, default='')
+    invoice_number = models.CharField(max_length=20, unique=True, null=True, blank=True, editable=False)
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
@@ -378,6 +379,11 @@ class PatientPackage(models.Model):
 
     def __str__(self):
         return f'{self.get_duration_display()} package - {self.patient.name} ({self.sessions_used}/{self.total_sessions})'
+
+    def save(self, *args, **kwargs):
+        if not self.invoice_number:
+            self.invoice_number = f'PKG-{uuid.uuid4().hex[:8].upper()}'
+        super().save(*args, **kwargs)
 
     @property
     def length_days(self):
@@ -538,6 +544,7 @@ class PackagePayment(models.Model):
     amount = models.DecimalField(max_digits=10, decimal_places=2)
     payment_mode = models.CharField(max_length=10, choices=PAYMENT_MODE_CHOICES, default='cash')
     notes = models.CharField(max_length=255, blank=True, default='')
+    receipt_number = models.CharField(max_length=20, unique=True, null=True, blank=True, editable=False)
     recorded_by = models.ForeignKey(settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.SET_NULL, related_name='+')
     created_at = models.DateTimeField(auto_now_add=True)
 
@@ -546,6 +553,11 @@ class PackagePayment(models.Model):
 
     def __str__(self):
         return f'NPR {self.amount} - {self.package}'
+
+    def save(self, *args, **kwargs):
+        if not self.receipt_number:
+            self.receipt_number = f'RCT-{uuid.uuid4().hex[:8].upper()}'
+        super().save(*args, **kwargs)
 
 
 def use_package_session(patient):
