@@ -1556,3 +1556,21 @@ class SheetMonthNavigationTests(TestCase):
         self.assertIn('from=2026-02-01', nav['next'])
         self.assertIn('to=2026-02-28', nav['next'])
         self.assertIn('status=paid', nav['next'])
+
+
+class BillFollowsPatientRecordTests(BillingBase):
+    def test_age_sex_and_phone_follow_the_patient_but_the_name_stays(self):
+        self.entry()
+        entry = BillingEntry.objects.latest('id')
+        patient = entry.patient
+        import datetime
+        from django.utils import timezone
+        patient.date_of_birth = timezone.localdate().replace(year=timezone.localdate().year - 51) - datetime.timedelta(days=1)
+        patient.gender, patient.phone = 'F', '9800000001'
+        patient.name = 'Renamed Person'
+        patient.save()
+        entry.refresh_from_db()
+        self.assertEqual(entry.age_shown, 51)
+        self.assertEqual(entry.sex_shown_display, 'Female')
+        self.assertEqual(entry.contact_shown, '9800000001')
+        self.assertNotEqual(entry.patient_name, 'Renamed Person')

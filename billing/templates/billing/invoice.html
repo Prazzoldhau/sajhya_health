@@ -43,7 +43,7 @@
     </div>
     <div class="inv-meta">
       <div><div class="l">Billed to</div><div class="n">{{ entry.patient_name }}</div>
-        <div>{% if entry.age %}{{ entry.age }} yrs{% endif %}{% if entry.sex %}{% if entry.age %} · {% endif %}{{ entry.get_sex_display }}{% endif %}{% if entry.patient %}<br>Patient ID {{ entry.patient.patient_code }}{% endif %}{% if entry.contact_number %}<br>{{ entry.contact_number }}{% endif %}</div></div>
+        <div>{% if entry.age_shown %}{{ entry.age_shown }} yrs{% endif %}{% if entry.sex_shown %}{% if entry.age_shown %} · {% endif %}{{ entry.sex_shown_display }}{% endif %}{% if entry.patient %}<br>Patient ID {{ entry.patient.patient_code }}{% endif %}{% if entry.contact_shown %}<br>{{ entry.contact_shown }}{% endif %}</div></div>
       <div><div class="l">Invoice details</div><div>Date: <b>{{ entry.entry_date|date:"j M Y" }}</b><br>Status: <span class="badge-s {{ entry.status_key }}">{{ entry.status_label }}</span><br>Payment mode: {{ entry.get_payment_mode_display }}{% if practice.person %}<br>Therapist: {{ practice.person }}{% endif %}</div></div>
     </div>
     <table class="inv-table"><thead><tr><th>SERVICE</th><th>AMOUNT (NPR)</th></tr></thead>

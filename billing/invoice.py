@@ -119,7 +119,7 @@ def build_pdf(entry, online_url=''):
     c.drawString(left, y - 6 * mm, _latin(entry.patient_name, patient_code or 'Patient'))
     c.setFont('Helvetica', 9.5)
     line = y - 12 * mm
-    for text in (' / '.join(x for x in (f'{entry.age} yrs' if entry.age else '', entry.get_sex_display() if entry.sex else '') if x), patient_code, entry.contact_number):
+    for text in (' / '.join(x for x in (f'{entry.age_shown} yrs' if entry.age_shown else '', entry.sex_shown_display) if x), patient_code, entry.contact_shown):
         if text:
             c.drawString(left, line, _latin(text, ''))
             line -= 5 * mm
@@ -243,7 +243,7 @@ def build_png(entry):
     d.text((pad, y), 'BILLED TO', font=_font(True, 16), fill=muted)
     d.text((W // 2 + 40, y), 'INVOICE DETAILS', font=_font(True, 16), fill=muted)
     d.text((pad, y + 28), _latin(entry.patient_name, code or 'Patient'), font=_font(True, 26), fill=ink)
-    sub = ' / '.join(x for x in (f'{entry.age} yrs' if entry.age else '', entry.get_sex_display() if entry.sex else '', code) if x)
+    sub = ' / '.join(x for x in (f'{entry.age_shown} yrs' if entry.age_shown else '', entry.sex_shown_display, code) if x)
     d.text((pad, y + 66), _latin(sub, ''), font=_font(False, 20), fill=ink)
     for i, text in enumerate(lines_right):
         d.text((W // 2 + 40, y + 28 + i * 30), text, font=_font(False, 21), fill=ink)

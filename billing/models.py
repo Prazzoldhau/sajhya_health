@@ -51,6 +51,28 @@ class BillingEntry(models.Model):
             self.invoice_number = f'BILL-{uuid.uuid4().hex[:8].upper()}'
         super().save(*args, **kwargs)
 
+    # Name, age, sex and contact follow the patient's record while the bill is linked to one, so a corrected phone number or age shows on every
+    # bill. Only the name is a frozen copy (the invoice keeps it, and so does a bill whose patient was deleted). The stored age, sex and contact
+    # are what a bill for a typed name (before bills needed a registered patient) shows.
+    @property
+    def age_shown(self):
+        return self.patient.age if self.patient_id else self.age
+
+    @property
+    def sex_shown(self):
+        return (self.patient.gender or '') if self.patient_id else self.sex
+
+    @property
+    def sex_shown_display(self):
+        return dict(self.SEX_CHOICES).get(self.sex_shown, '')
+
+    @property
+    def contact_shown(self):
+        """The patient's current phone. A clinic's patient phone is for the owner only, so it is shown only on a bill that was made with it visible."""
+        if self.patient_id and (self.patient.clinic_id is None or self.contact_number):
+            return self.patient.phone or ''
+        return self.contact_number
+
     @property
     def is_cancelled(self):
         return self.cancelled_at is not None

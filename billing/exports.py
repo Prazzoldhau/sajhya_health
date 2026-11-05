@@ -123,7 +123,7 @@ def bills(scope, f):
 
 def bill_row(e, scope):
     """One bill as the values of BILL_COLUMNS."""
-    phone = e.contact_number if scope.show_phone else ''
+    phone = e.contact_shown if scope.show_phone else ''
     if not phone and scope.show_phone and scope.phone_fallback and e.patient_id:
         phone = e.patient.phone
     return {

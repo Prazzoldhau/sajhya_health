@@ -568,7 +568,7 @@ def invoice(request, pk):
         return redirect('accounts:welcome')
     entry = get_object_or_404(BillingEntry.objects.select_related('patient'), pk=pk, professional=profile)
     public_url = request.build_absolute_uri(reverse('billing:invoice-public', args=[inv.invoice_token(entry)]))
-    phone = entry.contact_number or (entry.patient.phone if entry.patient_id and can_see_contact(profile, entry.patient) else '')
+    phone = entry.contact_shown or (entry.patient.phone if entry.patient_id and can_see_contact(profile, entry.patient) else '')
     email = entry.patient.email if entry.patient_id and can_see_contact(profile, entry.patient) else ''
     back = request.GET.get('next', '')
     context = billing_context(request, profile)
