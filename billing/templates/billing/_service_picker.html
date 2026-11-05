@@ -1,24 +1,27 @@
-{% comment %}Pick services and add-ons from the price list: fills the Service and Amount boxes of the form (both stay editable) and sends the lines with the bill.
+{% comment %}Pick services and add-ons from the price list with a drop-down: each one becomes a row (service, quantity for products, price you can change) and the total goes into the Service and Amount boxes of the form and onto the save button. The lines are sent with the bill.
 Use inside the form with the form's id, as in the billing page: include this file with form_id='entryForm'. Needs service_catalog in the context.{% endcomment %}
 <div class="svc-picker" data-picker-for="{{ form_id }}">
   <style>
     .svc-picker { margin: 4px 0 8px; padding: 9px 11px; border: 1px dashed #bfe3cd; border-radius: 10px; background: #f6fbf8; }
     .svc-picker .t { font-size: 10.5px; font-weight: 800; letter-spacing: .05em; text-transform: uppercase; color: #5d7568; margin-bottom: 6px; display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
     .svc-picker .t a { font-weight: 700; text-transform: none; letter-spacing: 0; color: #116b43; }
-    .svc-picker .g { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 6px; }
-    .svc-picker .chip { border: 1px solid #cfe6d8; background: #fff; border-radius: 16px; padding: 5px 11px; font-size: 12px; font-weight: 700; color: #116b43; cursor: pointer; }
-    .svc-picker .chip.addon { border-style: dashed; } .svc-picker .chip.product { border-color: #e2c98a; color: #7a5a10; background: #fffaf0; } .svc-picker .chip.product.on { background: #b07d12; border-color: #b07d12; color: #fff; }
-    .svc-picker .sub { font-size: 10.5px; font-weight: 800; letter-spacing: .05em; text-transform: uppercase; color: #8a6d1d; margin: 6px 0 4px; } .svc-picker .chip.on { background: #168653; border-color: #168653; color: #fff; }
-    .svc-picker .chip small { font-weight: 600; opacity: .8; margin-left: 4px; }
-    .svc-picker .sum { font-size: 12px; color: #426052; }
+    .svc-picker select { height: 36px; border: 1px solid #cfe6d8; border-radius: 8px; background: #fff; font-weight: 600; padding: 0 8px; }
+    .svc-picker .addrow { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; margin-bottom: 6px; } .svc-picker .addrow select[data-svc-add] { flex: 1; min-width: 200px; }
+    .svc-picker table { width: 100%; border-collapse: collapse; font-size: 12.5px; background: #fff; border: 1px solid #dcebe2; border-radius: 8px; overflow: hidden; }
+    .svc-picker th { text-align: left; font-size: 10px; letter-spacing: .05em; color: #6b8478; padding: 5px 8px; background: #f0f7f3; } .svc-picker th.r, .svc-picker td.r { text-align: right; }
+    .svc-picker td { padding: 4px 8px; border-top: 1px solid #edf3ef; vertical-align: middle; }
+    .svc-picker td input { height: 28px; border: 1px solid #cfe6d8; border-radius: 6px; padding: 0 6px; width: 78px; text-align: right; } .svc-picker td input.qty { width: 54px; }
+    .svc-picker .x { border: 0; background: none; color: #b83b3b; font-size: 18px; cursor: pointer; line-height: 1; }
+    .svc-picker .tag { font-size: 10px; font-weight: 800; color: #8a6d1d; background: #fff3d6; border-radius: 8px; padding: 1px 6px; margin-left: 4px; }
+    .svc-picker .sum { font-size: 12.5px; color: #426052; margin-top: 6px; display: flex; justify-content: space-between; } .svc-picker .sum b { font-size: 14px; color: #116b43; }
   </style>
-  <div class="t">Services and products from your price list <select data-svc-dept hidden aria-label="Show the services of one department" style="height:28px;border:1px solid #cfe6d8;border-radius:8px;background:#fff;font-weight:700"></select> {% if not hide_prices %}<a href="{% url 'billing:services' %}" target="_blank" rel="noopener">edit prices</a>{% endif %}</div>
+  <div class="t">Services and products from your price list <select data-svc-dept hidden aria-label="Show the services of one department" style="height:28px"></select> {% if not hide_prices %}<a href="{% url 'billing:services' %}" target="_blank" rel="noopener">edit prices</a>{% endif %}</div>
   {% if service_catalog %}
-  <div class="g" data-svc-chips></div>
-  <div class="g" data-svc-qty></div>
-  <div class="sum" data-svc-sum>Tap a service or add-on to fill in the bill. You can still change the text and amount.</div>
+  <div class="addrow"><select data-svc-add aria-label="Add a service"></select></div>
+  <table data-svc-table hidden><thead><tr><th>SERVICE</th><th class="r">QTY</th><th class="r">PRICE (NPR)</th><th class="r">AMOUNT</th><th></th></tr></thead><tbody data-svc-rows></tbody></table>
+  <div class="sum" data-svc-sum><span>Choose a service from the list. You can still change the text and amount below.</span></div>
   {% else %}
-  <div class="sum">No price list yet. {% if hide_prices %}Ask the manager to set up the services and add-ons.{% else %}<a href="{% url 'billing:services' %}" target="_blank" rel="noopener">Set up your services and add-ons</a> and they appear here as buttons.{% endif %}</div>
+  <div class="sum">No price list yet. {% if hide_prices %}Ask the manager to set up the services and add-ons.{% else %}<a href="{% url 'billing:services' %}" target="_blank" rel="noopener">Set up your services and add-ons</a> and they appear in this list.{% endif %}</div>
   {% endif %}
   <input type="hidden" name="lines" value="[]">
 </div>
@@ -28,55 +31,69 @@ Use inside the form with the form's id, as in the billing page: include this fil
 (function () {
   var box = document.querySelector('.svc-picker[data-picker-for="{{ form_id }}"]'), form = document.getElementById("{{ form_id }}");
   if (!box || !form) return;
-  var catalog = JSON.parse(document.getElementById('service-catalog').textContent), chips = box.querySelector('[data-svc-chips]'), sumEl = box.querySelector('[data-svc-sum]');
-  var linesInput = box.querySelector('input[name=lines]'), qtyBox = box.querySelector('[data-svc-qty]'), qtys = {}, selected = {}, deptSelect = box.querySelector('[data-svc-dept]');
+  var catalog = JSON.parse(document.getElementById('service-catalog').textContent), add = box.querySelector('[data-svc-add]'), table = box.querySelector('[data-svc-table]'), rows = box.querySelector('[data-svc-rows]'), sumEl = box.querySelector('[data-svc-sum]');
+  var linesInput = box.querySelector('input[name=lines]'), deptSelect = box.querySelector('[data-svc-dept]'), picked = [], qtys = {}, prices = {};
+  var saveBtn = null, saveLabel = '';  // the save button comes after this picker in the page, so it is found when first needed
   function money(n) { return (Math.round(n * 100) / 100).toString(); }
-  function apply() {
-    var picked = catalog.filter(function (s) { return selected[s.id]; });
-    function qty(s) { return s.product ? (qtys[s.id] || 1) : 1; }
-    function line(s) { return s.name + (qty(s) > 1 ? ' x' + qty(s) : ''); }
-    function cost(s) { return parseFloat(s.price) * qty(s); }
-    var total = picked.reduce(function (a, s) { return a + cost(s); }, 0);
-    linesInput.value = JSON.stringify(picked.map(function (s) { return { id: s.id, name: line(s), price: money(cost(s)), product: !!s.product, qty: qty(s) }; }));
-    qtyBox.innerHTML = '';
-    picked.filter(function (s) { return s.product; }).forEach(function (s) {
-      var l = document.createElement('label'); l.style.cssText = 'font-size:12px;display:flex;gap:5px;align-items:center';
-      l.appendChild(document.createTextNode(s.name + ' quantity'));
-      var i = document.createElement('input'); i.type = 'number'; i.min = 1; i.max = s.track ? Math.max(s.stock, 1) : 999; i.value = qty(s); i.style.cssText = 'width:64px;height:28px;border:1px solid #cfe6d8;border-radius:6px;padding:0 6px';
-      i.addEventListener('change', function () { var v = Math.max(1, parseInt(i.value, 10) || 1); if (s.track && v > s.stock) v = Math.max(s.stock, 1); qtys[s.id] = v; apply(); });
-      l.appendChild(i); qtyBox.appendChild(l);
-    });
+  function esc(t) { return String(t).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/"/g, '&quot;'); }
+  function find(id) { return catalog.filter(function (s) { return String(s.id) === String(id); })[0]; }
+  function qty(s) { return s.product ? (qtys[s.id] || 1) : 1; }
+  function unit(s) { var p = parseFloat(prices[s.id]); return isNaN(p) || p < 0 ? 0 : p; }
+  function cost(s) { return unit(s) * qty(s); }
+  function line(s) { return s.name + (qty(s) > 1 ? ' x' + qty(s) : ''); }
+  function sync() {
+    var list = picked.map(find).filter(Boolean), total = list.reduce(function (a, s) { return a + cost(s); }, 0);
+    linesInput.value = JSON.stringify(list.map(function (s) { return { id: s.id, name: line(s), price: money(cost(s)), product: !!s.product, qty: qty(s) }; }));
     var service = form.elements['service'], rate = form.elements['rate'];
-    if (picked.length) {
-      if (service) service.value = picked.map(line).join(' + ');
+    if (list.length) {
+      if (service) service.value = list.map(line).join(' + ');
       if (rate) rate.value = money(total);
-      sumEl.textContent = picked.map(function (s) { return line(s) + ' ' + money(cost(s)); }).join(' + ') + ' = NPR ' + money(total);
-    } else { sumEl.textContent = 'Tap a service or add-on to fill in the bill. You can still change the text and amount.'; }
+      sumEl.innerHTML = '<span>' + list.length + ' item' + (list.length > 1 ? 's' : '') + '</span><b>Total NPR ' + money(total) + '</b>';
+    } else { sumEl.innerHTML = '<span>Choose a service from the list. You can still change the text and amount below.</span>'; }
+    if (!saveBtn) { saveBtn = form.querySelector('button[type=submit]'); saveLabel = saveBtn ? saveBtn.textContent : ''; }
+    if (saveBtn) saveBtn.textContent = list.length ? saveLabel + ' · NPR ' + money(total) : saveLabel;
+    table.hidden = !list.length;
+    list.forEach(function (s) { var c = rows.querySelector('[data-amt="' + s.id + '"]'); if (c) c.textContent = money(cost(s)); });
   }
-  // a department filter appears once some services belong to a department; services of every department are always shown
+  function drawRows() {
+    rows.innerHTML = '';
+    picked.map(find).filter(Boolean).forEach(function (s) {
+      var tr = document.createElement('tr');
+      tr.innerHTML = '<td>' + esc(s.name) + (s.product ? '<span class="tag">product</span>' : s.addon ? '<span class="tag" style="color:#116b43;background:#e6f6ee">add-on</span>' : '') + (s.product && s.track ? '<div style="font-size:10.5px;color:#7c9186">' + s.stock + ' in stock</div>' : '') + '</td>' +
+        '<td class="r">' + (s.product ? '<input class="qty" type="number" min="1" max="' + (s.track ? Math.max(s.stock, 1) : 999) + '" value="' + qty(s) + '" data-q="' + s.id + '">' : '1') + '</td>' +
+        '<td class="r"><input type="number" min="0" step="0.01" value="' + esc(prices[s.id]) + '" data-p="' + s.id + '"></td><td class="r"><b data-amt="' + s.id + '"></b></td>' +
+        '<td class="r"><button type="button" class="x" data-r="' + s.id + '" aria-label="Remove ' + esc(s.name) + '">×</button></td>';
+      rows.appendChild(tr);
+    });
+    rows.querySelectorAll('[data-q]').forEach(function (i) { i.addEventListener('change', function () { var s = find(i.dataset.q), v = Math.max(1, parseInt(i.value, 10) || 1); if (s.track && v > s.stock) v = Math.max(s.stock, 1); qtys[s.id] = v; i.value = v; sync(); }); });
+    rows.querySelectorAll('[data-p]').forEach(function (i) { i.addEventListener('input', function () { prices[i.dataset.p] = i.value; sync(); }); });
+    rows.querySelectorAll('[data-r]').forEach(function (b) { b.addEventListener('click', function () { picked = picked.filter(function (id) { return String(id) !== b.dataset.r; }); drawRows(); drawOptions(); sync(); }); });
+  }
+  // a department filter appears once some services belong to a department; services of every department are always listed
   var depts = {};
   catalog.forEach(function (s) { if (s.dept) depts[s.dept] = s.dept_name; });
   if (Object.keys(depts).length) {
     deptSelect.hidden = false;
-    deptSelect.innerHTML = '<option value="">All services</option>' + Object.keys(depts).map(function (id) { return '<option value="' + id + '">' + depts[id].replace(/</g, '&lt;') + '</option>'; }).join('');
-    deptSelect.addEventListener('change', render);
+    deptSelect.innerHTML = '<option value="">All services</option>' + Object.keys(depts).map(function (id) { return '<option value="' + id + '">' + esc(depts[id]) + '</option>'; }).join('');
+    deptSelect.addEventListener('change', drawOptions);
   }
-  function render() {
-    chips.innerHTML = '';
-    var shownProducts = 0;
-    catalog.slice().sort(function (a, b) { return (a.product ? 1 : 0) - (b.product ? 1 : 0); }).forEach(function (s) {
-      if (deptSelect.value && s.dept && String(s.dept) !== deptSelect.value) return;
-      if (s.product && !shownProducts++) { var h = document.createElement('div'); h.className = 'sub'; h.style.flexBasis = '100%'; h.textContent = 'Aids & products'; chips.appendChild(h); }
-      var b = document.createElement('button'); b.type = 'button'; b.className = 'chip' + (s.addon ? ' addon' : '') + (s.product ? ' product' : '') + (selected[s.id] ? ' on' : '');
-      var out = s.product && s.track && s.stock <= 0;
-      b.innerHTML = (s.addon ? '+ ' : '') + s.name.replace(/</g, '&lt;') + '<small>' + money(parseFloat(s.price)) + (s.product && s.track ? (out ? ' · out of stock' : ' · ' + s.stock + ' left') : '') + '</small>';
-      if (out) { b.disabled = true; b.style.opacity = '.5'; b.style.cursor = 'not-allowed'; }
-      b.addEventListener('click', function () { selected[s.id] = !selected[s.id]; b.classList.toggle('on', !!selected[s.id]); apply(); });
-      chips.appendChild(b);
-    });
+  function option(s) {
+    var out = s.product && s.track && s.stock <= 0;
+    return '<option value="' + s.id + '"' + (out ? ' disabled' : '') + '>' + (s.addon ? '+ ' : '') + esc(s.name) + ' - NPR ' + money(parseFloat(s.price)) + (s.product && s.track ? (out ? ' (out of stock)' : ' (' + s.stock + ' left)') : '') + '</option>';
   }
-  render();
-  form.addEventListener('reset', function () { selected = {}; qtys = {}; render(); setTimeout(apply, 0); });
+  function drawOptions() {
+    var left = catalog.filter(function (s) { return picked.map(String).indexOf(String(s.id)) < 0 && !(deptSelect.value && s.dept && String(s.dept) !== deptSelect.value); });
+    var services = left.filter(function (s) { return !s.product && !s.addon; }), addons = left.filter(function (s) { return !s.product && s.addon; }), products = left.filter(function (s) { return s.product; });
+    function group(label, list) { return list.length ? '<optgroup label="' + label + '">' + list.map(option).join('') + '</optgroup>' : ''; }
+    add.innerHTML = '<option value="">' + (picked.length ? '+ Add another service or product...' : '+ Add a service or product...') + '</option>' + group('Services', services) + group('Add-ons', addons) + group('Aids & products', products);
+  }
+  add.addEventListener('change', function () {
+    var s = find(add.value);
+    if (s) { picked.push(s.id); prices[s.id] = money(parseFloat(s.price)); drawRows(); drawOptions(); sync(); }
+    else drawOptions();
+  });
+  drawOptions();
+  form.addEventListener('reset', function () { picked = []; qtys = {}; prices = {}; drawRows(); drawOptions(); setTimeout(sync, 0); });
 })();
 </script>
 {% endif %}

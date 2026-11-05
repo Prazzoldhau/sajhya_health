@@ -1116,7 +1116,7 @@ class PriceListTests(BillingBase):
         self.assertContains(self.client.get(reverse('billing:billing')), 'No price list yet')
         self.seed()
         for page in (self.client.get(reverse('billing:billing')), self.client.get(reverse('accounts:patient-detail', args=[self.patient.pk]) + '?tab=billing')):
-            self.assertContains(page, 'data-svc-chips')
+            self.assertContains(page, 'data-svc-add')
             self.assertContains(page, 'Basic Physiotherapy')
         self.client.post(reverse('billing:entry-create'), {'entry_date': self.today.isoformat(), 'patient': self.patient.pk, 'service': 'X', 'rate': '100', 'payment_mode': 'cash', 'payment_status': 'paid',
                                                            'lines': 'not json'})
