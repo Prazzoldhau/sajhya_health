@@ -1,13 +1,21 @@
 {% extends base_template|default:'accounts/pro_base.html' %}
 {% block title %}{{ patient.name }} - Billing | Sajhya Health{% endblock %}
+{% block extra_css %}
+  .section-title { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 6px 24px 10px; font-weight: 800; font-size: 14px; }
+  .section-title .bar { width: auto; min-height: 0; background: none; border-radius: 0; border-left: 3px solid var(--green); padding-left: 8px; }
+  .pb-new { scroll-margin-top: 90px; }
+  #patientBill [hidden], #advanceForm [hidden], #refundForm [hidden] { display: none !important; }
+  .pb-actions a { height: 36px; display: inline-flex; align-items: center; text-decoration: none; }
+{% endblock %}
 {% block main %}
 {% include 'billing/_tabs.html' %}
 <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:10px">
   <div><h1 style="margin:0;font-size:24px">{{ patient.name }} <span class="patient-id" style="display:inline;font-size:13px">{{ patient.patient_code }}</span></h1>
     <div class="patient-id">{% if patient.age %}{{ patient.age }} yrs{% endif %}{% if patient.gender %} · {{ patient.get_gender_display }}{% endif %}{% if show_contact and patient.phone %} · {{ patient.phone }}{% endif %} · Billing only</div></div>
-  <span style="margin-left:auto;display:flex;gap:8px;flex-wrap:wrap" class="no-print">
-    <a class="secondary-btn" href="{% url 'billing:billing' %}" style="text-decoration:none">&larr; Back to billing</a>
-    {% if not staff_mode %}<a class="secondary-btn" href="{% url 'accounts:patient-detail' patient.pk %}" style="text-decoration:none" title="Overview, SOAP notes and treatment plans">Open patient profile</a>{% endif %}
+  <span style="margin-left:auto;display:flex;gap:8px;flex-wrap:wrap" class="no-print pb-actions">
+    <a class="primary-btn" href="#newBill" onclick="setTimeout(function(){var f=document.querySelector('#patientBill [name=rate]');if(f)f.focus({preventScroll:true})},300)">＋ New bill</a>
+    <a class="secondary-btn" href="{% url 'billing:billing' %}">&larr; Back to billing</a>
+    {% if not staff_mode %}<a class="secondary-btn" href="{% url 'accounts:patient-detail' patient.pk %}" title="Overview, SOAP notes and treatment plans">Open patient profile</a>{% endif %}
   </span>
 </div>
 <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:10px;margin-bottom:12px">
