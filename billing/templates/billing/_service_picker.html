@@ -6,7 +6,16 @@ Use inside the form with the form's id, as in the billing page: include this fil
     .svc-picker .t { font-size: 10.5px; font-weight: 800; letter-spacing: .05em; text-transform: uppercase; color: #5d7568; margin-bottom: 6px; display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
     .svc-picker .t a { font-weight: 700; text-transform: none; letter-spacing: 0; color: #116b43; }
     .svc-picker select { height: 36px; border: 1px solid #cfe6d8; border-radius: 8px; background: #fff; font-weight: 600; padding: 0 8px; }
-    .svc-picker .addrow { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; margin-bottom: 6px; } .svc-picker .addrow select[data-svc-add] { flex: 1; min-width: 200px; }
+    .svc-picker .addrow { margin-bottom: 6px; }
+    .svc-picker .cb { position: relative; width: 100%; }
+    .svc-picker .cb input { width: 100%; height: 38px; border: 1px solid #cfe6d8; border-radius: 8px; background: #fff; font-weight: 600; padding: 0 30px 0 11px; }
+    .svc-picker .cb-caret { position: absolute; right: 11px; top: 10px; color: #5d7568; pointer-events: none; font-size: 12px; }
+    .svc-picker .cb-list { position: absolute; left: 0; right: 0; top: 42px; z-index: 30; max-height: 280px; overflow-y: auto; background: #fff; border: 1px solid #bfe3cd; border-radius: 10px; box-shadow: 0 8px 24px rgba(22, 75, 49, .16); }
+    .svc-picker .cb-list .g { padding: 6px 11px 3px; font-size: 10px; font-weight: 800; letter-spacing: .06em; text-transform: uppercase; color: #8a6d1d; background: #fafcfb; position: sticky; top: 0; }
+    .svc-picker .cb-list .o { display: flex; justify-content: space-between; gap: 10px; padding: 7px 11px; cursor: pointer; font-size: 13px; }
+    .svc-picker .cb-list .o.on { background: #e6f6ee; } .svc-picker .cb-list .o small { color: #5d7568; white-space: nowrap; }
+    .svc-picker .cb-list .o.off { opacity: .45; cursor: not-allowed; } .svc-picker .cb-list .o mark { background: #fff0b3; color: inherit; border-radius: 2px; }
+    .svc-picker .cb-list .none, .svc-picker .cb-list .more { padding: 9px 11px; font-size: 12px; color: #6c8178; }
     .svc-picker table { width: 100%; border-collapse: collapse; font-size: 12.5px; background: #fff; border: 1px solid #dcebe2; border-radius: 8px; overflow: hidden; }
     .svc-picker th { text-align: left; font-size: 10px; letter-spacing: .05em; color: #6b8478; padding: 5px 8px; background: #f0f7f3; } .svc-picker th.r, .svc-picker td.r { text-align: right; }
     .svc-picker td { padding: 4px 8px; border-top: 1px solid #edf3ef; vertical-align: middle; }
@@ -18,7 +27,7 @@ Use inside the form with the form's id, as in the billing page: include this fil
   </style>
   <div class="t">Services and products from your price list <select data-svc-dept hidden aria-label="Show the services of one department" style="height:28px;width:auto;max-width:190px"></select> {% if not hide_prices %}<a href="{% url 'billing:services' %}" target="_blank" rel="noopener">edit prices</a>{% endif %}</div>
   {% if service_catalog %}
-  <div class="addrow"><select data-svc-add aria-label="Add a service"></select></div>
+  <div class="addrow"><div class="cb"><input type="text" data-svc-add data-svc-search placeholder="Search or choose a service or product..." autocomplete="off" role="combobox" aria-expanded="false" aria-label="Search the price list"><span class="cb-caret" aria-hidden="true">&#9662;</span><div class="cb-list" data-svc-list role="listbox" hidden></div></div></div>
   <table data-svc-table hidden><thead><tr><th>SERVICE</th><th class="r">QTY</th><th class="r">PRICE (NPR)</th><th class="r">AMOUNT</th><th></th></tr></thead><tbody data-svc-rows></tbody></table>
   <div class="sum" data-svc-sum><span>Choose a service from the list. You can still change the text and amount below.</span></div>
   {% else %}
@@ -32,7 +41,7 @@ Use inside the form with the form's id, as in the billing page: include this fil
 (function () {
   var box = document.querySelector('.svc-picker[data-picker-for="{{ form_id }}"]'), form = document.getElementById("{{ form_id }}");
   if (!box || !form) return;
-  var catalog = JSON.parse(document.getElementById('service-catalog').textContent), add = box.querySelector('[data-svc-add]'), table = box.querySelector('[data-svc-table]'), rows = box.querySelector('[data-svc-rows]'), sumEl = box.querySelector('[data-svc-sum]');
+  var catalog = JSON.parse(document.getElementById('service-catalog').textContent), add = box.querySelector('[data-svc-search]'), list = box.querySelector('[data-svc-list]'), table = box.querySelector('[data-svc-table]'), rows = box.querySelector('[data-svc-rows]'), sumEl = box.querySelector('[data-svc-sum]');
   var linesInput = box.querySelector('input[name=lines]'), deptSelect = box.querySelector('[data-svc-dept]'), picked = [], qtys = {}, prices = {};
   var saveBtn = null, saveLabel = '';  // the save button comes after this picker in the page, so it is found when first needed
   function money(n) { return (Math.round(n * 100) / 100).toString(); }
@@ -78,22 +87,65 @@ Use inside the form with the form's id, as in the billing page: include this fil
     deptSelect.innerHTML = '<option value="">All services</option>' + Object.keys(depts).map(function (id) { return '<option value="' + id + '">' + esc(depts[id]) + '</option>'; }).join('');
     deptSelect.addEventListener('change', drawOptions);
   }
-  function option(s) {
-    var out = s.product && s.track && s.stock <= 0;
-    return '<option value="' + s.id + '"' + (out ? ' disabled' : '') + '>' + (s.addon ? '+ ' : '') + esc(s.name) + ' - NPR ' + money(parseFloat(s.price)) + (s.product && s.track ? (out ? ' (out of stock)' : ' (' + s.stock + ' left)') : '') + '</option>';
+  var active = -1, shown = [], LIMIT = 40;
+  function left() { return catalog.filter(function (s) { return picked.map(String).indexOf(String(s.id)) < 0 && !(deptSelect.value && s.dept && String(s.dept) !== deptSelect.value); }); }
+  function words(q) { return q.toLowerCase().split(/\s+/).filter(Boolean); }
+  function kind(s) { return s.product ? 'Aids & products' : s.addon ? 'Add-ons' : 'Services'; }
+  function score(s, ws) {  // every typed word must appear (in the name or its kind); names that start with the first word come first
+    var name = s.name.toLowerCase(), hay = name + ' ' + kind(s).toLowerCase();
+    for (var i = 0; i < ws.length; i++) if (hay.indexOf(ws[i]) < 0) return -1;
+    return ws.length && name.indexOf(ws[0]) === 0 ? 0 : (ws.length && name.split(/\s+/).some(function (w) { return w.indexOf(ws[0]) === 0; }) ? 1 : 2);
   }
+  function mark(name, ws) {
+    var out = esc(name);
+    ws.forEach(function (w) { var safe = esc(w).replace(/[.*+?^${}()|[\]\\]/g, '\\$&'); if (safe) out = out.replace(new RegExp('(' + safe + ')(?![^<]*>)', 'ig'), '<mark>$1</mark>'); });
+    return out;
+  }
+  function open() { list.hidden = false; add.setAttribute('aria-expanded', 'true'); }
+  function close() { list.hidden = true; add.setAttribute('aria-expanded', 'false'); active = -1; }
   function drawOptions() {
-    var left = catalog.filter(function (s) { return picked.map(String).indexOf(String(s.id)) < 0 && !(deptSelect.value && s.dept && String(s.dept) !== deptSelect.value); });
-    var services = left.filter(function (s) { return !s.product && !s.addon; }), addons = left.filter(function (s) { return !s.product && s.addon; }), products = left.filter(function (s) { return s.product; });
-    function group(label, list) { return list.length ? '<optgroup label="' + label + '">' + list.map(option).join('') + '</optgroup>' : ''; }
-    add.innerHTML = '<option value="">' + (picked.length ? '+ Add another service or product...' : '+ Add a service or product...') + '</option>' + group('Services', services) + group('Add-ons', addons) + group('Aids & products', products);
+    if (list.hidden) return;
+    var ws = words(add.value), pool = left();
+    var found = pool.map(function (s) { return { s: s, k: score(s, ws) }; }).filter(function (x) { return x.k >= 0; });
+    found.sort(function (x, y) { return x.k - y.k || (x.s.product - y.s.product) || x.s.name.localeCompare(y.s.name); });
+    var total = found.length;
+    shown = found.slice(0, LIMIT).map(function (x) { return x.s; });
+    var html = '', last = '';
+    shown.forEach(function (s, idx) {
+      var out = s.product && s.track && s.stock <= 0, g = kind(s);
+      if (!ws.length && g !== last) { html += '<div class="g">' + g + '</div>'; last = g; }
+      html += '<div class="o' + (out ? ' off' : '') + (idx === active ? ' on' : '') + '" role="option" data-i="' + idx + '"><span>' + (s.addon ? '+ ' : '') + mark(s.name, ws) + (ws.length ? ' <small>' + g + '</small>' : '') + '</span><small>NPR ' + money(parseFloat(s.price)) + (s.product && s.track ? (out ? ' · out of stock' : ' · ' + s.stock + ' left') : '') + '</small></div>';
+    });
+    if (!shown.length) html = '<div class="none">' + (pool.length ? 'Nothing matches &quot;' + esc(add.value) + '&quot;. Try fewer letters.' : 'Everything on the price list is already on this bill.') + '</div>';
+    else if (total > shown.length) html += '<div class="more">' + (total - shown.length) + ' more: type to narrow the list.</div>';
+    list.innerHTML = html;
   }
-  add.addEventListener('change', function () {
-    var s = find(add.value);
-    if (s) { picked.push(s.id); prices[s.id] = money(parseFloat(s.price)); drawRows(); drawOptions(); sync(); }
-    else drawOptions();
+  function choose(idx) {
+    var s = shown[idx];
+    if (!s || (s.product && s.track && s.stock <= 0)) return;
+    picked.push(s.id); prices[s.id] = money(parseFloat(s.price));
+    add.value = ''; active = -1; close(); drawRows(); sync(); add.focus();
+  }
+  function move(step) {
+    var enabled = shown.map(function (s, i) { return (s.product && s.track && s.stock <= 0) ? -1 : i; }).filter(function (i) { return i >= 0; });
+    if (!enabled.length) return;
+    var pos = enabled.indexOf(active);
+    active = enabled[(pos + step + enabled.length) % enabled.length];
+    drawOptions();
+    var el = list.querySelector('.o.on'); if (el && el.scrollIntoView) el.scrollIntoView({ block: 'nearest' });
+  }
+  add.addEventListener('focus', function () { open(); drawOptions(); });
+  add.addEventListener('click', function () { open(); drawOptions(); });
+  add.addEventListener('input', function () { open(); active = -1; drawOptions(); var first = shown.map(function (s, i) { return (s.product && s.track && s.stock <= 0) ? -1 : i; }).filter(function (i) { return i >= 0; })[0]; if (add.value && first !== undefined) { active = first; drawOptions(); } });
+  add.addEventListener('keydown', function (ev) {
+    if (ev.key === 'ArrowDown') { ev.preventDefault(); if (list.hidden) { open(); drawOptions(); } move(1); }
+    else if (ev.key === 'ArrowUp') { ev.preventDefault(); move(-1); }
+    else if (ev.key === 'Enter') { if (!list.hidden && active >= 0) { ev.preventDefault(); choose(active); } else if (!list.hidden) ev.preventDefault(); }
+    else if (ev.key === 'Escape') { if (!list.hidden) { ev.preventDefault(); ev.stopPropagation(); close(); } }
+    else if (ev.key === 'Tab') close();
   });
-  drawOptions();
+  list.addEventListener('mousedown', function (ev) { var o = ev.target.closest('.o'); if (o) { ev.preventDefault(); choose(parseInt(o.dataset.i, 10)); } });
+  document.addEventListener('mousedown', function (ev) { if (!box.contains(ev.target)) close(); });
   // the Service and Amount boxes repeat the rows, so they stay behind a link; they open for a custom item, a changed total, or when left empty
   var svcBox = null, rateBox = null, more = document.createElement('button');
   function compact() {  // the boxes come after this picker in the page, so look for them once it has loaded
