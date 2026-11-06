@@ -1627,3 +1627,40 @@ class LineDiscountTests(BillingBase):
         self.assertContains(page, 'Needling (less NPR 50.00 discount)')
         self.assertNotContains(page, 'Basic Physiotherapy (less')
         self.assertEqual(self.client.get(reverse('billing:invoice-pdf', args=[entry.pk])).status_code, 200)
+
+
+class EditBillWithAdvanceTests(BillingBase):
+    def setUp(self):
+        super().setUp()
+        self.client.post(reverse('billing:advance-add', args=[self.patient.pk]), {'amount': '300', 'payment_mode': 'cash'})
+        self.client.post(reverse('billing:patient-bill', args=[self.patient.pk]), {'entry_date': self.today.isoformat(), 'service': 'S', 'rate': '1000', 'payment_mode': 'cash', 'payment_status': 'due'})
+        self.entry_obj = BillingEntry.objects.get()
+
+    def correct(self, status, **extra):
+        data = {'entry_date': self.today.isoformat(), 'service': 'S', 'rate': '1000', 'payment_mode': 'cash', 'payment_status': status, **extra}
+        return self.client.post(reverse('billing:entry-correct', args=[self.entry_obj.pk]), data, follow=True)
+
+    def test_use_advance_settles_what_the_balance_covers_and_the_rest_stays_due(self):
+        page = self.correct('advance')
+        self.entry_obj.refresh_from_db()
+        self.assertEqual((self.entry_obj.amount_paid, advance_balance(self.patient.pk)), (300, 0))
+        self.assertContains(page, 'NPR 300 taken from the advance')
+        self.assertEqual(self.entry_obj.amount_due, 700)
+
+    def test_advance_plus_the_rest_now_leaves_nothing_due(self):
+        self.correct('advance_cash')
+        self.entry_obj.refresh_from_db()
+        self.assertEqual((self.entry_obj.amount_paid, self.entry_obj.amount_due, advance_balance(self.patient.pk)), (1000, 0, 0))
+        modes = sorted((p.payment_mode, p.amount) for p in self.entry_obj.payments.all())
+        self.assertEqual(modes, [('advance', 300), ('cash', 700)])
+
+    def test_the_edit_window_offers_both_and_knows_the_balance(self):
+        page = self.client.get(reverse('billing:billing'))
+        self.assertContains(page, 'Use advance balance')
+        self.assertContains(page, 'Advance + pay the rest now')
+        self.assertContains(page, 'data-advance="300')
+
+    def test_no_advance_to_use_says_so(self):
+        self.client.post(reverse('billing:advance-refund', args=[self.patient.pk]), {'amount': '300', 'payment_mode': 'cash'})
+        page = self.correct('advance')
+        self.assertContains(page, 'no advance balance to use')

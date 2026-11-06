@@ -121,7 +121,7 @@ class PatientBillForm(PaymentStatusMixin, forms.ModelForm):
 
 class BillCorrectionForm(forms.ModelForm):
     """Fix a bill: what was charged and how it was paid (cash, credit, part paid), never the patient's own details."""
-    payment_status = forms.ChoiceField(choices=[('paid', 'Paid in full'), ('partial', 'Part paid'), ('due', 'Not paid yet (credit)')], label='Payment')
+    payment_status = forms.ChoiceField(choices=[('paid', 'Paid in full'), ('partial', 'Part paid'), ('due', 'Not paid yet (credit)'), ('advance', 'Use advance balance'), ('advance_cash', 'Advance + pay the rest now')], label='Payment')
     amount_received = forms.DecimalField(required=False, min_value=0, max_digits=10, decimal_places=2, label='Total received so far (NPR)',
                                          widget=forms.NumberInput(attrs={'step': '0.01', 'min': 0}))
 
@@ -153,6 +153,8 @@ class BillCorrectionForm(forms.ModelForm):
 
     def received_total(self):
         status = self.cleaned_data['payment_status']
+        if status in ('advance', 'advance_cash'):  # settled from the patient's advance (see the view), not a typed amount
+            return None
         return self.cleaned_data['rate'] if status == 'paid' else self.cleaned_data.get('amount_received') if status == 'partial' else 0
 
 

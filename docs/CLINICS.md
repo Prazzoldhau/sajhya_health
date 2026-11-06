@@ -242,3 +242,7 @@ Picking a patient in billing (the search box, or a patient's name anywhere in th
 ## Discount on every item
 
 In the bill form each service or product row has its own **Discount**, typed as an amount (NPR) or a percentage, never more than the line itself. The bill total is the sum after discounts, and the summary under the rows shows the subtotal and the discount. Each saved line (`BillLine`) keeps its `discount`, its `price` is what the patient pays for it. The invoice (page, PDF, picture) prints "Needling (less NPR 50.00 discount)"; reports and the Excel file count the lines at their net price. Bills made before this have no discounts.
+
+## Edit bill: advance options
+
+The Edit bill window offers the same advance choices as a new bill. **Use advance balance** pays what is still due on the bill out of the patient's advance, as far as it goes (the rest stays due); **Advance + pay the rest now** uses the advance first and takes the remainder now in the payment mode shown. Payments already received are kept. The window shows the patient's advance balance, and the confirmation says how much was taken from the advance.

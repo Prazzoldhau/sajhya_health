@@ -117,6 +117,10 @@ def billing(request):
         logs = logs.filter(date=selected).order_by('id')
     package_sessions = package_session_rows(logs)
 
+    entries = list(entries)
+    held = dict(PatientAdvance.objects.filter(patient_id__in={e.patient_id for e in entries if e.patient_id}).values('patient_id').annotate(t=Sum('amount')).values_list('patient_id', 't'))
+    for e in entries:  # the Edit window offers "use advance balance" and says how much there is
+        e.advance_left = max(held.get(e.patient_id) or Decimal('0'), Decimal('0'))
     context = billing_context(request, profile)
     context.update({
         'package_sessions': package_sessions, 'active': 'billing', 'billing_tab': 'book', 'search': search, 'form': form, 'entries': entries, 'selected': selected, 'today': today,
@@ -358,8 +362,20 @@ def entry_correct(request, pk):
         messages.error(request, first_error(form))
         return back
     bill = form.save()
-    bill.set_amount_paid(form.received_total(), bill.payment_mode, request.user)
-    messages.success(request, f'{bill.invoice_number} updated - {bill.status_label.lower()}' + (f', NPR {bill.amount_due:g} due.' if bill.amount_due else '.'))
+    status = form.cleaned_data['payment_status']
+    used = Decimal('0')
+    if status in ('advance', 'advance_cash'):
+        # keep what was already received (cut back only if the amount was lowered), then settle the rest from the patient's advance; "advance + rest" takes what remains now
+        bill.set_amount_paid(min(bill.amount_paid, bill.rate), bill.payment_mode, request.user)
+        used = bill.use_advance(request.user)
+        if status == 'advance_cash' and bill.amount_due > 0:
+            bill.record_payment(bill.amount_due, bill.payment_mode, notes='Correction', user=request.user)
+    else:
+        bill.set_amount_paid(form.received_total(), bill.payment_mode, request.user)
+    text = f'{bill.invoice_number} updated - {bill.status_label.lower()}' + (f', NPR {bill.amount_due:g} due.' if bill.amount_due else '.')
+    if status in ('advance', 'advance_cash'):
+        text += f' NPR {used:g} taken from the advance.' if used else ' There was no advance balance to use.'
+    messages.success(request, text)
     return back
 
 
