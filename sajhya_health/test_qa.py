@@ -267,9 +267,10 @@ class DataEdgeTests(World):
                                                        'diagnosis': 'पिठ्यूँको दुखाइ', 'notes': 'x' * 5000})
         patient = Patient.objects.get(phone='9841000004')
         self.assertEqual(patient.name, name)
-        for tab in ('overview', 'soap', 'plan', 'exercises', 'visits', 'billing', 'notes', 'documents', 'assessments', 'profile'):
+        for tab in ('overview', 'soap', 'plan', 'exercises', 'visits', 'notes', 'documents', 'assessments', 'profile'):
             response = c.get(f'/accounts/patients/{patient.pk}/?tab={tab}')
             self.assertEqual(response.status_code, 200, tab)
+        self.assertEqual(c.get(f'/billing/patient/{patient.pk}/').status_code, 200)
         self.assertContains(c.get('/accounts/patients/', {'q': 'सीता'}), name)
 
     def test_over_long_values_are_rejected_not_crashed(self):

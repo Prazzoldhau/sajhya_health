@@ -57,7 +57,8 @@ class JavaScriptSyntaxTests(TestCase):
         urls = [reverse('accounts:dashboard'), reverse('accounts:patients'), reverse('accounts:appointments'), reverse('accounts:plans'),
                 reverse('accounts:plan-new', args=[pid]), reverse('accounts:plan-detail', args=[self.plan.pk]), reverse('accounts:plan-edit', args=[self.plan.pk]),
                 reverse('billing:billing'), reverse('billing:packages'), reverse('exercises:library'), reverse('accounts:patient-add')]
-        urls += [f"{reverse('accounts:patient-detail', args=[pid])}?tab={t}" for t in ('overview', 'plan', 'exercises', 'visits', 'billing', 'notes', 'documents')]
+        urls += [f"{reverse('accounts:patient-detail', args=[pid])}?tab={t}" for t in ('overview', 'plan', 'exercises', 'visits', 'notes', 'documents')]
+        urls += [reverse('billing:patient', args=[pid])]
         urls += [f"{reverse('accounts:patient-detail', args=[pid])}?tab=profile&section={s}" for s in ('general', 'medicine', 'nursing', 'aids', 'rehab', 'labs')]
         urls += [f"{reverse('accounts:patient-detail', args=[pid])}?tab=profile&section=rehab&therapy={t}" for t in ('occupational', 'speech', 'behavioural')]
         from django.core.management import call_command

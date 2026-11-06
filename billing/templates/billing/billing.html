@@ -54,7 +54,7 @@
       {% for e in entries %}
         <tr{% if e.is_cancelled %} style="opacity:.55"{% endif %}>
           <td>{{ e.invoice_number }}{% if search %}<div class="patient-id">{{ e.entry_date|date:"M j, Y" }}</div>{% endif %}</td>
-          <td><div class="patient-cell"><span class="patient-avatar">{{ e.patient_name|slice:":2"|upper }}</span><div>{% if e.patient %}{% if staff_mode %}{{ e.patient_name }}{% else %}<a href="{% url 'accounts:patient-detail' e.patient.pk %}?tab=billing" style="color:inherit;text-decoration:none">{{ e.patient_name }}</a>{% endif %}{% else %}{{ e.patient_name }}{% endif %}<div class="patient-id">{% if e.age_shown %}{{ e.age_shown }} yrs{% endif %}{% if e.sex_shown %} · {{ e.sex_shown_display }}{% endif %}{% if e.contact_shown %} · {{ e.contact_shown }}{% endif %}</div></div></div></td>
+          <td><div class="patient-cell"><span class="patient-avatar">{{ e.patient_name|slice:":2"|upper }}</span><div>{% if e.patient %}<a href="{% url 'billing:patient' e.patient.pk %}" style="color:inherit;text-decoration:none">{{ e.patient_name }}</a>{% else %}{{ e.patient_name }}{% endif %}<div class="patient-id">{% if e.age_shown %}{{ e.age_shown }} yrs{% endif %}{% if e.sex_shown %} · {{ e.sex_shown_display }}{% endif %}{% if e.contact_shown %} · {{ e.contact_shown }}{% endif %}</div></div></div></td>
           <td>{{ e.service }}{% if e.notes %}<div class="patient-id">{{ e.notes }}</div>{% endif %}{% if e.created_by_name %}<div class="patient-id">Billed by {{ e.created_by_name }}{% if e.created_by_role %} ({{ e.created_by_role }}){% endif %}</div>{% endif %}</td>
           <td>{{ e.get_payment_mode_display }}</td>
           <td style="text-align:right"><b{% if e.is_cancelled %} style="text-decoration:line-through"{% endif %}>NPR {{ e.rate }}</b></td>
@@ -92,7 +92,7 @@
     <thead><tr><th>{% if search %}DATE{% else %}PATIENT{% endif %}</th>{% if search %}<th>PATIENT</th>{% endif %}<th>PACKAGE</th><th>SESSION</th><th>RECORDED BY</th><th>NOTE</th><th style="text-align:right">WORTH</th></tr></thead>
     <tbody>{% for r in package_sessions %}<tr>
       {% if search %}<td>{{ r.entry.date|date:"M j, Y" }}</td>{% endif %}
-      <td>{% if staff_mode %}<b>{{ r.patient.name }}</b>{% else %}<a href="{% url 'accounts:patient-detail' r.patient.pk %}?tab=billing" style="color:inherit;font-weight:700;text-decoration:none">{{ r.patient.name }}</a>{% endif %}<div class="patient-id">{{ r.patient.patient_code }}</div></td>
+      <td><a href="{% url 'billing:patient' r.patient.pk %}" style="color:inherit;font-weight:700;text-decoration:none">{{ r.patient.name }}</a><div class="patient-id">{{ r.patient.patient_code }}</div></td>
       <td>{{ r.package.get_duration_display }} package<div class="patient-id">NPR {{ r.package.total_amount }}{% if r.package.is_fully_paid %} · paid in full{% else %} · NPR {{ r.package.amount_due }} still due{% endif %}</div></td>
       <td><b>{{ r.number }} of {{ r.of }}</b>{% if r.package.effective_status == 'completed' and r.number == r.of %}<div class="patient-id" style="color:#16834f;font-weight:700">Package complete</div>{% endif %}</td>
       <td>{{ r.entry.recorded_by_name|default:"-" }}{% if r.entry.recorded_by_role %}<div class="patient-id">{{ r.entry.recorded_by_role }}</div>{% endif %}</td>
@@ -180,7 +180,7 @@
   SajhyaUI.picker(find, {
     url: "{{ patient_search_url }}", emptyText: 'No matching patients',
     render: function (p) { return '<b>' + SajhyaUI.esc(p.name) + '</b> <span style="color:#7c9186">' + SajhyaUI.esc(p.code) + '</span>'; },
-    onPick: function (p) { location.href = "{% url 'billing:billing' %}?patient=" + p.id; },
+    onPick: function (p) { location.href = "{% url 'billing:patient' 0 %}".replace(/0\/$/, p.id + '/'); },
   });
   document.querySelectorAll('[data-cancel-bill]').forEach(function (fm) {
     fm.addEventListener('submit', function (ev) {

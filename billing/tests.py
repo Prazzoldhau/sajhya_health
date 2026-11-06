@@ -83,7 +83,7 @@ class BillingEntryTests(BillingBase):
         self.entry(patient=self.patient.pk, patient_name=self.patient.name)
         e = BillingEntry.objects.get()
         self.assertEqual((e.patient, e.sex, e.contact_number, e.age), (self.patient, 'F', '9841000000', self.patient.age))
-        self.assertContains(self.client.get(reverse('accounts:patient-detail', args=[self.patient.pk]), {'tab': 'billing'}), e.invoice_number)
+        self.assertContains(self.client.get(reverse('billing:patient', args=[self.patient.pk])), e.invoice_number)
 
     def test_cannot_link_another_professionals_patient(self):
         _, other_profile = make_professional('other')
@@ -291,10 +291,10 @@ class PackageTests(BillingBase):
     def test_patient_billing_tab_shows_packages_and_takes_payments(self):
         self.package()
         pkg = PatientPackage.objects.get()
-        tab = self.client.get(reverse('accounts:patient-detail', args=[self.patient.pk]), {'tab': 'billing'})
+        tab = self.client.get(reverse('billing:patient', args=[self.patient.pk]))
         self.assertContains(tab, '2 Weeks package')
         r = self.client.post(reverse('billing:package-payment', args=[pkg.pk]), {'amount': '500', 'payment_mode': 'online', 'next': 'patient'})
-        self.assertRedirects(r, reverse('accounts:patient-detail', args=[self.patient.pk]) + '?tab=billing')
+        self.assertRedirects(r, reverse('billing:patient', args=[self.patient.pk]))
         pkg.refresh_from_db()
         self.assertEqual(pkg.amount_paid, 1500)
 
@@ -319,7 +319,7 @@ class PackageTests(BillingBase):
 
 class PatientBillTests(BillingBase):
     def test_bill_from_the_patient_tab_is_filled_from_the_record_and_returns_to_the_tab(self):
-        tab = reverse('accounts:patient-detail', args=[self.patient.pk]) + '?tab=billing'
+        tab = reverse('billing:patient', args=[self.patient.pk])
         page = self.client.get(tab)
         self.assertContains(page, reverse('billing:patient-bill', args=[self.patient.pk]))  # the small form, not a link to the whole book
         r = self.client.post(reverse('billing:patient-bill', args=[self.patient.pk]),
@@ -379,7 +379,7 @@ class CreditBillTests(BillingBase):
         self.assertEqual(entry.payments.count(), 2)  # already paid: nothing more recorded
 
     def test_credit_from_the_patient_tab_and_receive_there(self):
-        tab = reverse('accounts:patient-detail', args=[self.patient.pk]) + '?tab=billing'
+        tab = reverse('billing:patient', args=[self.patient.pk])
         self.client.post(reverse('billing:patient-bill', args=[self.patient.pk]),
                          {'entry_date': self.today.isoformat(), 'service': 'Therapy', 'rate': '900', 'payment_mode': 'cash', 'payment_status': 'due'})
         entry = BillingEntry.objects.get()
@@ -436,7 +436,7 @@ class CancelBillTests(BillingBase):
         self.assertEqual((entry.status_key, revenue_for(self.profile, self.today)), ('partial', 500))
 
     def test_cancel_from_the_patient_tab_and_ownership(self):
-        tab = reverse('accounts:patient-detail', args=[self.patient.pk]) + '?tab=billing'
+        tab = reverse('billing:patient', args=[self.patient.pk])
         self.client.post(reverse('billing:patient-bill', args=[self.patient.pk]), {'entry_date': self.today.isoformat(), 'service': 'T', 'rate': '300', 'payment_mode': 'cash', 'payment_status': 'due'})
         entry = BillingEntry.objects.get()
         self.assertContains(self.client.get(tab), 'Cancel bill')
@@ -498,7 +498,7 @@ class CorrectBillTests(BillingBase):
 
     def test_the_patient_tab_and_the_book_open_the_small_edit_form(self):
         entry = self.make_bill(payment_status='due')
-        tab = self.client.get(reverse('accounts:patient-detail', args=[self.patient.pk]) + '?tab=billing')
+        tab = self.client.get(reverse('billing:patient', args=[self.patient.pk]))
         self.assertContains(tab, reverse('billing:entry-correct', args=[entry.pk]))
         self.assertContains(self.client.get(reverse('billing:billing'), {'edit': entry.pk}), reverse('billing:entry-correct', args=[entry.pk]))
 
@@ -554,7 +554,7 @@ class AdvanceTests(BillingBase):
         page = self.client.get(reverse('billing:billing'))
         self.assertEqual((page.context['received_total'], page.context['collected'], page.context['advance_net'], page.context['advance_held']), (1000, 0, 1000, 0))
         self.assertEqual(dict(page.context['by_mode'])['Cash'], 1000)
-        tab = self.client.get(reverse('accounts:patient-detail', args=[self.patient.pk]) + '?tab=billing')
+        tab = self.client.get(reverse('billing:patient', args=[self.patient.pk]))
         self.assertContains(tab, 'Advance balance: NPR 0')
         self.assertContains(tab, 'Used for a bill')
         self.assertContains(tab, 'Advance balance remaining: NPR 0')  # the balance is shown with the billing history too
@@ -563,7 +563,7 @@ class AdvanceTests(BillingBase):
     def test_the_billing_history_shows_the_advance_balance_left(self):
         self.take('1000')
         self.bill('800')
-        tab = self.client.get(reverse('accounts:patient-detail', args=[self.patient.pk]) + '?tab=billing')
+        tab = self.client.get(reverse('billing:patient', args=[self.patient.pk]))
         self.assertContains(tab, 'Advance balance remaining: NPR 200')
         self.assertContains(tab, 'NPR 800.00 paid from advance')
 
@@ -632,7 +632,7 @@ class CarryOverTests(BillingBase):
         self.assertEqual((second.status_key, second.amount_paid, advance_balance(self.patient.pk)), ('paid', 700, 0))
         self.assertEqual(sorted(p.payment_mode for p in second.payments.all()), ['advance', 'cash'])
         self.assertEqual(revenue_for(self.profile, self.today), 1400)
-        self.assertContains(self.client.get(reverse('accounts:patient-detail', args=[self.patient.pk]) + '?tab=billing'), 'Change not returned')
+        self.assertContains(self.client.get(reverse('billing:patient', args=[self.patient.pk])), 'Change not returned')
 
     def test_blank_cash_means_exact_and_a_larger_second_payment_carries_again(self):
         self.bill('700', payment_status='paid')
@@ -685,7 +685,7 @@ class AdvanceTabTests(BillingBase):
         r = self.client.post(reverse('billing:advance-add', args=[self.patient.pk]), {'amount': '200', 'payment_mode': 'cash', 'next': url})
         self.assertRedirects(r, url, fetch_redirect_response=False)
         r = self.client.post(reverse('billing:advance-add', args=[self.patient.pk]), {'amount': '50', 'payment_mode': 'cash', 'next': 'https://evil.example/'})
-        self.assertRedirects(r, reverse('accounts:patient-detail', args=[self.patient.pk]) + '?tab=billing', fetch_redirect_response=False)
+        self.assertRedirects(r, reverse('billing:patient', args=[self.patient.pk]), fetch_redirect_response=False)
         stranger, _ = make_professional('stranger')
         other = self.client_class()
         other.force_login(stranger)
@@ -695,10 +695,12 @@ class AdvanceTabTests(BillingBase):
     def test_links_from_billing_open_the_patients_billing_tab_directly(self):
         self.client.post(reverse('billing:patient-bill', args=[self.patient.pk]), {'entry_date': self.today.isoformat(), 'service': 'S', 'rate': '700', 'payment_mode': 'cash'})
         self.package()
-        target = reverse('accounts:patient-detail', args=[self.patient.pk])
-        self.assertContains(self.client.get(reverse('billing:billing')), f'{target}?tab=billing')
-        self.assertNotContains(self.client.get(reverse('billing:billing')), f'href="{target}"')
-        self.assertContains(self.client.get(reverse('billing:packages')), f'{target}?tab=billing')
+        target = reverse('billing:patient', args=[self.patient.pk])
+        profile = reverse('accounts:patient-detail', args=[self.patient.pk])
+        self.assertContains(self.client.get(reverse('billing:billing')), f'href="{target}"')
+        self.assertNotContains(self.client.get(reverse('billing:billing')), f'{profile}?tab=billing')
+        self.assertContains(self.client.get(reverse('billing:packages')), f'href="{target}"')
+        self.assertRedirects(self.client.get(profile + '?tab=billing'), target, fetch_redirect_response=False)  # the profile's Billing tab opens the billing page
 
 
 class InvoiceTests(BillingBase):
@@ -717,7 +719,7 @@ class InvoiceTests(BillingBase):
         self.assertIn(entry.invoice_number, page.context['message'])
         self.assertContains(page, 'Send by e-mail')
         self.assertContains(self.client.get(reverse('billing:billing')), reverse('billing:invoice', args=[entry.pk]))
-        self.assertContains(self.client.get(reverse('accounts:patient-detail', args=[self.patient.pk]) + '?tab=billing'), reverse('billing:invoice', args=[entry.pk]))
+        self.assertContains(self.client.get(reverse('billing:patient', args=[self.patient.pk])), reverse('billing:invoice', args=[entry.pk]))
 
     def test_pdf_is_a_real_pdf_for_the_owner_only(self):
         entry = self.make(payment_status='partial', amount_received='200')
@@ -795,7 +797,7 @@ class InvoiceExtraTests(BillingBase):
         self.assertIn('Your extra NPR 200.00 is kept as advance', page.context['message'])
         self.assertTrue(self.client.get(reverse('billing:invoice-pdf', args=[entry.pk])).content.startswith(b'%PDF'))
         self.assertContains(self.client.get(reverse('billing:billing')), '+NPR 200')
-        self.assertContains(self.client.get(reverse('accounts:patient-detail', args=[self.patient.pk]) + '?tab=billing'), '+NPR 200')
+        self.assertContains(self.client.get(reverse('billing:patient', args=[self.patient.pk])), '+NPR 200')
 
     def test_a_bill_with_no_extra_says_nothing_about_advance(self):
         self.client.post(reverse('billing:patient-bill', args=[self.patient.pk]), {'entry_date': self.today.isoformat(), 'service': 'Session', 'rate': '500', 'payment_mode': 'cash', 'payment_status': 'paid'})
@@ -858,7 +860,7 @@ class PackageDaysTests(BillingBase):
         self.assertContains(page, 'Or type the number of days')
         self.assertContains(page, '10 Days</option>')
         self.assertNotContains(page, 'Other (number of days)')  # the box is the way to type it, not a list entry
-        self.assertContains(self.client.get(reverse('accounts:patient-detail', args=[self.patient.pk]) + '?tab=billing'), '12 Days package')
+        self.assertContains(self.client.get(reverse('billing:patient', args=[self.patient.pk])), '12 Days package')
 
     def test_neither_a_choice_nor_days_or_a_silly_number_is_refused(self):
         self.start(duration='')
@@ -1115,7 +1117,7 @@ class PriceListTests(BillingBase):
         from .models import BillLine
         self.assertContains(self.client.get(reverse('billing:billing')), 'No price list yet')
         self.seed()
-        for page in (self.client.get(reverse('billing:billing')), self.client.get(reverse('accounts:patient-detail', args=[self.patient.pk]) + '?tab=billing')):
+        for page in (self.client.get(reverse('billing:billing')), self.client.get(reverse('billing:patient', args=[self.patient.pk]))):
             self.assertContains(page, 'data-svc-add')
             self.assertContains(page, 'Basic Physiotherapy')
         self.client.post(reverse('billing:entry-create'), {'entry_date': self.today.isoformat(), 'patient': self.patient.pk, 'service': 'X', 'rate': '100', 'payment_mode': 'cash', 'payment_status': 'paid',
@@ -1328,7 +1330,7 @@ class PackageInvoiceAndReceiptTests(BillingBase):
         page = self.client.get(reverse('billing:packages'))
         self.assertContains(page, reverse('billing:package-invoice', args=[self.pkg.pk]))
         self.assertContains(page, reverse('billing:package-receipt', args=[receipts[0].pk]))
-        tab = self.client.get(reverse('accounts:patient-detail', args=[self.patient.pk]) + '?tab=billing')
+        tab = self.client.get(reverse('billing:patient', args=[self.patient.pk]))
         self.assertContains(tab, reverse('billing:package-invoice', args=[self.pkg.pk]))
         self.assertContains(tab, reverse('billing:package-receipt', args=[receipts[1].pk]))
 
@@ -1574,3 +1576,21 @@ class BillFollowsPatientRecordTests(BillingBase):
         self.assertEqual(entry.sex_shown_display, 'Female')
         self.assertEqual(entry.contact_shown, '9800000001')
         self.assertNotEqual(entry.patient_name, 'Renamed Person')
+
+
+class PatientBillingPageTests(BillingBase):
+    def test_one_patients_billing_page_has_only_billing(self):
+        self.entry()
+        page = self.client.get(reverse('billing:patient', args=[self.patient.pk]))
+        self.assertEqual(page.status_code, 200)
+        for text in (self.patient.name, 'Billing history', 'Take advance', 'Packages', 'Open patient profile', 'Back to billing'):
+            self.assertContains(page, text)
+        for text in ('?tab=soap', '?tab=plan', '?tab=assessments'):  # none of the profile's other tabs
+            self.assertNotContains(page, text)
+
+    def test_the_profile_billing_tab_opens_the_billing_page_and_strangers_get_nothing(self):
+        self.assertRedirects(self.client.get(reverse('accounts:patient-detail', args=[self.patient.pk]), {'tab': 'billing'}), reverse('billing:patient', args=[self.patient.pk]), fetch_redirect_response=False)
+        stranger, _ = make_professional('stranger-billing')
+        other = self.client_class()
+        other.force_login(stranger)
+        self.assertEqual(other.get(reverse('billing:patient', args=[self.patient.pk])).status_code, 404)

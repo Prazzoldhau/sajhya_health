@@ -44,7 +44,7 @@ class ProfileTabTests(ProfileBase):
         self.assertEqual(r.status_code, 302)
         info = PatientProfile.objects.get(patient=self.patient)
         self.assertEqual((info.allergies, info.updated_by), ('Penicillin - rash', self.user))
-        for tab in ('overview', 'visits', 'billing'):
+        for tab in ('overview', 'visits'):
             page = self.client.get(reverse('accounts:patient-detail', args=[self.patient.pk]), {'tab': tab})
             self.assertContains(page, 'Allergies: Penicillin - rash')
 

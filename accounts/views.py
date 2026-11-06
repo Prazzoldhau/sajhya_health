@@ -373,7 +373,9 @@ def patient_detail(request, pk):
     profile, patient = own_patient(request, pk)
     patient.touch()  # opening a patient puts them at the top of "Recent patients"
     tab = request.GET.get('tab', 'overview')
-    if tab not in ('overview', 'plan', 'exercises', 'visits', 'billing', 'profile', 'assessments', 'soap', 'notes', 'documents'):
+    if tab == 'billing':  # billing has its own page: only bills, packages and advances
+        return redirect('billing:patient', patient_id=patient.pk)
+    if tab not in ('overview', 'plan', 'exercises', 'visits', 'profile', 'assessments', 'soap', 'notes', 'documents'):
         tab = 'overview'
     context = workspace_context(request.user, profile)
     context.update({
@@ -384,16 +386,6 @@ def patient_detail(request, pk):
         'plans': patient.plans.prefetch_related('phases') if tab == 'plan' else None,
         'prescriptions': patient.prescriptions.prefetch_related('exercises__exercise__step_images', 'exercises__feedback_logs') if tab == 'exercises' else None,
         'prompt': booked_prompt(request, profile),
-        'bill_entries': patient.billing_entries.prefetch_related('advance_moves', 'payments')[:50] if tab == 'billing' else None,
-        'packages': patient.packages.prefetch_related('payments') if tab == 'billing' else None,
-        'payment_form': PackagePaymentForm(),
-        'bill_form': PatientBillForm(initial={'entry_date': timezone.localdate()}) if tab == 'billing' else None,
-        'pay_form': EntryPaymentForm() if tab == 'billing' else None,
-        'service_catalog': catalog_for(profile) if tab == 'billing' else None,
-        'advance_balance': advance_balance(patient.pk) if tab == 'billing' else None,
-        'advance_moves': patient.advances.select_related('entry')[:15] if tab == 'billing' else None,
-        'advance_form': AdvanceForm() if tab == 'billing' else None,
-        'correct_form': BillCorrectionForm() if tab == 'billing' else None,
         'visit_form': VisitForm(initial={'date': timezone.localdate()}),
         'treat_ui': ui_for(disciplines.allowed(profile)),
         'next_form': NextVisitForm(initial={'date': timezone.localdate() + datetime.timedelta(days=7)}),

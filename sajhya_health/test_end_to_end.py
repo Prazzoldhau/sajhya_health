@@ -119,8 +119,9 @@ class FullJourneyTests(TestCase):
         rehab = c.get(reverse('accounts:patient-detail', args=[patient.pk]), {'tab': 'profile', 'section': 'rehab'})
         for text in ('LBP plan', 'Bridge', 'Mobilisation'):
             self.assertContains(rehab, text)
-        for tab in ('overview', 'plan', 'exercises', 'visits', 'billing', 'profile', 'notes', 'documents'):
+        for tab in ('overview', 'plan', 'exercises', 'visits', 'profile', 'notes', 'documents'):
             self.assertEqual(c.get(reverse('accounts:patient-detail', args=[patient.pk]), {'tab': tab}).status_code, 200, tab)
+        self.assertEqual(c.get(reverse('billing:patient', args=[patient.pk])).status_code, 200)
         self.assertEqual(Prescription.objects.get().exercises.count(), 1)
 
         # ---- 9. forgot password: email -> link -> new password -> old one dead, workspace still there ----

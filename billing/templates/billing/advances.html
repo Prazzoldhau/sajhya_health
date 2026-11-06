@@ -71,7 +71,7 @@
   {% if chosen %}
     <div class="adv-top">
       <span class="patient-avatar" style="width:46px;height:46px;font-size:15px">{{ chosen.patient.name|slice:":2"|upper }}</span>
-      <div><div class="who">{% if staff_mode %}{{ chosen.patient.name }}{% else %}<a href="{% url 'accounts:patient-detail' chosen.patient.pk %}?tab=billing">{{ chosen.patient.name }}</a>{% endif %}</div>
+      <div><div class="who"><a href="{% url 'billing:patient' chosen.patient.pk %}">{{ chosen.patient.name }}</a></div>
         <div class="patient-id">{{ chosen.patient.patient_code }}{% if chosen.contact %} · {{ chosen.contact }}{% endif %}</div></div>
       <div class="big"><div class="k">Balance</div><div class="v">NPR {{ chosen.balance }}</div></div>
     </div>

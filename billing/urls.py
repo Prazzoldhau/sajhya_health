@@ -32,6 +32,7 @@ urlpatterns = [
     path('export.csv', views.export_csv, name='export-csv'),
     path('advances/', views.advances, name='advances'),
     path('due/', views.dues, name='dues'),
+    path('patient/<int:patient_id>/', views.patient_billing, name='patient'),
     path('packages/', views.packages, name='packages'),
     path('packages/create/', views.package_create, name='package-create'),
     path('packages/<int:pk>/payment/', views.package_payment, name='package-payment'),

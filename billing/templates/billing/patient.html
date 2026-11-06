@@ -1,0 +1,28 @@
+{% extends base_template|default:'accounts/pro_base.html' %}
+{% block title %}{{ patient.name }} - Billing | Sajhya Health{% endblock %}
+{% block main %}
+{% include 'billing/_tabs.html' %}
+<div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:10px">
+  <div><h1 style="margin:0;font-size:24px">{{ patient.name }} <span class="patient-id" style="display:inline;font-size:13px">{{ patient.patient_code }}</span></h1>
+    <div class="patient-id">{% if patient.age %}{{ patient.age }} yrs{% endif %}{% if patient.gender %} · {{ patient.get_gender_display }}{% endif %}{% if show_contact and patient.phone %} · {{ patient.phone }}{% endif %} · Billing only</div></div>
+  <span style="margin-left:auto;display:flex;gap:8px;flex-wrap:wrap" class="no-print">
+    <a class="secondary-btn" href="{% url 'billing:billing' %}" style="text-decoration:none">&larr; Back to billing</a>
+    {% if not staff_mode %}<a class="secondary-btn" href="{% url 'accounts:patient-detail' patient.pk %}" style="text-decoration:none" title="Overview, SOAP notes and treatment plans">Open patient profile</a>{% endif %}
+  </span>
+</div>
+<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:10px;margin-bottom:12px">
+  <div class="panel" style="padding:11px 14px"><div class="patient-id">Billed</div><b style="font-size:19px">NPR {{ totals.billed }}</b></div>
+  <div class="panel" style="padding:11px 14px"><div class="patient-id">Received</div><b style="font-size:19px;color:#16834f">NPR {{ totals.received }}</b></div>
+  <div class="panel" style="padding:11px 14px"><div class="patient-id">Still due</div><b style="font-size:19px;color:#b78317">NPR {{ totals.due }}</b></div>
+  <div class="panel" style="padding:11px 14px"><div class="patient-id">Advance held</div><b style="font-size:19px">NPR {{ advance_balance }}</b></div>
+</div>
+<section class="panel">
+{% include 'billing/_patient_billing.html' %}
+</section>
+{% endblock %}
+
+{% block modals %}
+{% include 'billing/_pay_modal.html' %}
+{% include 'billing/_correct_modal.html' %}
+<script>document.querySelectorAll('[data-cancel-bill]').forEach(function (fm) { fm.addEventListener('submit', function (ev) { var r = prompt('Cancel this bill? It stays on record but no longer counts.\nReason (optional):'); if (r === null) { ev.preventDefault(); return; } fm.elements['reason'].value = r; }); });</script>
+{% endblock %}

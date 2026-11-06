@@ -116,8 +116,9 @@ class PatientTests(TestCase):
 
     def test_detail_tabs_edit_and_notes(self):
         patient = make_patient(self.profile)
-        for tab in ('overview', 'plan', 'exercises', 'visits', 'billing', 'notes', 'documents', 'bogus'):
+        for tab in ('overview', 'plan', 'exercises', 'visits', 'notes', 'documents', 'bogus'):
             self.assertEqual(self.client.get(reverse('accounts:patient-detail', args=[patient.pk]), {'tab': tab}).status_code, 200, tab)
+        self.assertRedirects(self.client.get(reverse('accounts:patient-detail', args=[patient.pk]), {'tab': 'billing'}), reverse('billing:patient', args=[patient.pk]))  # billing has its own page
         edit = self.client.post(reverse('accounts:patient-edit', args=[patient.pk]), {
             'name': 'Sita G', 'date_of_birth': '1990-01-02', 'gender': 'F', 'phone': '9841000000', 'status': 'on_hold',
             'diagnosis': 'LBP', 'icd10_code': 'M54.5', 'insurance': 'N/A'})

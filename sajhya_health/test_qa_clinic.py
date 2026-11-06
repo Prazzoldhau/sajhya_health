@@ -89,7 +89,7 @@ class ClinicRoleSweepTests(ClinicWorld):
     def test_real_ids_work_for_the_pages_staff_and_the_clinic_use(self):
         """The sweep above uses id 1 for everything; this uses the real rows so the pages are fully rendered."""
         pid, bid, cid = self.patient.pk, self.bill.pk, self.clinic.pk
-        clinic_pages = ['/accounts/dashboard/', '/accounts/patients/', f'/accounts/patients/{pid}/', f'/accounts/patients/{pid}/?tab=billing', f'/accounts/patients/{pid}/?tab=visits',
+        clinic_pages = ['/accounts/dashboard/', '/accounts/patients/', f'/accounts/patients/{pid}/', f'/accounts/patients/{pid}/?tab=visits',
                         f'/accounts/patients/{pid}/edit/', '/accounts/appointments/', '/accounts/messages/', '/accounts/messages/send/?audience=all', '/accounts/reports/',
                         '/billing/', '/billing/?patient=%d' % pid, '/billing/packages/', '/billing/advances/', f'/billing/entry/{bid}/invoice/', f'/billing/entry/{bid}/invoice.pdf',
                         f'/billing/entry/{bid}/invoice.png', f'/clinics/{cid}/', f'/clinics/{cid}/?tab=team', f'/clinics/{cid}/?tab=patients', f'/clinics/{cid}/?tab=queue',
@@ -154,7 +154,7 @@ class ClinicHostileTextTests(ClinicWorld):
         self.clinic.name = EVIL
         self.clinic.save()
         pid, bid, cid = self.patient.pk, self.bill.pk, self.clinic.pk
-        pages = {'clinic_login': ['/accounts/patients/', f'/accounts/patients/{pid}/', f'/accounts/patients/{pid}/?tab=billing', '/accounts/messages/', '/accounts/messages/send/?audience=all',
+        pages = {'clinic_login': ['/accounts/patients/', f'/accounts/patients/{pid}/', '/accounts/messages/', '/accounts/messages/send/?audience=all',
                                   '/billing/', f'/billing/?patient={pid}', '/billing/advances/', f'/billing/entry/{bid}/invoice/', '/accounts/appointments/', f'/clinics/{cid}/?tab=patients'],
                  'staff_receptionist': [f'/clinics/desk/?tab={t}' for t in ('overview', 'queue', 'patients', 'billing')]}
         for who, urls in pages.items():

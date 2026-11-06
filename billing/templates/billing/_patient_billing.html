@@ -1,0 +1,107 @@
+  <div class="section-title" style="padding-top:18px"><span class="bar">Advance paid</span><span>
+    <button type="button" class="primary-btn" style="height:34px" onclick="var f=document.getElementById('advanceForm');f.hidden=!f.hidden;if(!f.hidden)f.querySelector('[name=amount]').focus()">＋ Take advance</button>
+    {% if advance_balance > 0 %}<button type="button" class="secondary-btn" style="height:34px" onclick="var f=document.getElementById('refundForm');f.hidden=!f.hidden">Refund</button>{% endif %}</span></div>
+  <div style="margin:0 24px 12px;padding:12px 16px;border:1px solid {% if advance_balance > 0 %}#cfe6d8;background:#f1faf5{% else %}var(--line);background:#fff{% endif %};border-radius:10px">
+    <b style="font-size:15px">Advance balance: NPR {{ advance_balance }}</b>
+    <div class="patient-id">{% if advance_balance > 0 %}Choose <b>Use advance balance</b> when billing, or <b>Receive</b> a due bill with <b>From advance</b>. The balance carries to the next sessions.{% else %}Nothing held. If this patient pays ahead (for example NPR 1000 when a session is 700), take it here and the balance is used up session by session.{% endif %}</div>
+  </div>
+  <form method="post" action="{% url 'billing:advance-add' patient.pk %}" id="advanceForm" hidden style="margin:0 24px 14px;padding:14px 16px;border:1px solid var(--line);border-radius:10px;background:#f6faf7">
+    {% csrf_token %}
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;align-items:end">
+      <label>Amount (NPR) {{ advance_form.amount }}</label><label>Paid by {{ advance_form.payment_mode }}</label><label>Notes {{ advance_form.notes }}</label>
+    </div>
+    <label style="display:flex;gap:8px;align-items:center;margin-top:10px;font-size:12px"><input type="checkbox" name="settle" value="1"> Use it to clear this patient's unpaid bills first</label>
+    <div style="margin-top:10px;display:flex;gap:8px"><button type="submit" class="primary-btn">Save advance</button><button type="button" class="secondary-btn" onclick="var f=document.getElementById('advanceForm');f.reset();f.hidden=true">Cancel</button></div>
+  </form>
+  <form method="post" action="{% url 'billing:advance-refund' patient.pk %}" id="refundForm" hidden style="margin:0 24px 14px;padding:14px 16px;border:1px solid var(--line);border-radius:10px;background:#fff7f0">
+    {% csrf_token %}
+    <div class="patient-id" style="margin-bottom:8px">Pay back part of the advance (up to NPR {{ advance_balance }}).</div>
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;align-items:end">
+      <label>Amount (NPR) {{ advance_form.amount }}</label><label>Paid back by {{ advance_form.payment_mode }}</label><label>Notes {{ advance_form.notes }}</label>
+    </div>
+    <div style="margin-top:10px;display:flex;gap:8px"><button type="submit" class="primary-btn">Refund</button><button type="button" class="secondary-btn" onclick="document.getElementById('refundForm').hidden=true">Cancel</button></div>
+  </form>
+  {% if advance_moves %}
+  <div class="table-wrap" style="padding:0 24px 14px"><table>
+    <thead><tr><th>DATE</th><th>ADVANCE ACTIVITY</th><th>DETAIL</th><th style="text-align:right">AMOUNT</th></tr></thead>
+    <tbody>{% for m in advance_moves %}<tr><td>{{ m.paid_on|date:"Y-m-d" }}</td><td>{{ m.get_kind_display }}</td><td>{% if m.entry %}{{ m.entry.invoice_number }}{% elif m.payment_mode %}{{ m.get_payment_mode_display }}{% endif %}{% if m.notes %} · {{ m.notes }}{% endif %}</td>
+      <td style="text-align:right;font-weight:700;color:{% if m.amount < 0 %}#b78317{% else %}#16834f{% endif %}">{% if m.amount > 0 %}+{% endif %}NPR {{ m.amount }}</td></tr>{% endfor %}</tbody>
+  </table></div>
+  {% endif %}
+
+  <div class="section-title" style="padding-top:18px"><span class="bar">Packages</span><a class="primary-btn" href="{% url 'billing:packages' %}?patient={{ patient.pk }}" style="height:34px;text-decoration:none;display:inline-flex;align-items:center">＋ Start package</a></div>
+  <div style="padding:0 24px 8px">
+  {% for pk in packages %}
+    <div style="border:1px solid var(--line);border-radius:10px;margin-bottom:12px;overflow:hidden">
+      <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;padding:11px 16px;background:#f6faf7">
+        <b>{{ pk.get_duration_display }} package</b>
+        <span class="patient-id" style="display:inline">{{ pk.start_date|date:"M j" }} – {{ pk.end_date|date:"M j, Y" }}</span>
+        <span class="status {% if pk.effective_status == 'cancelled' or pk.effective_status == 'expired' %}hold{% elif pk.effective_status == 'completed' %}scheduled{% endif %}">{{ pk.effective_status_display }}</span>
+        <div style="margin-left:auto;display:flex;gap:6px;flex-wrap:wrap">
+          <a class="table-action" href="{% url 'billing:package-invoice' pk.pk %}" style="text-decoration:none" title="Package invoice: PDF, WhatsApp, e-mail">Invoice</a>
+          {% if pk.status == 'active' %}<form method="post" action="{% url 'billing:package-cancel' pk.pk %}" style="margin:0" onsubmit="return confirm('Cancel this package?')">{% csrf_token %}<input type="hidden" name="next" value="patient"><button class="table-action" type="submit">Cancel</button></form>{% endif %}
+        </div>
+      </div>
+      <div style="display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px;padding:12px 16px">
+        <div><div class="patient-id">Sessions</div><b>{{ pk.sessions_used }} of {{ pk.total_sessions }}</b><div style="height:6px;background:#e8f1ec;border-radius:4px;margin-top:6px"><div style="height:100%;width:{{ pk.usage_pct }}%;background:var(--green);border-radius:4px"></div></div></div>
+        <div><div class="patient-id">Price</div><b>NPR {{ pk.total_amount }}</b></div>
+        <div><div class="patient-id">Paid</div><b style="color:#16834f">NPR {{ pk.amount_paid }}</b></div>
+        <div><div class="patient-id">Balance due</div><b style="color:{% if pk.is_fully_paid %}#16834f{% else %}#b78317{% endif %}">{% if pk.is_fully_paid %}Fully paid{% else %}NPR {{ pk.amount_due }}{% endif %}</b></div>
+      </div>
+      {% if not pk.is_fully_paid and pk.status != 'cancelled' %}
+      <form method="post" action="{% url 'billing:package-payment' pk.pk %}" style="display:flex;gap:6px;flex-wrap:wrap;padding:0 16px 12px;align-items:center">{% csrf_token %}<input type="hidden" name="next" value="patient">
+        <input type="number" name="amount" step="0.01" min="0.01" value="{{ pk.amount_due }}" style="width:110px;padding:6px 8px;border:1px solid #dce8e0;border-radius:6px">
+        <select name="payment_mode" style="padding:6px 8px;border:1px solid #dce8e0;border-radius:6px"><option value="cash">Cash</option><option value="card">Card</option><option value="online">Online</option><option value="other">Other</option></select>
+        <button class="table-action" type="submit">Record payment</button>
+      </form>{% endif %}
+      {% if pk.payments.all %}<div style="padding:0 16px 12px;font-size:11.5px;color:var(--muted)">Payments: {% for pay in pk.payments.all %}{{ pay.created_at|date:"M j" }} NPR {{ pay.amount }} ({{ pay.get_payment_mode_display }}) <a href="{% url 'billing:package-receipt' pay.pk %}" style="color:#116b43;font-weight:700;text-decoration:none">Receipt</a>{% if not forloop.last %} · {% endif %}{% endfor %}</div>{% endif %}
+    </div>
+  {% empty %}
+    <div style="padding:20px;text-align:center;color:var(--muted)">No packages yet. Start a 1, 2, 3 or 4 week package; each recorded visit uses up a session.</div>
+  {% endfor %}
+  </div>
+
+  <div class="section-title" style="padding-top:8px"><span class="bar">Billing history</span><button type="button" class="secondary-btn" style="height:34px" onclick="var f=document.getElementById('patientBill');f.hidden=!f.hidden;if(!f.hidden)f.querySelector('[name=rate]').focus()">＋ New bill</button></div>
+  <form method="post" action="{% url 'billing:patient-bill' patient.pk %}" id="patientBill" hidden style="margin:0 24px 14px;padding:14px 16px;border:1px solid var(--line);border-radius:10px;background:#f6faf7">
+    {% csrf_token %}
+    {% include 'billing/_service_picker.html' with form_id='patientBill' %}
+    <div class="patient-id" style="margin-bottom:10px">Bill for <b>{{ patient.name }}</b> -- name, age and contact are filled in from the patient record.</div>
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;align-items:end">
+      <label>Date {{ bill_form.entry_date }}</label>
+      <label>Service {{ bill_form.service }}</label>
+      <label>Amount (NPR) {{ bill_form.rate }}</label>
+      <label>Payment {{ bill_form.payment_status }}</label>
+      <label>Payment mode {{ bill_form.payment_mode }}</label>
+      <label id="billReceivedWrap" hidden>{{ bill_form.amount_received.label }} {{ bill_form.amount_received }}</label>
+      <label id="billGivenWrap">{{ bill_form.amount_given.label }} {{ bill_form.amount_given }}</label>
+    </div>
+    <div class="patient-id" id="billGivenHint" style="margin-top:8px">Patient handed over more than the bill and you have no change? Enter the cash handed over: the extra is kept as their advance and used at the next session.</div>
+    <div class="patient-id" id="billCreditHint" hidden style="margin-top:8px">Left on credit: the amount stays due until you receive it from this tab or from Billing.</div>
+    <label style="display:block;margin-top:10px">Notes {{ bill_form.notes }}</label>
+    <script>(function(){var s=document.querySelector('#patientBill [name=payment_status]');function sync(){document.getElementById('billReceivedWrap').hidden=s.value!=='partial';var g=s.value==='paid'||s.value==='advance_cash';document.getElementById('billGivenWrap').hidden=!g;document.getElementById('billGivenHint').hidden=!g;document.getElementById('billCreditHint').hidden=s.value!=='due';}s.addEventListener('change',sync);})();</script>
+    <div style="margin-top:10px;display:flex;gap:8px"><button type="submit" class="primary-btn">Save bill</button><button type="button" class="secondary-btn" onclick="var f=document.getElementById('patientBill');f.reset();f.hidden=true">Cancel</button></div>
+  </form>
+  <div style="margin:0 24px 10px;padding:9px 14px;border:1px solid #cfe6d8;border-radius:10px;background:#f1faf4;display:flex;gap:10px;align-items:center;flex-wrap:wrap">
+    <b style="color:#116b43">Advance balance remaining: NPR {{ advance_balance }}</b>
+    <span class="patient-id" style="display:inline">{% if advance_balance %}Choose <b>Use advance balance</b> when billing to use it.{% else %}Nothing paid ahead right now.{% endif %}</span>
+  </div>
+  <div class="table-wrap" style="padding:0 24px 20px">
+    <table>
+      <thead><tr><th>DATE</th><th>INVOICE</th><th>SERVICE</th><th>PAYMENT</th><th style="text-align:right">AMOUNT</th><th style="text-align:right">STATUS</th><th></th></tr></thead>
+      <tbody>
+      {% for b in bill_entries %}
+        <tr><td>{{ b.entry_date|date:"Y-m-d" }}</td><td>{{ b.invoice_number }}</td><td>{{ b.service }}{% if b.created_by_name %}<div class="patient-id">by {{ b.created_by_name }}{% if b.created_by_role %} ({{ b.created_by_role }}){% endif %}</div>{% endif %}</td><td>{% if b.advance_paid and b.advance_paid >= b.amount_paid %}Advance{% else %}{{ b.get_payment_mode_display }}{% endif %}</td><td style="text-align:right"><b>NPR {{ b.rate }}</b></td>
+          <td style="text-align:right">{% if b.advance_paid and not b.is_cancelled %}<div class="patient-id" style="color:#b78317;font-weight:700">NPR {{ b.advance_paid }} paid from advance</div>{% endif %}{% if b.carried_over and not b.is_cancelled %}<div class="patient-id" style="color:#16834f;font-weight:700">+NPR {{ b.carried_over }} kept as advance</div>{% endif %}{% if b.is_cancelled %}<span style="color:#b83b3b;font-weight:700">Cancelled</span>{% elif b.status_key == 'paid' %}<span style="color:#16834f;font-weight:700">Paid</span>{% else %}<span style="color:#b78317;font-weight:700">{{ b.status_label }} · NPR {{ b.amount_due }} due</span> <button type="button" class="table-action" data-pay data-url="{% url 'billing:entry-payment' b.pk %}" data-next="{{ back_url }}" data-name="{{ patient.name }}" data-due="{{ b.amount_due }}" data-invoice="{{ b.invoice_number }}">Receive</button>{% endif %}</td>
+          <td style="text-align:right;white-space:nowrap">
+            <a class="table-action" href="{% url 'billing:invoice' b.pk %}?next={{ back_url|urlencode:'' }}" style="text-decoration:none" title="Invoice: PDF, WhatsApp, e-mail">Invoice</a>
+            {% if b.is_cancelled %}<form method="post" action="{% url 'billing:entry-restore' b.pk %}" style="display:inline">{% csrf_token %}<input type="hidden" name="next" value="{{ back_url }}"><button class="table-action" type="submit">Restore</button></form>
+            {% else %}<button type="button" class="table-action" data-correct data-url="{% url 'billing:entry-correct' b.pk %}" data-name="{{ patient.name }}" data-invoice="{{ b.invoice_number }}" data-date="{{ b.entry_date|date:'Y-m-d' }}" data-service="{{ b.service }}" data-rate="{{ b.rate }}" data-mode="{{ b.payment_mode }}" data-notes="{{ b.notes }}" data-status="{{ b.status_key }}" data-received="{{ b.amount_paid }}" data-next="{{ back_url }}">Edit</button>
+            <form method="post" action="{% url 'billing:entry-cancel' b.pk %}" style="display:inline" data-cancel-bill>{% csrf_token %}<input type="hidden" name="next" value="{{ back_url }}"><input type="hidden" name="reason"><button class="table-action" type="submit">Cancel bill</button></form>{% endif %}
+          </td></tr>
+      {% empty %}
+        <tr><td colspan="7" style="padding:22px;text-align:center;color:var(--muted)">No bills recorded for this patient yet.</td></tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+

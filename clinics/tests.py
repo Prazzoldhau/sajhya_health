@@ -1601,7 +1601,7 @@ class ReceptionFullBillingTests(Base):
         self.prepare()
         r = self.client.post(reverse('billing:patient-bill', args=[self.patient.pk]), {'entry_date': timezone.localdate().isoformat(), 'service': 'Hearing Test (Audiometry)',
                                                                                        'rate': '500', 'payment_mode': 'cash', 'payment_status': 'paid'})
-        self.assertRedirects(r, f"{reverse('billing:billing')}?patient={self.patient.pk}", fetch_redirect_response=False)  # staff cannot open the patient record
+        self.assertRedirects(r, reverse('billing:patient', args=[self.patient.pk]), fetch_redirect_response=False)  # staff cannot open the patient record
         self.assertEqual(BillingEntry.objects.get().service, 'Hearing Test (Audiometry)')
         r = self.client.post(reverse('billing:advance-add', args=[self.patient.pk]), {'amount': '1000', 'payment_mode': 'cash'})
         self.assertEqual(r.status_code, 302)

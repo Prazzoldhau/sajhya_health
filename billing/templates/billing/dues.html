@@ -51,7 +51,7 @@
 {% for g in groups %}
 <article class="du-card {{ g.band }}">
   <div class="du-head">
-    <div><div class="who">{% if g.patient and not staff_mode %}<a href="{% url 'accounts:patient-detail' g.patient.pk %}?tab=billing">{{ g.name }}</a>{% else %}{{ g.name }}{% endif %} <span class="patient-id" style="display:inline">{{ g.code }}</span></div>
+    <div><div class="who">{% if g.patient %}<a href="{% url 'billing:patient' g.patient.pk %}">{{ g.name }}</a>{% else %}{{ g.name }}{% endif %} <span class="patient-id" style="display:inline">{{ g.code }}</span></div>
       <div class="patient-id">{% if g.phone %}{{ g.phone }} · {% endif %}{{ g.bills|length }} bill{{ g.bills|length|pluralize }}{% if g.packages %} · {{ g.packages|length }} package{{ g.packages|length|pluralize }}{% endif %}</div></div>
     <span class="du-chip {{ g.band }}">{% if g.days == 0 %}today{% else %}{{ g.days }} day{{ g.days|pluralize }} waiting{% endif %}</span>
     <a class="table-action no-print" href="{{ g.reminder }}" target="_blank" rel="noopener" style="text-decoration:none" title="Open WhatsApp with a payment reminder ready to send">Remind on WhatsApp</a>

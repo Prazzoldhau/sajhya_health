@@ -44,10 +44,8 @@ def _selected_date(request):
 
 
 def _patient_page(request, patient):
-    """Where to go after billing one patient: their Billing tab, or (front-desk staff cannot open patient records) their bills in the billing book."""
-    if staff_member(request):
-        return f"{reverse('billing:billing')}?patient={patient.pk}"
-    return f"{reverse('accounts:patient-detail', args=[patient.pk])}?tab=billing"
+    """Where to go after billing one patient: their own billing page (bills, packages and advances only, not the patient profile)."""
+    return reverse('billing:patient', args=[patient.pk])
 
 
 def _back(date):
@@ -1037,3 +1035,24 @@ def dues(request):
     context.update({'active': 'billing', 'billing_tab': 'dues', 'groups': shown, 'summary': summary, 'aging': aging, 'filters': DUE_FILTERS, 'show': flt, 'q': request.GET.get('q', '').strip(),
                     'sort': sort, 'pay_form': EntryPaymentForm(), 'shown_total': sum((g['total'] for g in shown), Decimal('0'))})
     return render(request, 'billing/dues.html', context)
+
+
+@login_required
+def patient_billing(request, patient_id):
+    """One patient's billing and nothing else: new bill, advances, packages (start, pay, use) and the bill history. The front desk gets it too."""
+    profile = billing_profile(request)
+    if profile is None:
+        return redirect('accounts:welcome')
+    patient = get_object_or_404(profile.workspace_patients(), pk=patient_id)
+    member = staff_member(request)
+    bills = list(patient.billing_entries.prefetch_related('advance_moves', 'payments')[:50])
+    live = [b for b in bills if not b.is_cancelled]
+    context = billing_context(request, profile)
+    context.update({
+        'active': 'billing', 'billing_tab': 'book', 'patient': patient, 'show_contact': can_see_contact(profile, patient), 'back_url': reverse('billing:patient', args=[patient.pk]),
+        'bill_entries': bills, 'packages': patient.packages.prefetch_related('payments'), 'payment_form': PackagePaymentForm(), 'bill_form': PatientBillForm(initial={'entry_date': timezone.localdate()}),
+        'pay_form': EntryPaymentForm(), 'correct_form': BillCorrectionForm(), 'advance_form': AdvanceForm(), 'advance_balance': advance_balance(patient.pk), 'advance_moves': patient.advances.select_related('entry')[:15],
+        'service_catalog': catalog.catalog_for(profile, member.clinic.owner if member else None),
+        'totals': {'billed': sum((b.rate for b in live), Decimal('0')), 'received': sum((b.amount_paid for b in live), Decimal('0')), 'due': sum((b.amount_due for b in live), Decimal('0'))},
+    })
+    return render(request, 'billing/patient.html', context)
