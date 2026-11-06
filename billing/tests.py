@@ -1594,3 +1594,17 @@ class PatientBillingPageTests(BillingBase):
         other = self.client_class()
         other.force_login(stranger)
         self.assertEqual(other.get(reverse('billing:patient', args=[self.patient.pk])).status_code, 404)
+
+
+class PackageSearchTests(BillingBase):
+    def test_packages_can_be_found_by_patient_name_code_or_picked_patient(self):
+        self.package()
+        other = make_patient(self.profile, name='Hari Thapa', phone='9841999999')
+        self.package(patient=other.pk, total_amount='2500', amount_paid_now='0')
+        url = reverse('billing:packages')
+        self.assertEqual(len(self.client.get(url).context['packages']), 2)
+        self.assertEqual([p.patient_id for p in self.client.get(url, {'q': 'hari'}).context['packages']], [other.pk])
+        self.assertEqual([p.patient_id for p in self.client.get(url, {'q': other.patient_code}).context['packages']], [other.pk])
+        self.assertEqual([p.patient_id for p in self.client.get(url, {'for': self.patient.pk}).context['packages']], [self.patient.pk])
+        self.assertEqual(self.client.get(url, {'q': 'nobody here'}).context['packages'], [])
+        self.assertContains(self.client.get(url, {'q': 'hari'}), 'Showing 1 of 2')

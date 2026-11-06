@@ -35,10 +35,18 @@
   <div class="kpi"><div class="k">Package options</div><div class="v" style="font-size:16px;line-height:1.4">1 · 2 · 3 · 4 weeks</div><div class="n">Sessions used are recorded on each package</div></div>
 </div>
 
+<form method="get" class="no-print" id="pkFind" style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:10px">
+  {% if show %}<input type="hidden" name="show" value="{{ show }}">{% endif %}
+  <span style="position:relative;flex:1;min-width:260px;max-width:480px;display:block"><input type="search" name="q" id="pkFilterSearch" value="{% if who %}{{ who.name }}{% else %}{{ q }}{% endif %}" placeholder="Search a patient by name, patient ID or invoice number..." autocomplete="off" style="width:100%;height:38px;border:1px solid #b9dcc9;border-radius:19px;padding:0 16px;background:#fff"></span>
+  <input type="hidden" name="for" id="pkFilterFor" value="{% if who %}{{ who.pk }}{% endif %}">
+  <button class="primary-btn" type="submit" style="height:38px">Search</button>
+  {% if q or who %}<a class="secondary-btn" href="?{% if show %}show={{ show }}{% endif %}" style="text-decoration:none;display:inline-flex;align-items:center;height:38px">Clear</a>{% endif %}
+</form>
 <div class="chipbar">
-  <a href="?" class="{% if not show %}on{% endif %}">All</a>
-  {% for f in filters %}<a href="?show={{ f }}" class="{% if show == f %}on{% endif %}">{{ f|capfirst }}{% if f == 'due' %} balance{% endif %}</a>{% endfor %}
+  <a href="?{% if q %}q={{ q|urlencode }}{% endif %}{% if who %}{% if q %}&{% endif %}for={{ who.pk }}{% endif %}" class="{% if not show %}on{% endif %}">All</a>
+  {% for f in filters %}<a href="?show={{ f }}{% if q %}&q={{ q|urlencode }}{% endif %}{% if who %}&for={{ who.pk }}{% endif %}" class="{% if show == f %}on{% endif %}">{{ f|capfirst }}{% if f == 'due' %} balance{% endif %}</a>{% endfor %}
 </div>
+{% if q or who or show %}<p class="patient-id no-print" style="margin:-4px 0 10px">Showing {{ packages|length }} of {{ total_packages }} package{{ total_packages|pluralize }}{% if who %} for {{ who.name }}{% elif q %} matching &quot;{{ q }}&quot;{% endif %}.</p>{% endif %}
 
 {% for pk in packages %}
 <article class="pk">
@@ -137,6 +145,14 @@
   // patient search for the new-package form (shared picker: blocks submit until a patient is chosen)
   SajhyaUI.patientPicker($('pkSearch'), $('id_patient'), {
     url: "{{ patient_search_url }}", hint: $('pkChosen'), preset: JSON.parse($('preset-data').textContent),
+  });
+  // find one patient's packages: pick from the list (or type words and press Search for names, patient IDs and invoice numbers)
+  var find = $('pkFilterSearch');
+  SajhyaUI.picker(find, {
+    url: "{{ patient_search_url }}", emptyText: 'No matching patients',
+    render: function (p) { return '<b>' + SajhyaUI.esc(p.name) + '</b> <span style="color:#7c9186">' + SajhyaUI.esc(p.code) + '</span>'; },
+    onPick: function (p) { $('pkFilterFor').value = p.id; find.value = p.name; $('pkFind').submit(); },
+    onType: function () { $('pkFilterFor').value = ''; },
   });
   {% if open_new %}SajhyaUI.openModal('pkModal');{% endif %}
 })();

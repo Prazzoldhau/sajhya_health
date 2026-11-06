@@ -432,6 +432,14 @@ def packages(request):
         shown = [p for p in all_packages if p.effective_status == flt]
     else:
         shown = all_packages
+    text = request.GET.get('q', '').strip()[:100]
+    who = request.GET.get('for', '')
+    who_patient = profile.workspace_patients().filter(pk=int(who)).first() if who.isdigit() else None
+    if who_patient:
+        shown = [p for p in shown if p.patient_id == who_patient.pk]
+    if text:
+        words = text.lower().split()
+        shown = [p for p in shown if all(w in f'{p.patient.name} {p.patient.patient_code} {p.invoice_number}'.lower() for w in words)]
 
     preset = None
     if request.GET.get('patient', '').isdigit():
@@ -441,7 +449,7 @@ def packages(request):
     context = billing_context(request, profile)
     context.update({
         'advance_held_total': PatientAdvance.objects.filter(professional=profile).aggregate(t=Sum('amount'))['t'] or 0,
-        'active': 'billing', 'billing_tab': 'packages', 'packages': shown, 'show': flt, 'filters': PACKAGE_FILTERS, 'today': timezone.localdate(),
+        'active': 'billing', 'billing_tab': 'packages', 'packages': shown, 'show': flt, 'filters': PACKAGE_FILTERS, 'q': text, 'who': who_patient, 'total_packages': len(all_packages), 'today': timezone.localdate(),
         'form': PatientPackageForm(profile=profile, initial={'start_date': timezone.localdate(), 'amount_paid_now': 0}),
         'payment_form': PackagePaymentForm(),
         'active_count': len(live), 'sessions_left': sum(p.sessions_remaining for p in live),
