@@ -62,14 +62,31 @@ migration (add a new one); run `python manage.py test` before deploying.
 
 ## 4. Backups and restore
 
-Back up **both** of these together - they refer to each other:
+Patient data must be recoverable. `deploy/backup.sh` saves **both** things that belong together: the database and the uploaded files (`media/` and `private_uploads/`: credentials, patient pictures, lab reports). `static/` is part of the code, not user data.
 
-1. **The database**: `mysqldump --single-transaction -u user -p sajhya_health > sajhya_$(date +%F).sql`
-2. **`PRIVATE_MEDIA_ROOT`** (credentials, patient pictures, lab reports) and **`media/`** (public photos).
+**One-time setup on the server**
 
-`static/` images are part of the code/deploy, not user data. Clinic logos and banners are in `media/clinic_logos/` and `media/clinic_banners/` (covered by the `media/` backup). Restore = load the SQL into an empty database, copy the
-folders back, run `migrate` (no-op if versions match). Test a restore on another machine at least once; a backup you
-have never restored is a guess. Patient data is sensitive: encrypt backups and restrict who can read them.
+1. Make a passphrase so backups are encrypted (and keep a copy of it somewhere safe, away from the server: without it the backups cannot be opened):
+   `head -c 32 /dev/urandom | base64 > ~/.backup_passphrase; chmod 600 ~/.backup_passphrase`
+2. Try it once by hand: `bash ~/sajhya_health/deploy/backup.sh` (it prints each step; the copies appear in `~/backups/daily/`).
+3. cPanel > **Cron Jobs** > add, every day at 02:00 (the output is kept in a log; cPanel e-mails you when it fails):
+   `bash $HOME/sajhya_health/deploy/backup.sh >> $HOME/backups/cron.log 2>&1`
+
+It keeps 14 daily copies and 8 weekly copies (Sundays), checks the dump is complete before keeping it, and writes `~/backups/daily/last_ok`. `python manage.py deploy_doctor` warns when that file is missing or older than 36 hours.
+
+**Copy backups off the server.** A backup on the same server is lost with the server. Once a week at least, download `~/backups/weekly/` (cPanel File Manager) to a computer or drive that you control. Patient data: keep the passphrase and the copies private.
+
+**Prove the restore (do this once now, then every few months).** A backup you have never restored is a guess.
+
+1. cPanel > MySQL Databases: create an empty scratch database (for example `<account>_restoretest`) and add the app's database user to it with ALL PRIVILEGES.
+2. `bash ~/sajhya_health/deploy/restore_test.sh <account>_restoretest`
+3. It loads the newest backup into the scratch database (never the live one, and it refuses a scratch database that is not empty), prints live-versus-restored row counts for the main tables, checks that the files backup opens, then empties the scratch database. It ends with `RESULT: the backup restores correctly.` Counts a little lower than live are normal (people worked since the backup); an empty table is not. Add `--keep` to leave the copy loaded so you can look at it.
+
+**Real restore after a disaster:** load the database file into an empty database (`openssl enc -d -aes-256-cbc -pbkdf2 -iter 200000 -pass file:$HOME/.backup_passphrase < db_...sql.gz.enc | gunzip | mysql -u USER -p DBNAME`), unpack the files archive the same way into the app folder (`... < files_...tar.gz.enc | tar -xzf - -C ~/sajhya_health`), then `python manage.py migrate` (a no-op when versions match) and `python manage.py check_money`.
+
+Take a database backup **before** `migrate` when a release has new migrations (the deploy script already does).
+
+**HTTPS.** The settings force https when `DEBUG` is off: redirect from http, secure session and CSRF cookies, HSTS for a year. `deploy_doctor` warns if any of that is switched off. Keep the certificate renewing: cPanel > SSL/TLS Status > run AutoSSL; the live certificate expires on 2027-01-20 and AutoSSL renews it a few weeks before.
 
 ## 5. Everyday tasks
 

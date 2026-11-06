@@ -34,6 +34,19 @@ def raw_env_file(base_dir):
     return fresh
 
 
+def backup_note(now=None):
+    """Why the nightly backup looks unhealthy, or '' when it ran within the last 36 hours (deploy/backup.sh writes ~/backups/daily/last_ok)."""
+    import datetime
+    folder = Path(os.environ.get('BACKUP_DIR') or Path.home() / 'backups') / 'daily'
+    marker = folder / 'last_ok'
+    if not marker.exists():
+        return f'No backup record found ({marker}): the nightly backup has never run here.'
+    age = (now or datetime.datetime.now()) - datetime.datetime.fromtimestamp(marker.stat().st_mtime)
+    if age > datetime.timedelta(hours=36):
+        return f'The last successful backup was {age.days} day(s) {age.seconds // 3600} hour(s) ago.'
+    return ''
+
+
 class Command(BaseCommand):
     help = 'Check the server configuration (settings file, database login, folders, virtual environment) and explain any problem.'
 
@@ -94,6 +107,26 @@ class Command(BaseCommand):
             report(WARN, 'SERVE_MEDIA is off: profile and product photos will not show unless the web server serves /media/.', 'On cPanel set SERVE_MEDIA=True in .env.')
         if not settings.DEBUG and not getattr(settings, 'CSRF_TRUSTED_ORIGINS', []):
             report(WARN, 'CSRF_TRUSTED_ORIGINS is empty.', 'Behind HTTPS set CSRF_TRUSTED_ORIGINS=https://app.sajhya.com or forms will fail with 403.')
+
+        # --- HTTPS and backups: patient data must travel encrypted and must be recoverable
+        if not settings.DEBUG:
+            problems = []
+            if not settings.SECURE_SSL_REDIRECT:
+                problems.append('SECURE_SSL_REDIRECT is off: plain http:// pages are still served.')
+            if not settings.SESSION_COOKIE_SECURE or not settings.CSRF_COOKIE_SECURE:
+                problems.append('Session or CSRF cookies are not marked secure.')
+            if not settings.SECURE_HSTS_SECONDS:
+                problems.append('HSTS is off: browsers are not told to always use https.')
+            origins = getattr(settings, 'CSRF_TRUSTED_ORIGINS', [])
+            if origins and any(o.startswith('http://') for o in origins):
+                problems.append('CSRF_TRUSTED_ORIGINS contains an http:// address.')
+            report(WARN if problems else OK, ' '.join(problems) if problems else 'HTTPS is enforced (redirect, secure cookies, HSTS).',
+                   'Remove SECURE_SSL_REDIRECT=False / SECURE_HSTS_SECONDS=0 from .env, and use https:// origins.' if problems else '')
+            note = backup_note()
+            if note:
+                report(WARN, note, 'Set up the nightly backup: docs/OPERATIONS.md section "Backups and restore" (cron job running deploy/backup.sh).')
+            else:
+                report(OK, 'The nightly database backup ran in the last 36 hours.')
 
         # --- database: show what we resolved, then really try to connect
         db = settings.DATABASES['default']

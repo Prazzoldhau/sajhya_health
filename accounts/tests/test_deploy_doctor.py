@@ -74,3 +74,22 @@ class EnvOverrideDetectionTests(SimpleTestCase):
             values = raw_env_file(folder)
         self.assertEqual((values['DEBUG'], values['DATABASE_URL']), ('False', 'mysql://u:p@localhost:3306/d'))
         self.assertTrue(values['SECRET_KEY'].startswith('abc'))  # parsed exactly like the settings loader does
+
+
+class BackupAndHttpsChecksTests(SimpleTestCase):
+    def test_backup_note_says_when_backups_never_ran_or_went_stale(self):
+        import datetime, os, tempfile
+        from pathlib import Path
+        from accounts.management.commands.deploy_doctor import backup_note
+        with tempfile.TemporaryDirectory() as d, mock.patch.dict(os.environ, {'BACKUP_DIR': d}):
+            self.assertIn('never run', backup_note())
+            daily = Path(d) / 'daily'
+            daily.mkdir()
+            (daily / 'last_ok').write_text('x')
+            self.assertEqual(backup_note(), '')
+            self.assertIn('2 day', backup_note(datetime.datetime.now() + datetime.timedelta(days=2, hours=1)))
+
+    def test_doctor_warns_when_https_is_not_enforced_in_production(self):
+        with override_settings(DEBUG=False, SECRET_KEY='k' * 60, SECURE_SSL_REDIRECT=False, ALLOWED_HOSTS=['x']):
+            code, text = run()
+        self.assertIn('SECURE_SSL_REDIRECT is off', text)
