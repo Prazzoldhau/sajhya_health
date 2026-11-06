@@ -7,6 +7,7 @@ Use inside the form with the form's id, as in the billing page: include this fil
     .svc-picker .t a { font-weight: 700; text-transform: none; letter-spacing: 0; color: #116b43; }
     .svc-picker select { height: 36px; border: 1px solid #cfe6d8; border-radius: 8px; background: #fff; font-weight: 600; padding: 0 8px; }
     .svc-picker .addrow { margin-bottom: 6px; }
+    .svc-picker { min-width: 0; max-width: 100%; box-sizing: border-box; } .svc-picker .tw { overflow-x: auto; border-radius: 8px; }
     .svc-picker .cb { position: relative; width: 100%; }
     .svc-picker .cb input { width: 100%; height: 38px; border: 1px solid #cfe6d8; border-radius: 8px; background: #fff; font-weight: 600; padding: 0 30px 0 11px; }
     .svc-picker .cb-caret { position: absolute; right: 11px; top: 10px; color: #5d7568; pointer-events: none; font-size: 12px; }
@@ -17,10 +18,10 @@ Use inside the form with the form's id, as in the billing page: include this fil
     .svc-picker .cb-list .o.off { opacity: .45; cursor: not-allowed; } .svc-picker .cb-list .o mark { background: #fff0b3; color: inherit; border-radius: 2px; }
     .svc-picker .cb-list .none, .svc-picker .cb-list .more { padding: 9px 11px; font-size: 12px; color: #6c8178; }
     .svc-picker table { width: 100%; border-collapse: collapse; font-size: 12.5px; background: #fff; border: 1px solid #dcebe2; border-radius: 8px; overflow: hidden; }
-    .svc-picker th { text-align: left; font-size: 10px; letter-spacing: .05em; color: #6b8478; padding: 5px 8px; background: #f0f7f3; } .svc-picker th.r, .svc-picker td.r { text-align: right; }
-    .svc-picker td { padding: 4px 8px; border-top: 1px solid #edf3ef; vertical-align: middle; }
-    .svc-picker td input { height: 28px; border: 1px solid #cfe6d8; border-radius: 6px; padding: 0 6px; width: 78px; text-align: right; } .svc-picker td input.qty { width: 54px; }
-    .svc-picker td input.disc { width: 70px; } .svc-picker td select.dt { height: 28px; border: 1px solid #cfe6d8; border-radius: 6px; background: #fff; padding: 0 2px; width: 52px; font-size: 12px; }
+    .svc-picker th { text-align: left; font-size: 10px; letter-spacing: .05em; color: #6b8478; padding: 5px 5px; white-space: nowrap; background: #f0f7f3; } .svc-picker th.r, .svc-picker td.r { text-align: right; }
+    .svc-picker td { padding: 4px 5px; border-top: 1px solid #edf3ef; vertical-align: middle; }
+    .svc-picker td input { height: 28px; border: 1px solid #cfe6d8; border-radius: 6px; padding: 0 6px; width: 66px; text-align: right; } .svc-picker td input.qty { width: 46px; }
+    .svc-picker td input.disc { width: 58px; } .svc-picker td select.dt { height: 28px; border: 1px solid #cfe6d8; border-radius: 6px; background: #fff; padding: 0 2px; width: 50px; font-size: 12px; padding-right: 0; }
     .svc-picker .x { border: 0; background: none; color: #b83b3b; font-size: 18px; cursor: pointer; line-height: 1; }
     .svc-picker .tag { font-size: 10px; font-weight: 800; color: #8a6d1d; background: #fff3d6; border-radius: 8px; padding: 1px 6px; margin-left: 4px; }
     .svc-compact:not(.svc-open) .svc-manual { display: none; } form:not(.svc-compact) .svc-more, .svc-open .svc-more { display: none; } .svc-more { font-size: 12px; font-weight: 700; color: #116b43; background: none; border: 0; padding: 2px 0 6px; cursor: pointer; text-decoration: underline; }
@@ -29,7 +30,7 @@ Use inside the form with the form's id, as in the billing page: include this fil
   <div class="t">Services and products from your price list <select data-svc-dept hidden aria-label="Show the services of one department" style="height:28px;width:auto;max-width:190px"></select> {% if not hide_prices %}<a href="{% url 'billing:services' %}" target="_blank" rel="noopener">edit prices</a>{% endif %}</div>
   {% if service_catalog %}
   <div class="addrow"><div class="cb"><input type="text" data-svc-add data-svc-search placeholder="Search or choose a service or product..." autocomplete="off" role="combobox" aria-expanded="false" aria-label="Search the price list"><span class="cb-caret" aria-hidden="true">&#9662;</span><div class="cb-list" data-svc-list role="listbox" hidden></div></div></div>
-  <table data-svc-table hidden><thead><tr><th>SERVICE</th><th class="r">QTY</th><th class="r">PRICE (NPR)</th><th class="r">DISCOUNT</th><th class="r">AMOUNT</th><th></th></tr></thead><tbody data-svc-rows></tbody></table>
+  <div class="tw"><table data-svc-table hidden><thead><tr><th>SERVICE</th><th class="r">QTY</th><th class="r">PRICE (NPR)</th><th class="r">DISCOUNT</th><th class="r">AMOUNT</th><th></th></tr></thead><tbody data-svc-rows></tbody></table></div>
   <div class="sum" data-svc-sum><span>Choose a service from the list. You can still change the text and amount below.</span></div>
   {% else %}
   <div class="sum">No price list yet. {% if hide_prices %}Ask the manager to set up the services and add-ons.{% else %}<a href="{% url 'billing:services' %}" target="_blank" rel="noopener">Set up your services and add-ons</a> and they appear in this list.{% endif %}</div>
