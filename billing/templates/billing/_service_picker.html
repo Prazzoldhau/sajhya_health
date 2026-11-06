@@ -20,6 +20,7 @@ Use inside the form with the form's id, as in the billing page: include this fil
     .svc-picker th { text-align: left; font-size: 10px; letter-spacing: .05em; color: #6b8478; padding: 5px 8px; background: #f0f7f3; } .svc-picker th.r, .svc-picker td.r { text-align: right; }
     .svc-picker td { padding: 4px 8px; border-top: 1px solid #edf3ef; vertical-align: middle; }
     .svc-picker td input { height: 28px; border: 1px solid #cfe6d8; border-radius: 6px; padding: 0 6px; width: 78px; text-align: right; } .svc-picker td input.qty { width: 54px; }
+    .svc-picker td input.disc { width: 70px; } .svc-picker td select.dt { height: 28px; border: 1px solid #cfe6d8; border-radius: 6px; background: #fff; padding: 0 2px; width: 52px; font-size: 12px; }
     .svc-picker .x { border: 0; background: none; color: #b83b3b; font-size: 18px; cursor: pointer; line-height: 1; }
     .svc-picker .tag { font-size: 10px; font-weight: 800; color: #8a6d1d; background: #fff3d6; border-radius: 8px; padding: 1px 6px; margin-left: 4px; }
     .svc-compact:not(.svc-open) .svc-manual { display: none; } form:not(.svc-compact) .svc-more, .svc-open .svc-more { display: none; } .svc-more { font-size: 12px; font-weight: 700; color: #116b43; background: none; border: 0; padding: 2px 0 6px; cursor: pointer; text-decoration: underline; }
@@ -28,7 +29,7 @@ Use inside the form with the form's id, as in the billing page: include this fil
   <div class="t">Services and products from your price list <select data-svc-dept hidden aria-label="Show the services of one department" style="height:28px;width:auto;max-width:190px"></select> {% if not hide_prices %}<a href="{% url 'billing:services' %}" target="_blank" rel="noopener">edit prices</a>{% endif %}</div>
   {% if service_catalog %}
   <div class="addrow"><div class="cb"><input type="text" data-svc-add data-svc-search placeholder="Search or choose a service or product..." autocomplete="off" role="combobox" aria-expanded="false" aria-label="Search the price list"><span class="cb-caret" aria-hidden="true">&#9662;</span><div class="cb-list" data-svc-list role="listbox" hidden></div></div></div>
-  <table data-svc-table hidden><thead><tr><th>SERVICE</th><th class="r">QTY</th><th class="r">PRICE (NPR)</th><th class="r">AMOUNT</th><th></th></tr></thead><tbody data-svc-rows></tbody></table>
+  <table data-svc-table hidden><thead><tr><th>SERVICE</th><th class="r">QTY</th><th class="r">PRICE (NPR)</th><th class="r">DISCOUNT</th><th class="r">AMOUNT</th><th></th></tr></thead><tbody data-svc-rows></tbody></table>
   <div class="sum" data-svc-sum><span>Choose a service from the list. You can still change the text and amount below.</span></div>
   {% else %}
   <div class="sum">No price list yet. {% if hide_prices %}Ask the manager to set up the services and add-ons.{% else %}<a href="{% url 'billing:services' %}" target="_blank" rel="noopener">Set up your services and add-ons</a> and they appear in this list.{% endif %}</div>
@@ -42,23 +43,29 @@ Use inside the form with the form's id, as in the billing page: include this fil
   var box = document.querySelector('.svc-picker[data-picker-for="{{ form_id }}"]'), form = document.getElementById("{{ form_id }}");
   if (!box || !form) return;
   var catalog = JSON.parse(document.getElementById('service-catalog').textContent), add = box.querySelector('[data-svc-search]'), list = box.querySelector('[data-svc-list]'), table = box.querySelector('[data-svc-table]'), rows = box.querySelector('[data-svc-rows]'), sumEl = box.querySelector('[data-svc-sum]');
-  var linesInput = box.querySelector('input[name=lines]'), deptSelect = box.querySelector('[data-svc-dept]'), picked = [], qtys = {}, prices = {};
+  var linesInput = box.querySelector('input[name=lines]'), deptSelect = box.querySelector('[data-svc-dept]'), picked = [], qtys = {}, prices = {}, discs = {}, dtypes = {};
   var saveBtn = null, saveLabel = '';  // the save button comes after this picker in the page, so it is found when first needed
   function money(n) { return (Math.round(n * 100) / 100).toString(); }
   function esc(t) { return String(t).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/"/g, '&quot;'); }
   function find(id) { return catalog.filter(function (s) { return String(s.id) === String(id); })[0]; }
   function qty(s) { return s.product ? (qtys[s.id] || 1) : 1; }
   function unit(s) { var p = parseFloat(prices[s.id]); return isNaN(p) || p < 0 ? 0 : p; }
-  function cost(s) { return unit(s) * qty(s); }
+  function gross(s) { return unit(s) * qty(s); }
+  function disc(s) {  // the discount on this line, typed as an amount or as a percentage of it, never more than the line itself
+    var v = parseFloat(discs[s.id]); if (isNaN(v) || v <= 0) return 0;
+    var g = gross(s), d = dtypes[s.id] === 'pct' ? g * Math.min(v, 100) / 100 : Math.min(v, g);
+    return Math.round(d * 100) / 100;
+  }
+  function cost(s) { return gross(s) - disc(s); }
   function line(s) { return s.name + (qty(s) > 1 ? ' x' + qty(s) : ''); }
   function sync() {
-    var list = picked.map(find).filter(Boolean), total = list.reduce(function (a, s) { return a + cost(s); }, 0);
-    linesInput.value = JSON.stringify(list.map(function (s) { return { id: s.id, name: line(s), price: money(cost(s)), product: !!s.product, qty: qty(s) }; }));
+    var list = picked.map(find).filter(Boolean), total = list.reduce(function (a, s) { return a + cost(s); }, 0), off = list.reduce(function (a, s) { return a + disc(s); }, 0);
+    linesInput.value = JSON.stringify(list.map(function (s) { return { id: s.id, name: line(s), price: money(cost(s)), discount: money(disc(s)), product: !!s.product, qty: qty(s) }; }));
     var service = form.elements['service'], rate = form.elements['rate'];
     if (list.length) {
       if (service) service.value = list.map(line).join(' + ');
       if (rate) rate.value = money(total);
-      sumEl.innerHTML = '<span>' + list.length + ' item' + (list.length > 1 ? 's' : '') + '</span><b>Total NPR ' + money(total) + '</b>';
+      sumEl.innerHTML = '<span>' + list.length + ' item' + (list.length > 1 ? 's' : '') + (off > 0 ? ' · subtotal NPR ' + money(total + off) + ' · discount − NPR ' + money(off) : '') + '</span><b>Total NPR ' + money(total) + '</b>';
     } else { sumEl.innerHTML = '<span>Choose a service from the list. You can still change the text and amount below.</span>'; }
     if (!saveBtn) { saveBtn = form.querySelector('button[type=submit]'); saveLabel = saveBtn ? saveBtn.textContent : ''; }
     if (saveBtn) saveBtn.textContent = list.length ? saveLabel + ' · NPR ' + money(total) : saveLabel;
@@ -71,11 +78,15 @@ Use inside the form with the form's id, as in the billing page: include this fil
       var tr = document.createElement('tr');
       tr.innerHTML = '<td>' + esc(s.name) + (s.product ? '<span class="tag">product</span>' : s.addon ? '<span class="tag" style="color:#116b43;background:#e6f6ee">add-on</span>' : '') + (s.product && s.track ? '<div style="font-size:10.5px;color:#7c9186">' + s.stock + ' in stock</div>' : '') + '</td>' +
         '<td class="r">' + (s.product ? '<input class="qty" type="number" min="1" max="' + (s.track ? Math.max(s.stock, 1) : 999) + '" value="' + qty(s) + '" data-q="' + s.id + '">' : '1') + '</td>' +
-        '<td class="r"><input type="number" min="0" step="0.01" value="' + esc(prices[s.id]) + '" data-p="' + s.id + '"></td><td class="r"><b data-amt="' + s.id + '"></b></td>' +
+        '<td class="r"><input type="number" min="0" step="0.01" value="' + esc(prices[s.id]) + '" data-p="' + s.id + '"></td>' +
+        '<td class="r"><input class="disc" type="number" min="0" step="0.01" placeholder="0" value="' + esc(discs[s.id] || '') + '" data-d="' + s.id + '" aria-label="Discount on ' + esc(s.name) + '"> <select class="dt" data-dt="' + s.id + '" aria-label="Discount type"><option value="amt"' + (dtypes[s.id] === 'pct' ? '' : ' selected') + '>NPR</option><option value="pct"' + (dtypes[s.id] === 'pct' ? ' selected' : '') + '>%</option></select></td>' +
+        '<td class="r"><b data-amt="' + s.id + '"></b></td>' +
         '<td class="r"><button type="button" class="x" data-r="' + s.id + '" aria-label="Remove ' + esc(s.name) + '">×</button></td>';
       rows.appendChild(tr);
     });
     rows.querySelectorAll('[data-q]').forEach(function (i) { i.addEventListener('change', function () { var s = find(i.dataset.q), v = Math.max(1, parseInt(i.value, 10) || 1); if (s.track && v > s.stock) v = Math.max(s.stock, 1); qtys[s.id] = v; i.value = v; sync(); }); });
+    rows.querySelectorAll('[data-d]').forEach(function (i) { i.addEventListener('input', function () { discs[i.dataset.d] = i.value; sync(); }); });
+    rows.querySelectorAll('[data-dt]').forEach(function (i) { i.addEventListener('change', function () { dtypes[i.dataset.dt] = i.value; sync(); }); });
     rows.querySelectorAll('[data-p]').forEach(function (i) { i.addEventListener('input', function () { prices[i.dataset.p] = i.value; sync(); }); });
     rows.querySelectorAll('[data-r]').forEach(function (b) { b.addEventListener('click', function () { picked = picked.filter(function (id) { return String(id) !== b.dataset.r; }); drawRows(); drawOptions(); sync(); }); });
   }
@@ -159,7 +170,7 @@ Use inside the form with the form's id, as in the billing page: include this fil
     form.addEventListener('invalid', function () { form.classList.add('svc-open'); }, true);
   }
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', compact); else compact();
-  form.addEventListener('reset', function () { picked = []; qtys = {}; prices = {}; form.classList.remove('svc-open'); if (svcBox) form.classList.add('svc-compact'); drawRows(); drawOptions(); setTimeout(sync, 0); });
+  form.addEventListener('reset', function () { picked = []; qtys = {}; prices = {}; discs = {}; dtypes = {}; form.classList.remove('svc-open'); if (svcBox) form.classList.add('svc-compact'); drawRows(); drawOptions(); setTimeout(sync, 0); });
 })();
 </script>
 {% endif %}

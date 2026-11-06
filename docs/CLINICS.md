@@ -238,3 +238,7 @@ The package invoice also lists **every session used** (number "n of N", date, wh
 ## A billing page for each patient
 
 Picking a patient in billing (the search box, or a patient's name anywhere in the billing pages) opens that patient's **own billing page** at `/billing/patient/<id>/`: new bill, take or refund advance, start / pay / use / cancel packages, and the bill history. It shows only billing. The patient profile (overview, SOAP notes, treatment plan) is not opened. The profile's **Billing** tab link goes to the same page, and the page has "Open patient profile" for professionals. Front-desk staff use the same page, since they cannot open patient records. Everything done on the page returns to it.
+
+## Discount on every item
+
+In the bill form each service or product row has its own **Discount**, typed as an amount (NPR) or a percentage, never more than the line itself. The bill total is the sum after discounts, and the summary under the rows shows the subtotal and the discount. Each saved line (`BillLine`) keeps its `discount`, its `price` is what the patient pays for it. The invoice (page, PDF, picture) prints "Needling (less NPR 50.00 discount)"; reports and the Excel file count the lines at their net price. Bills made before this have no discounts.

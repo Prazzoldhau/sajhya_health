@@ -1608,3 +1608,22 @@ class PackageSearchTests(BillingBase):
         self.assertEqual([p.patient_id for p in self.client.get(url, {'for': self.patient.pk}).context['packages']], [self.patient.pk])
         self.assertEqual(self.client.get(url, {'q': 'nobody here'}).context['packages'], [])
         self.assertContains(self.client.get(url, {'q': 'hari'}), 'Showing 1 of 2')
+
+
+class LineDiscountTests(BillingBase):
+    def test_each_line_keeps_its_own_discount_and_the_invoice_shows_it(self):
+        import json
+        from .models import BillLine
+        lines = json.dumps([{'name': 'Basic Physiotherapy', 'price': '400', 'discount': '0'},
+                            {'name': 'Needling', 'price': '250', 'discount': '50'},
+                            {'name': 'Taping', 'price': '180', 'discount': '20.00'},
+                            {'name': 'Cupping', 'price': '100', 'discount': '-5'}])  # a bad discount is ignored
+        self.client.post(reverse('billing:patient-bill', args=[self.patient.pk]), {'entry_date': self.today.isoformat(), 'service': 'x', 'rate': '930', 'payment_mode': 'cash', 'payment_status': 'paid', 'lines': lines})
+        entry = BillingEntry.objects.get()
+        self.assertEqual([(l.name, l.price, l.discount) for l in entry.lines.all()],
+                         [('Basic Physiotherapy', 400, 0), ('Needling', 250, 50), ('Taping', 180, 20), ('Cupping', 100, 0)])
+        self.assertEqual(len(entry.line_items), 4)  # the net prices still add up to the bill
+        page = self.client.get(reverse('billing:invoice', args=[entry.pk]))
+        self.assertContains(page, 'Needling (less NPR 50.00 discount)')
+        self.assertNotContains(page, 'Basic Physiotherapy (less')
+        self.assertEqual(self.client.get(reverse('billing:invoice-pdf', args=[entry.pk])).status_code, 200)

@@ -266,7 +266,8 @@ class BillLine(models.Model):
     """What a bill was made of: the services and add-ons picked from the price list, with the price each had on that day."""
     entry = models.ForeignKey(BillingEntry, on_delete=models.CASCADE, related_name='lines')
     name = models.CharField(max_length=150)
-    price = models.DecimalField(max_digits=10, decimal_places=2)
+    price = models.DecimalField(max_digits=10, decimal_places=2, help_text='What the patient pays for this line, after its discount.')
+    discount = models.DecimalField(max_digits=10, decimal_places=2, default=0, help_text='Taken off this line (already out of the price).')
     is_product = models.BooleanField(default=False)
     item = models.ForeignKey(ServiceItem, null=True, blank=True, on_delete=models.SET_NULL, related_name='bill_lines')
     qty = models.PositiveSmallIntegerField(default=1)
@@ -278,6 +279,11 @@ class BillLine(models.Model):
 
     def __str__(self):
         return f'{self.name} {self.price}'
+
+    @property
+    def shown_name(self):
+        """The name as printed on the invoice: with the discount this line was given, if any."""
+        return f'{self.name} (less NPR {self.discount:,.2f} discount)' if self.discount and self.discount > 0 else self.name
 
 
 class EntryPayment(models.Model):

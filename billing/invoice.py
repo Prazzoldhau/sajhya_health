@@ -138,7 +138,7 @@ def build_pdf(entry, online_url=''):
     c.drawRightString(right - 3 * mm, top + 3 * mm, 'AMOUNT (NPR)')
     c.setFillColor(ink)
     c.setFont('Helvetica', 11)
-    lines = [(l.name, l.price) for l in entry.line_items] or [(entry.service, entry.rate)]  # the services picked from the price list, else the one service text
+    lines = [(l.shown_name, l.price) for l in entry.line_items] or [(entry.service, entry.rate)]  # the services picked from the price list, else the one service text
     for i, (name, price) in enumerate(lines):
         c.drawString(left + 3 * mm, top - 6 * mm - i * 6 * mm, _latin(name, 'Service'))
         c.drawRightString(right - 3 * mm, top - 6 * mm - i * 6 * mm, f'{price:,.2f}')
@@ -251,7 +251,7 @@ def build_png(entry):
     d.rectangle([pad, y, W - pad, y + 46], fill=soft)
     d.text((pad + 14, y + 12), 'SERVICE', font=_font(True, 18), fill=green)
     d.text((W - pad - 14, y + 12), 'AMOUNT (NPR)', font=_font(True, 18), fill=green, anchor='ra')
-    lines = [(l.name, l.price) for l in entry.line_items] or [(entry.service, entry.rate)]
+    lines = [(l.shown_name, l.price) for l in entry.line_items] or [(entry.service, entry.rate)]
     for i, (name, price) in enumerate(lines):
         d.text((pad + 14, y + 66 + i * 36), _latin(name, 'Service'), font=_font(False, 24), fill=ink)
         d.text((W - pad - 14, y + 66 + i * 36), f'{price:,.2f}', font=_font(False, 24), fill=ink, anchor='ra')

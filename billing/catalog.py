@@ -99,7 +99,7 @@ def seed_suggested(profile, department=None):
 
 
 def parse_lines(raw):
-    """The lines posted by a bill form (a JSON list of {name, price}), cleaned: trimmed names, non-negative prices, no blanks, at most MAX_LINES."""
+    """The lines posted by a bill form (a JSON list of {name, price, discount}; the price is what is charged after the line's discount), cleaned: trimmed names, non-negative prices and discounts, no blanks, at most MAX_LINES."""
     try:
         rows = json.loads(raw or '[]')
     except ValueError:
@@ -120,8 +120,14 @@ def parse_lines(raw):
             item_id = abs(int(row.get('id') or 0))
         except (TypeError, ValueError):
             qty, item_id = 1, 0
+        try:
+            discount = Decimal(str(row.get('discount', '0') or '0'))
+        except InvalidOperation:
+            discount = Decimal('0')
+        if discount < 0 or discount >= Decimal('10000000'):
+            discount = Decimal('0')
         if name and price >= 0 and price < Decimal('10000000'):
-            lines.append((name, price.quantize(Decimal('0.01')), row.get('product') is True, item_id, qty))
+            lines.append((name, price.quantize(Decimal('0.01')), row.get('product') is True, item_id, qty, discount.quantize(Decimal('0.01'))))
     return lines
 
 
@@ -137,7 +143,7 @@ def _stock_items(profile, ids):
 def stock_problem(profile, raw):
     """A sentence saying which product is short, when the posted lines ask for more than is in stock; None when all is fine."""
     wanted = {}
-    for _, _, product, item_id, qty in parse_lines(raw):
+    for _, _, product, item_id, qty, _ in parse_lines(raw):
         if product and item_id:
             wanted[item_id] = wanted.get(item_id, 0) + qty
     for pk, item in _stock_items(profile, list(wanted)).items():
@@ -149,11 +155,11 @@ def stock_problem(profile, raw):
 def save_lines(entry, raw):
     """Keep the posted lines with a new bill. They are only a breakdown: the bill's own amount (which can be a discounted total) stays what counts."""
     lines = parse_lines(raw)
-    tracked = _stock_items(entry.professional, [i for _, _, product, i, _ in lines if product and i])
-    for order, (name, price, product, item_id, qty) in enumerate(lines):
+    tracked = _stock_items(entry.professional, [i for _, _, product, i, _, _ in lines if product and i])
+    for order, (name, price, product, item_id, qty, discount) in enumerate(lines):
         item = tracked.get(item_id) if product else None
         line = BillLine.objects.create(entry=entry, name=name, price=price, is_product=product, item=item or (ServiceItem.objects.filter(pk=item_id).first() if product and item_id else None),
-                                       qty=qty, order=order)
+                                       qty=qty, discount=discount, order=order)
         if item is not None:
             take_stock(line, entry.created_by_name, entry.created_by_role)
 
