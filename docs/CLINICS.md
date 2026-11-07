@@ -253,3 +253,9 @@ The Edit bill window offers the same advance choices as a new bill. **Use advanc
 - **Extra cash and old dues.** When the cash handed over is more than the bill and the patient has unpaid bills, a green ticked box offers **Use the extra to clear old dues first**. Ticked: the extra pays the oldest unpaid bills first and only what is left is kept as advance. Unticked: all of the extra is kept as advance. The saved message says how much cleared old dues and how the advance changed ("Advance held: NPR 0 to NPR 300"). The advance balance is always the sum of its ledger: advance taken, minus advance used, plus extra kept, so a second payment the same day adds up the same way.
 - **Take advance** on the patient page now has "use it to clear unpaid bills first" ticked (green) when the patient owes something.
 - **SOAP note, Plan:** Treatment given today now has a search box and quick buttons for the person's own department's treatments and the exercise library. Picking one adds a line with its usual dose to the text, which stays free to edit.
+
+## QA 12
+
+- **Service rows stay inside the window.** In forms the direct children of a `.mini-form` may now shrink, so a long list of services (or the wrapper around the picker) can no longer stretch the whole form past the card.
+- **The Payment box shows the advance.** "Use advance balance (NPR 500 held, NPR 100 left after this bill)" and "Advance + pay the rest now (NPR 100 in cash)" update as the amount changes.
+- **Every bill that touches the advance shows the sum**: held before, minus what it used, plus what it kept, equals held after (for example "Advance: NPR 400 + 1200 kept = NPR 1600 held"), in the billing book, the patient's billing history and the front desk list, and in the confirmation message. The advance is a ledger, so extra cash on two days adds up (400 kept on day 1, 1200 kept on day 2, 1600 held).

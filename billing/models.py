@@ -94,6 +94,20 @@ class BillingEntry(models.Model):
         return sum((m.amount for m in self.advance_moves.all() if m.kind == 'deposit' and m.amount > 0), Decimal('0'))
 
     @property
+    def advance_trail(self):
+        """What this bill did to the patient's advance, as a sum: held before, minus what it used, plus what it kept, equals held after.
+        None when the bill never touched the advance. The figures come from the advance ledger, so they stay right when later bills follow."""
+        moves = list(self.advance_moves.all())
+        used = -sum((m.amount for m in moves if m.kind == 'used'), Decimal('0'))
+        kept = sum((m.amount for m in moves if m.kind == 'deposit' and m.amount > 0), Decimal('0'))
+        if not self.patient_id or (used <= 0 and kept <= 0):
+            return None
+        last = max(m.pk for m in moves)
+        after = PatientAdvance.objects.filter(patient_id=self.patient_id, pk__lte=last).aggregate(t=models.Sum('amount'))['t'] or Decimal('0')
+        net = sum((m.amount for m in moves if m.pk <= last), Decimal('0'))
+        return {'before': after - net, 'used': used if used > 0 else None, 'kept': kept if kept > 0 else None, 'after': after}
+
+    @property
     def cash_handed_over(self):
         """Everything the patient handed over for this bill: what settled it plus the extra that was carried over."""
         paid_in_money = sum((p.amount for p in self.payments.all() if p.payment_mode != ADVANCE), Decimal('0'))

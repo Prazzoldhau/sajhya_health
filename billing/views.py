@@ -56,8 +56,10 @@ def _advance_note(form, before, patient_id):
         parts.append(f'NPR {float(cleared):g} of the extra cleared old dues.')
     if patient_id and before is not None:
         after = advance_balance(patient_id)
+        kept = getattr(form, 'carried', Decimal('0'))
+        used = before + kept - after
         if after != before:
-            parts.append(f'Advance held: NPR {float(before):g} to NPR {float(after):g}.')
+            parts.append(f'Advance: NPR {float(before):g}' + (f' - NPR {float(used):g} used' if used > 0 else '') + (f' + NPR {float(kept):g} kept' if kept > 0 else '') + f' = NPR {float(after):g} held.')
     return (' ' + ' '.join(parts)) if parts else ''
 
 

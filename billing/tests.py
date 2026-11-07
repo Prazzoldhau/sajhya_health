@@ -1696,7 +1696,7 @@ class AdvanceDefaultsAndOldDuesTests(BillingBase):
         self.assertEqual((old.amount_paid, old.amount_due), (500, 0))
         self.assertEqual(advance_balance(self.patient.pk), 300)  # 1500 handed over - 700 bill - 500 old dues
         self.assertContains(page, 'NPR 500 of the extra cleared old dues')
-        self.assertContains(page, 'Advance held: NPR 0 to NPR 300')
+        self.assertIn('Advance: NPR 0 + NPR 300 kept = NPR 300 held', ' '.join(m.message for m in page.context['messages']))
 
     def test_without_the_tick_all_the_extra_is_kept_as_advance_and_old_dues_stay(self):
         self.bill(payment_status='due', rate='500')
@@ -1710,3 +1710,35 @@ class AdvanceDefaultsAndOldDuesTests(BillingBase):
         self.bill(payment_status='advance', rate='400')          # 1000 - 400 = 600
         self.bill(rate='300', amount_given='500')                # pays 300, 200 extra -> 800
         self.assertEqual(advance_balance(self.patient.pk), 800)
+
+
+class AdvanceAcrossDaysTests(BillingBase):
+    def post(self, day, rate, given, status='paid'):
+        return self.client.post(reverse('billing:patient-bill', args=[self.patient.pk]),
+                                {'entry_date': day.isoformat(), 'service': 'S', 'rate': str(rate), 'payment_mode': 'cash', 'payment_status': status, 'amount_given': str(given)}, follow=True)
+
+    def test_extra_cash_on_two_days_adds_up_and_each_bill_shows_the_sum(self):
+        import datetime
+        d1, d2 = self.today, self.today + datetime.timedelta(days=1)
+        self.post(d1, 600, 1000)                      # 400 kept
+        page = self.post(d2, 800, 2000)               # 1200 kept: 400 + 1200 = 1600
+        self.assertEqual(advance_balance(self.patient.pk), 1600)
+        self.assertIn('Advance: NPR 400 + NPR 1200 kept = NPR 1600 held', ' '.join(m.message for m in page.context['messages']))
+        first, second = BillingEntry.objects.order_by('entry_date')
+        self.assertEqual(first.advance_trail, {'before': 0, 'used': None, 'kept': 400, 'after': 400})
+        self.assertEqual(second.advance_trail, {'before': 400, 'used': None, 'kept': 1200, 'after': 1600})
+        history = self.client.get(reverse('billing:patient', args=[self.patient.pk]))
+        self.assertContains(history, 'NPR 400 + 1200 kept = <b>NPR 1600 held</b>')
+
+    def test_using_the_advance_and_paying_the_rest_shows_used_and_kept(self):
+        import datetime
+        self.post(self.today, 600, 1000)                                       # 400 held
+        self.post(self.today + datetime.timedelta(days=1), 800, 2000, 'advance_cash')   # 400 used, 400 cash, 1600 kept
+        second = BillingEntry.objects.order_by('entry_date')[1]
+        self.assertEqual(second.advance_trail, {'before': 400, 'used': 400, 'kept': 1600, 'after': 1600})
+
+    def test_the_payment_box_says_how_much_advance_is_left(self):
+        self.client.post(reverse('billing:advance-add', args=[self.patient.pk]), {'amount': '500', 'payment_mode': 'cash'})
+        page = self.client.get(reverse('billing:patient', args=[self.patient.pk]))
+        self.assertContains(page, 'left after this bill')
+        self.assertContains(page, 'in cash)')
