@@ -66,7 +66,7 @@ Use inside the form with the form's id, as in the billing page: include this fil
     var service = form.elements['service'], rate = form.elements['rate'];
     if (list.length) {
       if (service) service.value = list.map(line).join(' + ');
-      if (rate) rate.value = money(total);
+      if (rate) { rate.value = money(total); rate.dispatchEvent(new Event('input', { bubbles: true })); }
       sumEl.innerHTML = '<span>' + list.length + ' item' + (list.length > 1 ? 's' : '') + (off > 0 ? ' · subtotal NPR ' + money(total + off) + ' · discount − NPR ' + money(off) : '') + '</span><b>Total NPR ' + money(total) + '</b>';
     } else { sumEl.innerHTML = '<span>Choose a service from the list. You can still change the text and amount below.</span>'; }
     if (!saveBtn) { saveBtn = form.querySelector('button[type=submit]'); saveLabel = saveBtn ? saveBtn.textContent : ''; }

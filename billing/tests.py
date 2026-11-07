@@ -1664,3 +1664,49 @@ class EditBillWithAdvanceTests(BillingBase):
         self.client.post(reverse('billing:advance-refund', args=[self.patient.pk]), {'amount': '300', 'payment_mode': 'cash'})
         page = self.correct('advance')
         self.assertContains(page, 'no advance balance to use')
+
+
+class AdvanceDefaultsAndOldDuesTests(BillingBase):
+    def bill(self, **extra):
+        data = {'entry_date': self.today.isoformat(), 'service': 'S', 'rate': '700', 'payment_mode': 'cash', 'payment_status': 'paid', **extra}
+        return self.client.post(reverse('billing:patient-bill', args=[self.patient.pk]), data, follow=True)
+
+    def advance(self, amount):
+        self.client.post(reverse('billing:advance-add', args=[self.patient.pk]), {'amount': amount, 'payment_mode': 'cash'})
+
+    def test_a_patient_with_an_advance_is_billed_from_it_by_default(self):
+        page = self.client.get(reverse('billing:patient', args=[self.patient.pk]))
+        self.assertEqual(page.context['bill_form'].initial['payment_status'], 'paid')
+        self.advance('500')
+        page = self.client.get(reverse('billing:patient', args=[self.patient.pk]))
+        self.assertEqual(page.context['bill_form'].initial['payment_status'], 'advance')
+        self.assertContains(page, 'data-advance="500')
+
+    def test_the_patient_search_says_what_each_patient_holds_and_owes(self):
+        self.advance('500')
+        self.bill(payment_status='due')
+        results = self.client.get(reverse('accounts:appointment-patient-search'), {'q': 'Sita'}).json()['results']
+        self.assertEqual((results[0]['advance'], results[0]['dues']), (500.0, 700.0))
+
+    def test_extra_cash_clears_old_dues_first_and_the_rest_is_kept_as_advance(self):
+        self.bill(payment_status='due', rate='500')
+        old = BillingEntry.objects.get()
+        page = self.bill(rate='700', amount_given='1500', clear_dues='on')
+        old.refresh_from_db()
+        self.assertEqual((old.amount_paid, old.amount_due), (500, 0))
+        self.assertEqual(advance_balance(self.patient.pk), 300)  # 1500 handed over - 700 bill - 500 old dues
+        self.assertContains(page, 'NPR 500 of the extra cleared old dues')
+        self.assertContains(page, 'Advance held: NPR 0 to NPR 300')
+
+    def test_without_the_tick_all_the_extra_is_kept_as_advance_and_old_dues_stay(self):
+        self.bill(payment_status='due', rate='500')
+        old = BillingEntry.objects.get()
+        self.bill(rate='700', amount_given='1500')
+        old.refresh_from_db()
+        self.assertEqual((old.amount_due, advance_balance(self.patient.pk)), (500, 800))
+
+    def test_a_second_payment_the_same_day_keeps_the_advance_consistent(self):
+        self.advance('1000')
+        self.bill(payment_status='advance', rate='400')          # 1000 - 400 = 600
+        self.bill(rate='300', amount_given='500')                # pays 300, 200 extra -> 800
+        self.assertEqual(advance_balance(self.patient.pk), 800)

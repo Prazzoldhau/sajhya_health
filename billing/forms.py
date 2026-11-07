@@ -1,6 +1,7 @@
 from decimal import Decimal
 
 from django import forms
+from django.db.models import F
 
 from accounts.models import Patient
 from accounts.widgets import date_widget
@@ -18,6 +19,7 @@ class PaymentStatusMixin(forms.Form):
     amount_given = forms.DecimalField(required=False, min_value=0, max_digits=10, decimal_places=2, label='Cash handed over (NPR)',
                                       widget=forms.NumberInput(attrs={'placeholder': 'Only if more than the bill', 'step': '0.01', 'min': 0}),
                                       help_text='No change to give back? Enter what the patient handed over: the extra is carried over to their next session.')
+    clear_dues = forms.BooleanField(required=False, initial=True, label="Use the extra to clear this patient's old dues first")
     patient_linked = False  # the patient-tab form always knows the patient; the book form does once one is picked
 
     def clean_rate(self):
@@ -46,10 +48,24 @@ class PaymentStatusMixin(forms.Form):
                 self.add_error('amount_received', 'That is the full amount: choose "Paid in full" instead.')
         return data
 
+    def _clear_old_dues(self, entry, extra, user):
+        """The extra cash goes to this patient's oldest unpaid bills first; whatever is left is kept as advance. Returns what is left."""
+        older = (BillingEntry.objects.filter(patient_id=entry.patient_id, professional=entry.professional, cancelled_at__isnull=True, amount_paid__lt=F('rate'))
+                 .exclude(pk=entry.pk).order_by('entry_date', 'id'))
+        for old in older:
+            if extra <= 0:
+                break
+            paid = old.record_payment(min(extra, old.amount_due), entry.payment_mode, notes='Extra cash from a later bill', paid_on=entry.entry_date, user=user)
+            if paid:
+                extra -= paid.amount
+                self.cleared += paid.amount
+        return extra
+
     def apply_payment(self, entry, user=None):
         """After a new bill is saved: record what was received with it (nothing at all when it is left on credit)."""
         status = self.cleaned_data.get('payment_status') or 'paid'
         self.carried = Decimal('0')
+        self.cleared = Decimal('0')
         if status == 'advance':
             return entry.use_advance(user)
         if status in ('paid', 'advance_cash'):
@@ -60,6 +76,8 @@ class PaymentStatusMixin(forms.Form):
             given = owed if given is None else given
             paid = entry.record_payment(min(given, owed), entry.payment_mode, paid_on=entry.entry_date, user=user)
             extra = given - (paid.amount if paid else 0) if owed > 0 else given
+            if extra > 0 and entry.patient_id and self.cleaned_data.get('clear_dues'):
+                extra = self._clear_old_dues(entry, extra, user)
             if extra > 0 and entry.patient_id:  # no change given back: the extra is carried over as the patient's advance
                 entry.carry_over(extra, entry.payment_mode, user=user, paid_on=entry.entry_date)
                 self.carried = extra

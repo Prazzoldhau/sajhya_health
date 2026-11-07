@@ -423,9 +423,13 @@ def patient_search(request):
     patients = profile.workspace_patients().exclude(status='discharged').select_related('clinic')
     if q:
         patients = patients.filter(Q(name__icontains=q) | Q(phone__icontains=q) | Q(patient_code__icontains=q))
+    from billing.models import patient_money  # lazy: billing imports accounts
+    page = list(patients.order_by('name')[:10])
+    money = patient_money(p.pk for p in page)
     return JsonResponse({'results': [
-        {'id': p.pk, 'name': p.name, 'code': p.patient_code, 'phone': p.phone if can_see_contact(profile, p) else '', 'age': p.age, 'gender': p.gender}
-        for p in patients.order_by('name')[:10]]})
+        {'id': p.pk, 'name': p.name, 'code': p.patient_code, 'phone': p.phone if can_see_contact(profile, p) else '', 'age': p.age, 'gender': p.gender,
+         'advance': float(money[p.pk][0]), 'dues': float(money[p.pk][1])}
+        for p in page]})
 
 
 @login_required

@@ -342,3 +342,15 @@ class EmailNotSetUpTests(Base):
             r = self.client.post(reverse('soapnotes:email', args=[note.pk]), {'email': 'patient@example.com'}, follow=True)
         self.assertContains(r, 'not set up on this server')
         self.assertEqual((SoapShare.objects.count(), len(mail.outbox)), (0, 0))
+
+
+class TreatmentPickerTests(TestCase):
+    def test_the_note_form_offers_selectable_modalities(self):
+        from accounts.tests.helpers import make_patient, make_professional
+        user, profile = make_professional()
+        patient = make_patient(profile)
+        self.client.force_login(user)
+        page = self.client.get(reverse('soapnotes:new', args=[patient.pk]))
+        self.assertContains(page, 'id="txSearch"')
+        self.assertContains(page, 'Pick the modalities and treatments given')
+        self.assertContains(page, 'data-tx="')  # quick buttons of the person's own department

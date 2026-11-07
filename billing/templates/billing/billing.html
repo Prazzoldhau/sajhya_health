@@ -127,6 +127,8 @@
         <div class="two"><label>Payment {{ form.payment_status }}</label><label>Payment mode {{ form.payment_mode }}</label></div>
         <label id="receivedWrap" hidden>{{ form.amount_received.label }} {{ form.amount_received }}</label>
         <label id="givenWrap">{{ form.amount_given.label }} {{ form.amount_given }}<span class="hint">{{ form.amount_given.help_text }}</span></label>
+        <div id="clearWrap" hidden><label style="display:flex;gap:9px;align-items:center;font-size:12.5px;padding:8px 11px;border:1px solid #cfe6d8;background:#f1faf4;border-radius:9px"><input type="checkbox" name="clear_dues" id="clearDues" checked style="width:18px;height:18px;accent-color:#168653;flex:none"><span id="clearText"></span></label></div>
+        <div class="hint" id="advHint" hidden></div>
         <div class="hint" id="creditHint" hidden>Left on credit: it appears under <b>Payments due</b> until the patient pays.</div>
       </div>
       <label>Notes {{ form.notes }}</label>
@@ -140,18 +142,27 @@
   var form = $('entryForm');
   function f(name) { return form.elements[name]; }
   function open() { SajhyaUI.openModal('entryModal'); }
+  var held = { advance: 0, dues: 0 };  // what the picked patient holds in advance and owes, from the patient search
+  function num(name) { var v = parseFloat(f(name).value); return isNaN(v) ? 0 : v; }
   function syncPay() {
-    var s = f('payment_status').value;
+    var s = f('payment_status').value, rate = num('rate'), given = num('amount_given');
     $('receivedWrap').hidden = s !== 'partial'; $('creditHint').hidden = s !== 'due'; $('givenWrap').hidden = s !== 'paid' && s !== 'advance_cash';
+    var adv = $('advHint');
+    adv.hidden = !(held.advance > 0);
+    if (!adv.hidden) adv.textContent = 'Advance held: NPR ' + held.advance + '.' + (s === 'advance' && rate > held.advance ? ' It covers NPR ' + held.advance + ' of this NPR ' + rate + ' bill and the rest stays due; choose "Advance + pay the rest now" to take it now.' : '');
+    var owed = s === 'advance_cash' ? Math.max(rate - held.advance, 0) : rate, extra = given - owed, show = held.dues > 0 && (s === 'paid' || s === 'advance_cash') && extra > 0;
+    $('clearWrap').hidden = !show;
+    if (show) $('clearText').textContent = 'Use the extra NPR ' + extra + ' to clear old dues (NPR ' + held.dues + ' due) first; the rest, if any, is kept as advance.';
   }
   f('payment_status').addEventListener('change', syncPay);
+  f('rate').addEventListener('input', syncPay); f('amount_given').addEventListener('input', syncPay);
   $('newEntry').addEventListener('click', function () {
-    form.reset(); form.action = form.dataset.create; $('entryTitle').textContent = 'New billing entry'; $('payFields').hidden = false; $('svcPicker').hidden = false; syncPay(); f('patient').value = ''; f('entry_date').value = "{{ selected|date:'Y-m-d' }}";
+    form.reset(); held = { advance: 0, dues: 0 }; form.action = form.dataset.create; $('entryTitle').textContent = 'New billing entry'; $('payFields').hidden = false; $('svcPicker').hidden = false; syncPay(); f('patient').value = ''; f('entry_date').value = "{{ selected|date:'Y-m-d' }}";
     $('patientPick').hidden = false; $('detailsNote').hidden = false; lockDetails(true); open();
   });
   document.querySelectorAll('[data-edit]').forEach(function (b) {
     b.addEventListener('click', function () {
-      var d = b.dataset; form.action = d.url; $('entryTitle').textContent = 'Edit billing entry'; $('payFields').hidden = true; $('svcPicker').hidden = true; $('patientPick').hidden = true; $('detailsNote').hidden = true; lockDetails(false); form.classList.remove('svc-compact');
+      var d = b.dataset; held = { advance: 0, dues: 0 }; form.action = d.url; $('entryTitle').textContent = 'Edit billing entry'; $('payFields').hidden = true; $('svcPicker').hidden = true; $('patientPick').hidden = true; $('detailsNote').hidden = true; lockDetails(false); form.classList.remove('svc-compact');
       f('patient').value = d.patient; f('patient_name').value = d.name; f('entry_date').value = d.date; f('age').value = d.age; f('sex').value = d.sex;
       f('contact_number').value = d.contact; f('service').value = d.service; f('rate').value = d.rate; f('payment_mode').value = d.mode; f('notes').value = d.notes; open();
     });
@@ -169,11 +180,14 @@
     render: function (p) { return '<b>' + SajhyaUI.esc(p.name) + '</b> <span style="color:#7c9186">' + SajhyaUI.esc(p.code) + '</span>'; },
     onPick: function (p) {
       f('patient').value = p.id; f('patient_name').value = p.name; f('contact_number').value = p.phone || '';
+      held = { advance: p.advance || 0, dues: p.dues || 0 };
+      f('payment_status').value = held.advance > 0 ? 'advance' : 'paid';  // a patient with an advance is billed from it by default: typing the amount by hand invites mistakes
+      syncPay();
       if (p.age != null) f('age').value = p.age;
       if (p.gender) f('sex').value = p.gender;
       input.value = p.name + ' (' + p.code + ')';
     },
-    onType: function () { f('patient').value = ''; },
+    onType: function () { f('patient').value = ''; held = { advance: 0, dues: 0 }; syncPay(); },
   });
   // search a patient: pick from the list to see only that patient's bills (typing and pressing Enter searches names, phones and invoices)
   var find = $('billFind');

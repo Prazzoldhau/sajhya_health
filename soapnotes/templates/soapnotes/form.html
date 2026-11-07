@@ -82,7 +82,13 @@
 <section class="sn-sec">
   <header><span class="letter">P</span><div><h3>Plan</h3><span class="hint">Treatment, baseline metrics and clinical goals - the same format as the treatment plan, which can start from this note</span></div></header>
   <div class="sn-body">
-    <label class="sn-f">Treatment given today<textarea name="treatment_today" placeholder="Modalities, manual therapy, exercises performed, response to treatment">{{ v.treatment_today }}</textarea></label>
+    <div class="sn-f"><span>Treatment given today</span>
+      <div class="tx-pick" style="border:1px solid #dce8e0;border-radius:10px;padding:9px 11px;background:#f6faf7;margin-bottom:6px;display:grid;gap:7px">
+        <div style="font-size:11px;font-weight:800;color:#116b43">Pick the modalities and treatments given <span style="font-weight:600;color:#7c9186">search {{ treat_ui.hint }} or exercises; each one is added to the text below with its usual dose, which you can edit</span></div>
+        {% if treat_ui.chips %}<div style="display:flex;gap:6px;flex-wrap:wrap">{% for name, dose, short in treat_ui.chips %}<button type="button" data-tx="{{ name }}|{{ dose }}" style="border:1px solid #cfe6d8;background:#fff;border-radius:14px;padding:4px 10px;font-size:11px;font-weight:700;color:#116b43;cursor:pointer">＋ {{ short }}</button>{% endfor %}</div>{% endif %}
+        <span style="position:relative;display:block"><input type="search" id="txSearch" placeholder="{{ treat_ui.placeholder }}" autocomplete="off" style="width:100%"></span>
+      </div>
+      <textarea name="treatment_today" id="txText" placeholder="Modalities, manual therapy, exercises performed, response to treatment">{{ v.treatment_today }}</textarea></div>
     <div><div class="sn-sub">Baseline metrics</div>
       <div class="sn-chips" id="measureChips" style="margin:8px 0"></div>
       <div id="measuresBox" class="sn-rows"></div></div>
@@ -240,6 +246,25 @@
   }
   document.getElementById('hepAdd').addEventListener('click', add);
   [nameBox, doseBox].forEach(function (b) { b.addEventListener('keydown', function (e) { if (e.key === 'Enter') { e.preventDefault(); add(); } }); });
+})();
+</script>
+<script>
+(function () {
+  var text = document.getElementById('txText'), input = document.getElementById('txSearch');
+  if (!text || !input || !window.SajhyaUI) return;
+  function add(name, dose) {
+    name = (name || '').trim(); if (!name) return;
+    var line = '\u2022 ' + name + (dose ? ' - ' + dose : '');
+    if (text.value.toLowerCase().indexOf('\u2022 ' + name.toLowerCase()) < 0) text.value = (text.value.replace(/\s+$/, '') ? text.value.replace(/\s+$/, '') + '\n' : '') + line + '\n';
+    input.value = ''; text.focus(); text.scrollTop = text.scrollHeight;
+  }
+  SajhyaUI.picker(input, {
+    url: "{% url 'accounts:treatment-search' %}", minChars: 1, emptyText: 'No match - press Enter to add what you typed',
+    render: function (r) { return '<b>' + SajhyaUI.esc(r.name) + '</b> <span style="color:#7c9186">' + SajhyaUI.esc(r.group) + (r.dose ? ' \u00b7 ' + SajhyaUI.esc(r.dose) : '') + '</span>'; },
+    onPick: function (r) { add(r.name, r.dose); },
+  });
+  input.addEventListener('keydown', function (e) { if (e.key === 'Enter') { e.preventDefault(); if (input.value.trim()) add(input.value, ''); } });
+  document.querySelectorAll('[data-tx]').forEach(function (b) { b.addEventListener('click', function () { var p = b.dataset.tx.split('|'); add(p[0], p[1]); }); });
 })();
 </script>
 {% endblock %}

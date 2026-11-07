@@ -1,5 +1,5 @@
   <div class="section-title" class="pb-new" style="padding-top:18px" id="newBill"><span class="bar">New bill</span></div>
-  <form method="post" action="{% url 'billing:patient-bill' patient.pk %}" id="patientBill" class="mini-form" style="margin:0 24px 14px;padding:14px 16px;border:1px solid var(--line);border-radius:10px;background:#f6faf7">
+  <form method="post" action="{% url 'billing:patient-bill' patient.pk %}" id="patientBill" class="mini-form" data-advance="{{ advance_balance }}" data-dues="{{ patient_dues }}" style="margin:0 24px 14px;padding:14px 16px;border:1px solid var(--line);border-radius:10px;background:#f6faf7">
     {% csrf_token %}
     {% include 'billing/_service_picker.html' with form_id='patientBill' %}
     <div class="patient-id" style="margin-bottom:10px">Bill for <b>{{ patient.name }}</b> -- name, age and contact are filled in from the patient record.</div>
@@ -12,10 +12,17 @@
       <label id="billReceivedWrap" hidden>{{ bill_form.amount_received.label }} {{ bill_form.amount_received }}</label>
       <label id="billGivenWrap">{{ bill_form.amount_given.label }} {{ bill_form.amount_given }}</label>
     </div>
+    <div id="billClearWrap" hidden style="margin-top:8px"><label style="display:flex;gap:9px;align-items:center;font-size:12.5px;padding:8px 11px;border:1px solid #cfe6d8;background:#f1faf4;border-radius:9px"><input type="checkbox" name="clear_dues" checked style="width:18px;height:18px;accent-color:#168653;flex:none"><span id="billClearText"></span></label></div>
+    <div class="patient-id" id="billAdvHint" hidden style="margin-top:8px;color:#16834f;font-weight:700"></div>
     <div class="patient-id" id="billGivenHint" style="margin-top:8px">Patient handed over more than the bill and you have no change? Enter the cash handed over: the extra is kept as their advance and used at the next session.</div>
     <div class="patient-id" id="billCreditHint" hidden style="margin-top:8px">Left on credit: the amount stays due until you receive it from this tab or from Billing.</div>
     <label style="display:block;margin-top:10px">Notes {{ bill_form.notes }}</label>
-    <script>(function(){var s=document.querySelector('#patientBill [name=payment_status]');function sync(){document.getElementById('billReceivedWrap').hidden=s.value!=='partial';var g=s.value==='paid'||s.value==='advance_cash';document.getElementById('billGivenWrap').hidden=!g;document.getElementById('billGivenHint').hidden=!g;document.getElementById('billCreditHint').hidden=s.value!=='due';}s.addEventListener('change',sync);})();</script>
+    <script>(function(){var form=document.getElementById('patientBill'),s=form.querySelector('[name=payment_status]'),rate=form.querySelector('[name=rate]'),given=form.querySelector('[name=amount_given]');var advance=parseFloat(form.dataset.advance)||0,dues=parseFloat(form.dataset.dues)||0;
+function n(el){var v=parseFloat(el.value);return isNaN(v)?0:v;}
+function sync(){var st=s.value,r=n(rate),g=n(given);document.getElementById('billReceivedWrap').hidden=st!=='partial';var show=st==='paid'||st==='advance_cash';document.getElementById('billGivenWrap').hidden=!show;document.getElementById('billGivenHint').hidden=!show;document.getElementById('billCreditHint').hidden=st!=='due';
+var ah=document.getElementById('billAdvHint');ah.hidden=!(advance>0);ah.textContent='Advance held: NPR '+advance+'.'+(st==='advance'&&r>advance?' It covers NPR '+advance+' of this NPR '+r+' bill and the rest stays due; choose "Advance + pay the rest now" to take it now.':'');
+var owed=st==='advance_cash'?Math.max(r-advance,0):r,extra=g-owed,sc=dues>0&&show&&extra>0;document.getElementById('billClearWrap').hidden=!sc;if(sc)document.getElementById('billClearText').textContent='Use the extra NPR '+extra+' to clear old dues (NPR '+dues+' due) first; the rest, if any, is kept as advance.';}
+s.addEventListener('change',sync);rate.addEventListener('input',sync);given.addEventListener('input',sync);form.addEventListener('reset',function(){setTimeout(sync,0);});sync();})();</script>
     <div style="margin-top:10px;display:flex;gap:8px"><button type="submit" class="primary-btn">Save bill</button><button type="button" class="secondary-btn" onclick="document.getElementById('patientBill').reset()">Cancel</button></div>
   </form>
   <div class="section-title" style="padding-top:18px"><span class="bar">Advance paid</span><span>
@@ -30,7 +37,7 @@
     <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;align-items:end">
       <label>Amount (NPR) {{ advance_form.amount }}</label><label>Paid by {{ advance_form.payment_mode }}</label><label>Notes {{ advance_form.notes }}</label>
     </div>
-    <label style="display:flex;gap:8px;align-items:center;margin-top:10px;font-size:12px"><input type="checkbox" name="settle" value="1"> Use it to clear this patient's unpaid bills first</label>
+    <label style="display:flex;gap:8px;align-items:center;margin-top:10px;font-size:12px"><input type="checkbox" name="settle" value="1" {% if patient_dues %}checked{% endif %} style="width:18px;height:18px;accent-color:#168653"> Use it to clear this patient's unpaid bills first{% if patient_dues %} (NPR {{ patient_dues }} due){% endif %}</label>
     <div style="margin-top:10px;display:flex;gap:8px"><button type="submit" class="primary-btn">Save advance</button><button type="button" class="secondary-btn" onclick="var f=document.getElementById('advanceForm');f.reset();f.hidden=true">Cancel</button></div>
   </form>
   <form method="post" action="{% url 'billing:advance-refund' patient.pk %}" id="refundForm" hidden style="margin:0 24px 14px;padding:14px 16px;border:1px solid var(--line);border-radius:10px;background:#fff7f0">

@@ -22,7 +22,7 @@ from . import catalog, exports
 from . import package_docs as pdocs
 from . import invoice as inv
 from .forms import AdvanceForm, BillCorrectionForm, BillingEntryForm, EntryPaymentForm, PackagePaymentForm, PatientBillForm, PatientPackageForm
-from .models import PRODUCT_TYPES, StockMove, PackageSession, package_session_rows, ServiceItem, ADVANCE, BillingEntry, EntryPayment, PackagePayment, PatientAdvance, PatientPackage, advance_balance, lock_patient
+from .models import patient_money, PRODUCT_TYPES, StockMove, PackageSession, package_session_rows, ServiceItem, ADVANCE, BillingEntry, EntryPayment, PackagePayment, PatientAdvance, PatientPackage, advance_balance, lock_patient
 
 
 def revenue_for(profile, date):
@@ -46,6 +46,19 @@ def _selected_date(request):
 def _patient_page(request, patient):
     """Where to go after billing one patient: their own billing page (bills, packages and advances only, not the patient profile)."""
     return reverse('billing:patient', args=[patient.pk])
+
+
+def _advance_note(form, before, patient_id):
+    """What the bill did to the patient's old dues and advance, for the confirmation message."""
+    parts = []
+    cleared = getattr(form, 'cleared', Decimal('0'))
+    if cleared:
+        parts.append(f'NPR {float(cleared):g} of the extra cleared old dues.')
+    if patient_id and before is not None:
+        after = advance_balance(patient_id)
+        if after != before:
+            parts.append(f'Advance held: NPR {float(before):g} to NPR {float(after):g}.')
+    return (' ' + ' '.join(parts)) if parts else ''
 
 
 def _back(date):
@@ -159,12 +172,14 @@ def entry_save(request, pk=None):
                 messages.error(request, short)
                 return redirect('billing:billing')
         obj.save()
-        carried = None
+        carried, note = None, ''
         if not pk:
+            before = advance_balance(obj.patient_id) if obj.patient_id else None
             catalog.save_lines(obj, request.POST.get('lines'))
             form.apply_payment(obj, request.user)
             carried = getattr(form, 'carried', 0)
-        messages.success(request, f'Saved - {obj.invoice_number}' + (f'. NPR {carried:g} carried over as advance for {obj.patient_name}.' if carried else ''))
+            note = _advance_note(form, before, obj.patient_id)
+        messages.success(request, f'Saved - {obj.invoice_number}' + (f'. NPR {carried:g} carried over as advance for {obj.patient_name}.' if carried else '') + note)
         return _back(obj.entry_date)
     messages.error(request, first_error(form))
     return redirect('billing:billing')
@@ -192,12 +207,13 @@ def patient_bill(request, patient_id):
         entry.contact_number = patient.phone if can_see_contact(profile, patient) else ''
         entry.created_by_name, entry.created_by_role = actor_of(request.user, profile)
         entry.save()
+        before = advance_balance(patient.pk)
         catalog.save_lines(entry, request.POST.get('lines'))
         form.apply_payment(entry, request.user)
         carried = getattr(form, 'carried', 0)
         if form.cleaned_data.get('payment_status') == 'advance' and entry.amount_paid == 0:
             messages.info(request, f'{patient.name} has no advance balance, so the bill is left on credit.')
-        messages.success(request, f'Bill {entry.invoice_number} saved for {patient.name}.' + (f' NPR {entry.amount_due:g} is due.' if entry.amount_due else '') + (f' NPR {carried:g} carried over as advance - balance NPR {advance_balance(patient.pk):g}.' if carried else ''))
+        messages.success(request, f'Bill {entry.invoice_number} saved for {patient.name}.' + (f' NPR {entry.amount_due:g} is due.' if entry.amount_due else '') + (f' NPR {carried:g} carried over as advance - balance NPR {advance_balance(patient.pk):g}.' if carried else '') + _advance_note(form, before, patient.pk))
     else:
         messages.error(request, first_error(form))
     return back
@@ -1069,13 +1085,14 @@ def patient_billing(request, patient_id):
         return redirect('accounts:welcome')
     patient = get_object_or_404(profile.workspace_patients(), pk=patient_id)
     member = staff_member(request)
+    held, owing = patient_money([patient.pk])[patient.pk]  # a patient with an advance is billed from it by default
     bills = list(patient.billing_entries.prefetch_related('advance_moves', 'payments')[:50])
     live = [b for b in bills if not b.is_cancelled]
     context = billing_context(request, profile)
     context.update({
         'active': 'billing', 'billing_tab': 'book', 'patient': patient, 'show_contact': can_see_contact(profile, patient), 'back_url': reverse('billing:patient', args=[patient.pk]),
-        'bill_entries': bills, 'packages': patient.packages.prefetch_related('payments'), 'payment_form': PackagePaymentForm(), 'bill_form': PatientBillForm(initial={'entry_date': timezone.localdate()}),
-        'pay_form': EntryPaymentForm(), 'correct_form': BillCorrectionForm(), 'advance_form': AdvanceForm(), 'advance_balance': advance_balance(patient.pk), 'advance_moves': patient.advances.select_related('entry')[:15],
+        'bill_entries': bills, 'packages': patient.packages.prefetch_related('payments'), 'payment_form': PackagePaymentForm(), 'bill_form': PatientBillForm(initial={'entry_date': timezone.localdate(), 'payment_status': 'advance' if held > 0 else 'paid'}), 'patient_dues': owing,
+        'pay_form': EntryPaymentForm(), 'correct_form': BillCorrectionForm(), 'advance_form': AdvanceForm(), 'advance_balance': held, 'advance_moves': patient.advances.select_related('entry')[:15],
         'service_catalog': catalog.catalog_for(profile, member.clinic.owner if member else None),
         'totals': {'billed': sum((b.rate for b in live), Decimal('0')), 'received': sum((b.amount_paid for b in live), Decimal('0')), 'due': sum((b.amount_due for b in live), Decimal('0'))},
     })

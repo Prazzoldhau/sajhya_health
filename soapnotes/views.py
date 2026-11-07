@@ -11,6 +11,8 @@ from django.utils import timezone
 from django.views.decorators.http import require_POST
 
 from accounts.access import can_see_contact, own_patient, workspace_context
+from accounts.treatments import ui_for
+from assessments import disciplines
 from accounts.messaging import EMAIL_NOT_SET_UP, channel_links, email_ready
 from accounts.models import Visit
 from accounts.services import record_visit
@@ -66,7 +68,7 @@ def _form_context(request, profile, patient, note, posted=None, errors=None):
     context.update({
         'active': 'patients', 'patient': patient, 'note': note, 'state': state, 'previous': previous, 'errors': errors or [], 'posted': posted,
         'presets': presets, 'measure_presets': MEASURE_PRESETS, 'today': timezone.localdate().isoformat(),
-        'v': _values(note, posted),
+        'v': _values(note, posted), 'treat_ui': ui_for(disciplines.allowed(profile)),
         'flags': posted.getlist('red_flags') if posted is not None else note.red_flags,
         'types': SoapNote.TYPE_CHOICES, 'stages': SoapNote.STAGE_CHOICES, 'irritabilities': SoapNote.IRRITABILITY_CHOICES, 'prognoses': SoapNote.PROGNOSIS_CHOICES,
     })

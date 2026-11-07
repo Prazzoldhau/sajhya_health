@@ -246,3 +246,10 @@ In the bill form each service or product row has its own **Discount**, typed as 
 ## Edit bill: advance options
 
 The Edit bill window offers the same advance choices as a new bill. **Use advance balance** pays what is still due on the bill out of the patient's advance, as far as it goes (the rest stays due); **Advance + pay the rest now** uses the advance first and takes the remainder now in the payment mode shown. Payments already received are kept. The window shows the patient's advance balance, and the confirmation says how much was taken from the advance.
+
+## Advance and old dues when billing (QA 11)
+
+- **Advance by default.** When a patient who holds an advance is picked (New entry window), or on that patient's billing page, the Payment choice starts on **Use advance balance**, and a line shows the balance. If the advance is smaller than the bill, the line says the rest stays due and suggests **Advance + pay the rest now**.
+- **Extra cash and old dues.** When the cash handed over is more than the bill and the patient has unpaid bills, a green ticked box offers **Use the extra to clear old dues first**. Ticked: the extra pays the oldest unpaid bills first and only what is left is kept as advance. Unticked: all of the extra is kept as advance. The saved message says how much cleared old dues and how the advance changed ("Advance held: NPR 0 to NPR 300"). The advance balance is always the sum of its ledger: advance taken, minus advance used, plus extra kept, so a second payment the same day adds up the same way.
+- **Take advance** on the patient page now has "use it to clear unpaid bills first" ticked (green) when the patient owes something.
+- **SOAP note, Plan:** Treatment given today now has a search box and quick buttons for the person's own department's treatments and the exercise library. Picking one adds a line with its usual dose to the text, which stays free to edit.
