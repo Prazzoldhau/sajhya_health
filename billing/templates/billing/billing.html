@@ -155,11 +155,11 @@
   function syncPay() {
     var s = f('payment_status').value, rate = num('rate'), given = num('amount_given');
     relabel(rate);
-    $('receivedWrap').hidden = s !== 'partial'; $('creditHint').hidden = s !== 'due'; $('givenWrap').hidden = s !== 'paid' && s !== 'advance_cash';
+    $('receivedWrap').hidden = s !== 'partial'; $('creditHint').hidden = s !== 'due'; $('givenWrap').hidden = s !== 'paid' && s !== 'advance_cash' && s !== 'advance';
     var adv = $('advHint');
     adv.hidden = !(held.advance > 0);
     if (!adv.hidden) adv.textContent = 'Advance held: NPR ' + held.advance + '.' + (s === 'advance' && rate > held.advance ? ' It covers NPR ' + held.advance + ' of this NPR ' + rate + ' bill and the rest stays due; choose "Advance + pay the rest now" to take it now.' : '');
-    var owed = s === 'advance_cash' ? Math.max(rate - held.advance, 0) : rate, extra = given - owed, show = held.dues > 0 && (s === 'paid' || s === 'advance_cash') && extra > 0;
+    var owed = (s === 'advance_cash' || s === 'advance') ? Math.max(rate - held.advance, 0) : rate, extra = given - owed, show = held.dues > 0 && (s === 'paid' || s === 'advance_cash' || s === 'advance') && extra > 0;
     $('clearWrap').hidden = !show;
     if (show) $('clearText').textContent = 'Use the extra NPR ' + extra + ' to clear old dues (NPR ' + held.dues + ' due) first; the rest, if any, is kept as advance.';
   }

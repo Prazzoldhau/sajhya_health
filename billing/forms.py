@@ -36,7 +36,7 @@ class PaymentStatusMixin(forms.Form):
             return data
         status, rate, got = data.get('payment_status') or 'paid', data.get('rate'), data.get('amount_received')
         given = data.get('amount_given')
-        if status in ('paid', 'advance_cash') and given is not None and rate is not None:
+        if status in ('paid', 'advance_cash', 'advance') and given is not None and rate is not None:
             if status == 'paid' and given < rate:
                 self.add_error('amount_given', 'That is less than the bill: choose "Part paid" instead.')
             elif given > rate and not (self.patient_linked or data.get('patient')):
@@ -66,10 +66,10 @@ class PaymentStatusMixin(forms.Form):
         status = self.cleaned_data.get('payment_status') or 'paid'
         self.carried = Decimal('0')
         self.cleared = Decimal('0')
-        if status == 'advance':
+        if status == 'advance' and not self.cleaned_data.get('amount_given'):
             return entry.use_advance(user)
-        if status in ('paid', 'advance_cash'):
-            if status == 'advance_cash':
+        if status in ('paid', 'advance_cash', 'advance'):
+            if status in ('advance_cash', 'advance'):  # the advance is used first; cash handed over on top of it is kept as advance after the rest is paid
                 entry.use_advance(user)
             owed = entry.amount_due
             given = self.cleaned_data.get('amount_given')

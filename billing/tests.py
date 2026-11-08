@@ -1742,3 +1742,32 @@ class AdvanceAcrossDaysTests(BillingBase):
         page = self.client.get(reverse('billing:patient', args=[self.patient.pk]))
         self.assertContains(page, 'left after this bill')
         self.assertContains(page, 'in cash)')
+
+
+class ExtraCashWithAdvanceStatusTests(BillingBase):
+    def post(self, status, given, rate=500):
+        return self.client.post(reverse('billing:patient-bill', args=[self.patient.pk]),
+                                {'entry_date': self.today.isoformat(), 'service': 'S', 'rate': str(rate), 'payment_mode': 'cash', 'payment_status': status, 'amount_given': given}, follow=True)
+
+    def test_cash_handed_over_with_use_advance_balance_is_added_to_the_advance(self):
+        self.client.post(reverse('billing:advance-add', args=[self.patient.pk]), {'amount': '2150', 'payment_mode': 'cash'})
+        page = self.post('advance', '4000')     # 500 comes out of the advance, 4000 handed over is kept: 2150 - 500 + 4000
+        self.assertEqual(advance_balance(self.patient.pk), 5650)
+        entry = BillingEntry.objects.get()
+        self.assertEqual((entry.amount_paid, entry.advance_paid), (500, 500))
+        self.assertEqual(entry.advance_trail, {'before': 2150, 'used': 500, 'kept': 4000, 'after': 5650})
+        self.assertIn('Advance: NPR 2150 - NPR 500 used + NPR 4000 kept = NPR 5650 held', ' '.join(m.message for m in page.context['messages']))
+
+    def test_use_advance_without_cash_still_only_uses_the_advance(self):
+        self.client.post(reverse('billing:advance-add', args=[self.patient.pk]), {'amount': '2150', 'payment_mode': 'cash'})
+        self.post('advance', '')
+        self.assertEqual(advance_balance(self.patient.pk), 1650)
+
+    def test_paid_in_full_with_extra_cash_gives_the_same_total(self):
+        self.client.post(reverse('billing:advance-add', args=[self.patient.pk]), {'amount': '2150', 'payment_mode': 'cash'})
+        self.post('paid', '4000')               # 3500 extra kept: 2150 + 3500
+        self.assertEqual(advance_balance(self.patient.pk), 5650)
+
+    def test_the_cash_box_is_offered_for_use_advance_balance(self):
+        page = self.client.get(reverse('billing:billing'))
+        self.assertContains(page, "s !== 'advance_cash' && s !== 'advance'")
