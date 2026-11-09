@@ -1773,43 +1773,22 @@ class ExtraCashWithAdvanceStatusTests(BillingBase):
         self.assertContains(page, "s !== 'advance_cash' && s !== 'advance'")
 
 
-class PaidInFullPlusOldDuesTests(BillingBase):
-    def bill(self, rate, status, **extra):
+class RemainingDueOnTopTests(BillingBase):
+    def bill(self, rate, status='due', **extra):
         return self.client.post(reverse('billing:patient-bill', args=[self.patient.pk]),
                                 {'entry_date': self.today.isoformat(), 'service': 'S', 'rate': str(rate), 'payment_mode': 'cash', 'payment_status': status, **extra}, follow=True)
 
-    def two_old_dues(self):
-        self.bill(200, 'due')
-        self.bill(300, 'due')
-
-    def test_the_search_and_the_page_list_each_old_due(self):
-        self.two_old_dues()
+    def test_the_search_and_the_page_show_each_remaining_due_on_top_of_the_payment_box(self):
+        self.bill(200)
+        self.bill(300)
         results = self.client.get(reverse('accounts:appointment-patient-search'), {'q': 'Sita'}).json()['results']
         self.assertEqual((results[0]['dues'], results[0]['due_list']), (500.0, [200.0, 300.0]))
         page = self.client.get(reverse('billing:patient', args=[self.patient.pk]))
-        self.assertEqual(page.context['bill_form'].initial['payment_status'], 'paid_all')  # shown instead of plain "Paid in full"
-        self.assertContains(page, 'data-duelist="200,300"')
-        self.assertContains(page, 'Paid in full + old dues')
+        self.assertContains(page, 'Remaining due: <b>NPR 200, 300</b>')
+        self.assertContains(page, 'total <b>NPR 500</b>')
+        self.assertEqual(page.context['bill_form'].initial['payment_status'], 'paid')   # the choices are not changed
+        self.assertContains(self.client.get(reverse('billing:billing')), 'id="dueBanner"')
 
-    def test_paid_in_full_plus_old_dues_takes_this_bill_and_every_old_one(self):
-        self.two_old_dues()
-        page = self.bill(700, 'paid_all')
-        self.assertEqual([(e.amount_paid, e.amount_due) for e in BillingEntry.objects.order_by('id')], [(200, 0), (300, 0), (700, 0)])
-        self.assertEqual(advance_balance(self.patient.pk), 0)
-        self.assertIn('NPR 500 of the extra cleared old dues', ' '.join(m.message for m in page.context['messages']))
-
-    def test_less_cash_than_everything_pays_this_bill_then_the_oldest_dues(self):
-        self.two_old_dues()
-        self.bill(700, 'paid_all', amount_given='1000')       # 700 this bill, 300 to the old dues: 200 first, then 100 of 300
-        rows = [(e.amount_paid, e.amount_due) for e in BillingEntry.objects.order_by('id')]
-        self.assertEqual(rows, [(200, 0), (100, 200), (700, 0)])
-
-    def test_more_cash_than_everything_keeps_the_rest_as_advance(self):
-        self.two_old_dues()
-        self.bill(700, 'paid_all', amount_given='1500')       # 700 + 500 old dues, 300 left
-        self.assertEqual(advance_balance(self.patient.pk), 300)
-
-    def test_cash_below_this_bill_is_refused(self):
-        self.two_old_dues()
-        self.bill(700, 'paid_all', amount_given='400')
-        self.assertEqual(BillingEntry.objects.count(), 2)
+    def test_no_dues_no_banner(self):
+        page = self.client.get(reverse('billing:patient', args=[self.patient.pk]))
+        self.assertContains(page, 'id="billDueBanner" hidden')

@@ -124,12 +124,12 @@
       <div class="hint" id="detailsNote" style="margin-top:-4px">Name, age, sex and contact come from the patient's record.</div>
       <div class="two"><label>Service {{ form.service }}</label><label>Amount (NPR) {{ form.rate }}</label></div>
       <div id="payFields">
+        <div id="dueBanner" hidden style="margin-bottom:8px;padding:8px 12px;border:1px solid #f0d9a0;background:#fff8e6;border-radius:9px;font-size:13px;color:#8a5a00"></div>
         <div class="two" style="grid-template-columns:1fr"><label>Payment {{ form.payment_status }}</label><label>Payment mode {{ form.payment_mode }}</label></div>
         <label id="receivedWrap" hidden>{{ form.amount_received.label }} {{ form.amount_received }}</label>
         <label id="givenWrap">{{ form.amount_given.label }} {{ form.amount_given }}<span class="hint">{{ form.amount_given.help_text }}</span></label>
         <div id="clearWrap" hidden><label style="display:flex;gap:9px;align-items:center;font-size:12.5px;padding:8px 11px;border:1px solid #cfe6d8;background:#f1faf4;border-radius:9px"><input type="checkbox" name="clear_dues" id="clearDues" checked style="width:18px;height:18px;accent-color:#168653;flex:none"><span id="clearText"></span></label></div>
         <div class="hint" id="advHint" hidden></div>
-        <div class="hint" id="dueHint" hidden style="color:#a97510;font-weight:700"></div>
         <div class="hint" id="creditHint" hidden>Left on credit: it appears under <b>Payments due</b> until the patient pays.</div>
       </div>
       <label>Notes {{ form.notes }}</label>
@@ -147,10 +147,9 @@
   function num(name) { var v = parseFloat(f(name).value); return isNaN(v) ? 0 : v; }
   function m(x) { return Math.round(x * 100) / 100; }
   function relabel(rate) {  // the choices in the box itself say what the advance covers and what is left
-    var adv = held.advance, owing = held.dues > 0, listText = held.list.join(', ');
+    var adv = held.advance;
     Array.prototype.forEach.call(f('payment_status').options, function (o) {
-      if (o.value === 'paid') o.textContent = owing ? 'Paid in full (this bill only)' : 'Paid in full';
-      if (o.value === 'paid_all') { o.textContent = 'Paid in full + old dues (due ' + listText + ')'; o.hidden = o.disabled = !owing; }
+
       if (o.value === 'advance') o.textContent = adv > 0 ? 'Use advance balance (NPR ' + m(adv) + ' held' + (rate > 0 ? ', NPR ' + m(Math.max(adv - rate, 0)) + ' left after this bill' : '') + ')' : 'Use advance balance';
       if (o.value === 'advance_cash') o.textContent = adv > 0 && rate > 0 ? 'Advance + pay the rest now (NPR ' + m(Math.max(rate - adv, 0)) + ' in cash)' : 'Advance + pay the rest now';
     });
@@ -158,13 +157,13 @@
   function syncPay() {
     var s = f('payment_status').value, rate = num('rate'), given = num('amount_given');
     relabel(rate);
-    $('receivedWrap').hidden = s !== 'partial'; $('creditHint').hidden = s !== 'due'; $('givenWrap').hidden = s !== 'paid' && s !== 'paid_all' && s !== 'advance_cash' && s !== 'advance';
+    $('receivedWrap').hidden = s !== 'partial'; $('creditHint').hidden = s !== 'due'; $('givenWrap').hidden = s !== 'paid' && s !== 'advance_cash' && s !== 'advance';
     var adv = $('advHint');
     adv.hidden = !(held.advance > 0);
     if (!adv.hidden) adv.textContent = 'Advance held: NPR ' + held.advance + '.' + (s === 'advance' && rate > held.advance ? ' It covers NPR ' + held.advance + ' of this NPR ' + rate + ' bill and the rest stays due; choose "Advance + pay the rest now" to take it now.' : '');
-    var dh = $('dueHint');
-    dh.hidden = !(held.dues > 0);
-    if (!dh.hidden) dh.textContent = 'Old dues: NPR ' + held.list.join(' + ') + ' = NPR ' + m(held.dues) + (s === 'paid_all' ? '. Collect NPR ' + m(rate + held.dues) + ' now (this bill NPR ' + rate + ' + old dues); leave "Cash handed over" empty if that is exactly what was handed over.' : '.');
+    var db = $('dueBanner');  // what the patient still owes, on top of the Payment box
+    db.hidden = !(held.dues > 0);
+    if (!db.hidden) db.innerHTML = 'Remaining due: <b>NPR ' + held.list.join(', ') + '</b> &middot; total <b>NPR ' + m(held.dues) + '</b>';
     var owed = (s === 'advance_cash' || s === 'advance') ? Math.max(rate - held.advance, 0) : rate, extra = given - owed, show = held.dues > 0 && (s === 'paid' || s === 'advance_cash' || s === 'advance') && extra > 0;
     $('clearWrap').hidden = !show;
     if (show) $('clearText').textContent = 'Use the extra NPR ' + extra + ' to clear old dues (NPR ' + held.dues + ' due) first; the rest, if any, is kept as advance.';
@@ -196,7 +195,7 @@
     onPick: function (p) {
       f('patient').value = p.id; f('patient_name').value = p.name; f('contact_number').value = p.phone || '';
       held = { advance: p.advance || 0, dues: p.dues || 0, list: p.due_list || [] };
-      f('payment_status').value = held.advance > 0 ? 'advance' : held.dues > 0 ? 'paid_all' : 'paid';  // the advance first; else this bill together with what is already owed  // a patient with an advance is billed from it by default: typing the amount by hand invites mistakes
+      f('payment_status').value = held.advance > 0 ? 'advance' : 'paid';  // a patient with an advance is billed from it by default: typing the amount by hand invites mistakes
       syncPay();
       if (p.age != null) f('age').value = p.age;
       if (p.gender) f('sex').value = p.gender;

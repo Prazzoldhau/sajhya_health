@@ -1093,7 +1093,7 @@ def patient_billing(request, patient_id):
     context = billing_context(request, profile)
     context.update({
         'active': 'billing', 'billing_tab': 'book', 'patient': patient, 'show_contact': can_see_contact(profile, patient), 'back_url': reverse('billing:patient', args=[patient.pk]),
-        'bill_entries': bills, 'packages': patient.packages.prefetch_related('payments'), 'payment_form': PackagePaymentForm(), 'bill_form': PatientBillForm(initial={'entry_date': timezone.localdate(), 'payment_status': 'advance' if held > 0 else 'paid_all' if owing > 0 else 'paid'}), 'patient_dues': owing, 'patient_dues_list': ','.join(f'{float(x):g}' for x in owing_list[:8]),
+        'bill_entries': bills, 'packages': patient.packages.prefetch_related('payments'), 'payment_form': PackagePaymentForm(), 'bill_form': PatientBillForm(initial={'entry_date': timezone.localdate(), 'payment_status': 'advance' if held > 0 else 'paid'}), 'patient_dues': owing, 'patient_dues_list_text': ', '.join(f'{float(x):g}' for x in owing_list[:8]),
         'pay_form': EntryPaymentForm(), 'correct_form': BillCorrectionForm(), 'advance_form': AdvanceForm(), 'advance_balance': held, 'advance_moves': patient.advances.select_related('entry')[:15],
         'service_catalog': catalog.catalog_for(profile, member.clinic.owner if member else None),
         'totals': {'billed': sum((b.rate for b in live), Decimal('0')), 'received': sum((b.amount_paid for b in live), Decimal('0')), 'due': sum((b.amount_due for b in live), Decimal('0'))},

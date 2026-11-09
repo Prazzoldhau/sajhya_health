@@ -12,7 +12,7 @@ from .models import BillingEntry, EntryPayment, PackagePayment, PatientAdvance, 
 class PaymentStatusMixin(forms.Form):
     """New bills can be paid in full, part paid, or left on credit (due) - many patients settle at the end of the week.
     The payment mode is the mode of what is received now. Editing a bill never changes what was already received."""
-    payment_status = forms.ChoiceField(choices=[('paid', 'Paid in full'), ('paid_all', 'Paid in full + old dues'), ('partial', 'Part paid'), ('due', 'Not paid yet (credit)'), ('advance', 'Use advance balance'), ('advance_cash', 'Advance + pay the rest now')], initial='paid', required=False, label='Payment')
+    payment_status = forms.ChoiceField(choices=[('paid', 'Paid in full'), ('partial', 'Part paid'), ('due', 'Not paid yet (credit)'), ('advance', 'Use advance balance'), ('advance_cash', 'Advance + pay the rest now')], initial='paid', required=False, label='Payment')
     amount_received = forms.DecimalField(required=False, min_value=0, max_digits=10, decimal_places=2, label='Received now (NPR)',
                                          widget=forms.NumberInput(attrs={'placeholder': 'Amount received now', 'step': '0.01', 'min': 0}))
 
@@ -36,8 +36,8 @@ class PaymentStatusMixin(forms.Form):
             return data
         status, rate, got = data.get('payment_status') or 'paid', data.get('rate'), data.get('amount_received')
         given = data.get('amount_given')
-        if status in ('paid', 'paid_all', 'advance_cash', 'advance') and given is not None and rate is not None:
-            if status in ('paid', 'paid_all') and given < rate:
+        if status in ('paid', 'advance_cash', 'advance') and given is not None and rate is not None:
+            if status == 'paid' and given < rate:
                 self.add_error('amount_given', 'That is less than the bill: choose "Part paid" instead.')
             elif given > rate and not (self.patient_linked or data.get('patient')):
                 self.add_error('amount_given', 'The extra can only be carried over for a registered patient. Pick the patient, or enter the exact amount.')
@@ -69,11 +69,6 @@ class PaymentStatusMixin(forms.Form):
         status = self.cleaned_data.get('payment_status') or 'paid'
         self.carried = Decimal('0')
         self.cleared = Decimal('0')
-        if status == 'paid_all':  # this bill and the patient's old dues, in one go: the cash to take is this bill plus everything older that is unpaid
-            status = 'paid'
-            self.cleaned_data['clear_dues'] = bool(entry.patient_id)
-            if entry.patient_id and self.cleaned_data.get('amount_given') is None:
-                self.cleaned_data['amount_given'] = entry.amount_due + sum((o.amount_due for o in self._older_dues(entry)), Decimal('0'))
         if status == 'advance' and not self.cleaned_data.get('amount_given'):
             return entry.use_advance(user)
         if status in ('paid', 'advance_cash', 'advance'):
