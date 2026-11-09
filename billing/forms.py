@@ -12,7 +12,7 @@ from .models import BillingEntry, EntryPayment, PackagePayment, PatientAdvance, 
 class PaymentStatusMixin(forms.Form):
     """New bills can be paid in full, part paid, or left on credit (due) - many patients settle at the end of the week.
     The payment mode is the mode of what is received now. Editing a bill never changes what was already received."""
-    payment_status = forms.ChoiceField(choices=[('paid', 'Paid in full'), ('partial', 'Part paid'), ('due', 'Not paid yet (credit)'), ('advance', 'Use advance balance'), ('advance_cash', 'Advance + pay the rest now')], initial='paid', required=False, label='Payment')
+    payment_status = forms.ChoiceField(choices=[('', 'Choose the payment option'), ('paid', 'Paid in full'), ('partial', 'Part paid'), ('due', 'Not paid yet (credit)'), ('advance', 'Use advance balance'), ('advance_cash', 'Advance + pay the rest now')], initial='', required=False, label='Payment')
     amount_received = forms.DecimalField(required=False, min_value=0, max_digits=10, decimal_places=2, label='Received now (NPR)',
                                          widget=forms.NumberInput(attrs={'placeholder': 'Amount received now', 'step': '0.01', 'min': 0}))
 
@@ -33,6 +33,9 @@ class PaymentStatusMixin(forms.Form):
     def clean(self):
         data = super().clean()
         if self.instance.pk:
+            return data
+        if 'payment_status' in self.data and not data.get('payment_status'):  # the box was posted still on "Choose the payment option": never assume the bill was paid
+            self.add_error('payment_status', 'Choose how this bill was paid: paid in full, part paid, on credit or from the advance.')
             return data
         status, rate, got = data.get('payment_status') or 'paid', data.get('rate'), data.get('amount_received')
         given = data.get('amount_given')

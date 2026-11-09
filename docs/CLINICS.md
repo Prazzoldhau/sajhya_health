@@ -265,3 +265,7 @@ The Edit bill window offers the same advance choices as a new bill. **Use advanc
 ## Remaining due on top of the Payment box
 
 When the patient has unpaid bills, an amber line sits on top of the Payment box: "Remaining due: NPR 200, 300 - total NPR 500" (each unpaid bill, oldest first), so nobody has to look the amount up. The Payment choices are unchanged ("Paid in full", Part paid, credit, advance); the extra cash of a bill can still clear old dues (the green tick). Works in the New entry window (the line appears when the patient is picked) and on the patient's billing page.
+
+## The Payment box starts on "Choose the payment option"
+
+A new bill is never assumed to be paid. In the New entry window, on the patient's billing page and in the front-desk form, the Payment box starts on **Choose the payment option**; saving without choosing is stopped with a red message (and refused by the server if it is posted anyway). The one default kept is for a patient who holds an advance: the box starts on **Use advance balance**, as asked in QA 11. Editing an old bill is not affected.

@@ -1676,7 +1676,7 @@ class AdvanceDefaultsAndOldDuesTests(BillingBase):
 
     def test_a_patient_with_an_advance_is_billed_from_it_by_default(self):
         page = self.client.get(reverse('billing:patient', args=[self.patient.pk]))
-        self.assertEqual(page.context['bill_form'].initial['payment_status'], 'paid')
+        self.assertEqual(page.context['bill_form'].initial['payment_status'], '')   # no assumption: the box starts on "Choose the payment option"
         self.advance('500')
         page = self.client.get(reverse('billing:patient', args=[self.patient.pk]))
         self.assertEqual(page.context['bill_form'].initial['payment_status'], 'advance')
@@ -1786,9 +1786,44 @@ class RemainingDueOnTopTests(BillingBase):
         page = self.client.get(reverse('billing:patient', args=[self.patient.pk]))
         self.assertContains(page, 'Remaining due: <b>NPR 200, 300</b>')
         self.assertContains(page, 'total <b>NPR 500</b>')
-        self.assertEqual(page.context['bill_form'].initial['payment_status'], 'paid')   # the choices are not changed
+        self.assertEqual(page.context['bill_form'].initial['payment_status'], '')   # nothing is chosen for the user
         self.assertContains(self.client.get(reverse('billing:billing')), 'id="dueBanner"')
 
     def test_no_dues_no_banner(self):
         page = self.client.get(reverse('billing:patient', args=[self.patient.pk]))
         self.assertContains(page, 'id="billDueBanner" hidden')
+
+
+class ChooseThePaymentOptionTests(BillingBase):
+    def post(self, **extra):
+        data = {'entry_date': self.today.isoformat(), 'service': 'S', 'rate': '700', 'payment_mode': 'cash', **extra}
+        return self.client.post(reverse('billing:patient-bill', args=[self.patient.pk]), data, follow=True)
+
+    def test_the_box_starts_on_choose_and_a_bill_posted_without_a_choice_is_refused(self):
+        page = self.client.get(reverse('billing:patient', args=[self.patient.pk]))
+        self.assertEqual(page.context['bill_form'].initial['payment_status'], '')
+        self.assertContains(page, 'Choose the payment option')
+        refused = self.post(payment_status='')
+        self.assertEqual(BillingEntry.objects.count(), 0)
+        self.assertIn('Choose how this bill was paid', ' '.join(m.message for m in refused.context['messages']))
+
+    def test_choosing_paid_in_full_still_records_the_bill(self):
+        self.post(payment_status='paid')
+        entry = BillingEntry.objects.get()
+        self.assertEqual((entry.amount_paid, entry.amount_due), (700, 0))
+
+    def test_the_new_entry_window_starts_on_choose_and_guards_the_save(self):
+        page = self.client.get(reverse('billing:billing'))
+        self.assertContains(page, 'Choose the payment option')
+        self.assertContains(page, 'id="payErr"')
+
+    def test_editing_an_old_bill_is_not_blocked_by_the_box(self):
+        old = BillingEntry.objects.create(professional=self.profile, patient_name='Old Walk In', service='Consult', rate=400, payment_mode='cash', entry_date=self.today)
+        self.client.post(reverse('billing:entry-edit', args=[old.pk]), {'entry_date': self.today.isoformat(), 'patient_name': 'Old Walk In', 'service': 'Consult', 'rate': '450', 'payment_mode': 'cash', 'payment_status': ''})
+        old.refresh_from_db()
+        self.assertEqual(old.rate, 450)
+
+    def test_a_patient_with_an_advance_still_starts_on_the_advance(self):
+        self.client.post(reverse('billing:advance-add', args=[self.patient.pk]), {'amount': '500', 'payment_mode': 'cash'})
+        page = self.client.get(reverse('billing:patient', args=[self.patient.pk]))
+        self.assertEqual(page.context['bill_form'].initial['payment_status'], 'advance')

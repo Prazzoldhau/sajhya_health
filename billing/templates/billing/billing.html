@@ -130,6 +130,7 @@
         <label id="givenWrap">{{ form.amount_given.label }} {{ form.amount_given }}<span class="hint">{{ form.amount_given.help_text }}</span></label>
         <div id="clearWrap" hidden><label style="display:flex;gap:9px;align-items:center;font-size:12.5px;padding:8px 11px;border:1px solid #cfe6d8;background:#f1faf4;border-radius:9px"><input type="checkbox" name="clear_dues" id="clearDues" checked style="width:18px;height:18px;accent-color:#168653;flex:none"><span id="clearText"></span></label></div>
         <div class="hint" id="advHint" hidden></div>
+        <div class="hint" id="payErr" hidden style="color:#b83b3b;font-weight:700">Choose the payment option: paid in full, part paid, not paid yet, or from the advance.</div>
         <div class="hint" id="creditHint" hidden>Left on credit: it appears under <b>Payments due</b> until the patient pays.</div>
       </div>
       <label>Notes {{ form.notes }}</label>
@@ -156,7 +157,7 @@
   }
   function syncPay() {
     var s = f('payment_status').value, rate = num('rate'), given = num('amount_given');
-    relabel(rate);
+    relabel(rate); if (s) $('payErr').hidden = true;
     $('receivedWrap').hidden = s !== 'partial'; $('creditHint').hidden = s !== 'due'; $('givenWrap').hidden = s !== 'paid' && s !== 'advance_cash' && s !== 'advance';
     var adv = $('advHint');
     adv.hidden = !(held.advance > 0);
@@ -185,7 +186,8 @@
   // a new bill needs a registered patient, so the details are filled from the record and cannot be typed; an old unregistered bill can still be edited
   function lockDetails(on) { ['patient_name', 'age', 'sex', 'contact_number'].forEach(function (n) { var el = f(n); if (el.tagName === 'SELECT') el.disabled = false; el.readOnly = on; el.style.background = on ? '#f3f7f4' : ''; if (el.tagName === 'SELECT') el.style.pointerEvents = on ? 'none' : ''; }); }
   form.addEventListener('submit', function (ev) {
-    if (form.getAttribute('action') === form.dataset.create && !f('patient').value) { ev.preventDefault(); $('patientHint').style.color = '#b83b3b'; $('billSearch').focus(); }
+    if (form.getAttribute('action') === form.dataset.create && !f('patient').value) { ev.preventDefault(); $('patientHint').style.color = '#b83b3b'; $('billSearch').focus(); return; }
+    if (form.getAttribute('action') === form.dataset.create && !f('payment_status').value) { ev.preventDefault(); $('payErr').hidden = false; f('payment_status').focus(); }  // never save a bill as paid by default
   });
   // link to a registered patient: search, then pre-fill the details
   var input = $('billSearch');
@@ -195,13 +197,13 @@
     onPick: function (p) {
       f('patient').value = p.id; f('patient_name').value = p.name; f('contact_number').value = p.phone || '';
       held = { advance: p.advance || 0, dues: p.dues || 0, list: p.due_list || [] };
-      f('payment_status').value = held.advance > 0 ? 'advance' : 'paid';  // a patient with an advance is billed from it by default: typing the amount by hand invites mistakes
+      f('payment_status').value = held.advance > 0 ? 'advance' : '';  // a patient with an advance is billed from it by default: typing the amount by hand invites mistakes
       syncPay();
       if (p.age != null) f('age').value = p.age;
       if (p.gender) f('sex').value = p.gender;
       input.value = p.name + ' (' + p.code + ')';
     },
-    onType: function () { f('patient').value = ''; held = { advance: 0, dues: 0, list: [] }; f('payment_status').value = 'paid'; syncPay(); },
+    onType: function () { f('patient').value = ''; held = { advance: 0, dues: 0, list: [] }; f('payment_status').value = ''; syncPay(); },
   });
   // search a patient: pick from the list to see only that patient's bills (typing and pressing Enter searches names, phones and invoices)
   var find = $('billFind');
