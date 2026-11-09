@@ -348,14 +348,15 @@ def lock_patient(patient_id):
 
 
 def patient_money(patient_ids):
-    """{patient_id: (advance held, unpaid bills total)} for these patients, in two queries (the bill form uses it to default to the advance and to offer clearing old dues)."""
+    """{patient_id: (advance held, unpaid bills total, [each unpaid bill's amount, oldest first])} for these patients, in two queries (the bill form uses it to default to the advance and to show and clear old dues)."""
     from django.db.models import F, Sum
     ids = list(patient_ids)
     advance = dict(PatientAdvance.objects.filter(patient_id__in=ids).values('patient_id').annotate(t=Sum('amount')).values_list('patient_id', 't'))
     due = {}
-    for pid, owing in BillingEntry.objects.filter(patient_id__in=ids, cancelled_at__isnull=True, amount_paid__lt=F('rate')).values_list('patient_id', F('rate') - F('amount_paid')):
-        due[pid] = due.get(pid, Decimal('0')) + owing
-    return {pid: (max(advance.get(pid) or Decimal('0'), Decimal('0')), due.get(pid, Decimal('0'))) for pid in ids}
+    unpaid = BillingEntry.objects.filter(patient_id__in=ids, cancelled_at__isnull=True, amount_paid__lt=F('rate')).order_by('entry_date', 'id')
+    for pid, owing in unpaid.values_list('patient_id', F('rate') - F('amount_paid')):
+        due.setdefault(pid, []).append(owing)
+    return {pid: (max(advance.get(pid) or Decimal('0'), Decimal('0')), sum(due.get(pid, []), Decimal('0')), due.get(pid, [])) for pid in ids}
 
 
 def advance_balance(patient_id):

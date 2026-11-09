@@ -428,7 +428,7 @@ def patient_search(request):
     money = patient_money(p.pk for p in page)
     return JsonResponse({'results': [
         {'id': p.pk, 'name': p.name, 'code': p.patient_code, 'phone': p.phone if can_see_contact(profile, p) else '', 'age': p.age, 'gender': p.gender,
-         'advance': float(money[p.pk][0]), 'dues': float(money[p.pk][1])}
+         'advance': float(money[p.pk][0]), 'dues': float(money[p.pk][1]), 'due_list': [float(x) for x in money[p.pk][2]][:8]}
         for p in page]})
 
 

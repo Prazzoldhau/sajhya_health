@@ -457,7 +457,7 @@ def patient_search(request, member):
     page = list(patients.order_by('name')[:10])
     money = patient_money(p.pk for p in page)
     return JsonResponse({'results': [{'id': p.pk, 'name': p.name, 'code': p.patient_code, 'phone': p.phone if member.can('contact') else '',
-                                      'age': p.age, 'gender': p.gender, 'advance': float(money[p.pk][0]), 'dues': float(money[p.pk][1])} for p in page]})
+                                      'age': p.age, 'gender': p.gender, 'advance': float(money[p.pk][0]), 'dues': float(money[p.pk][1]), 'due_list': [float(x) for x in money[p.pk][2]][:8]} for p in page]})
 
 
 @desk_view('queue_manage')
