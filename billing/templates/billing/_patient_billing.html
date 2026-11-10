@@ -1,5 +1,5 @@
   <div class="section-title" class="pb-new" style="padding-top:18px" id="newBill"><span class="bar">New bill</span></div>
-  <form method="post" action="{% url 'billing:patient-bill' patient.pk %}" id="patientBill" class="mini-form" data-advance="{{ advance_balance }}" data-dues="{{ patient_dues }}" style="margin:0 24px 14px;padding:14px 16px;border:1px solid var(--line);border-radius:10px;background:#f6faf7">
+  <form method="post" action="{% url 'billing:patient-bill' patient.pk %}" id="patientBill" class="mini-form" data-advance="{{ advance_balance }}" data-dues="{{ patient_dues }}" data-duelist="{{ patient_dues_list_text }}" style="margin:0 24px 14px;padding:14px 16px;border:1px solid var(--line);border-radius:10px;background:#f6faf7">
     {% csrf_token %}
     {% include 'billing/_service_picker.html' with form_id='patientBill' %}
     <div class="patient-id" style="margin-bottom:10px">Bill for <b>{{ patient.name }}</b> -- name, age and contact are filled in from the patient record.</div>
@@ -19,15 +19,20 @@
     <div class="patient-id" id="billPayErr" hidden style="margin-top:8px;color:#b83b3b;font-weight:700">Choose the payment option: paid in full, part paid, not paid yet, or from the advance.</div>
     <div class="patient-id" id="billCreditHint" hidden style="margin-top:8px">Left on credit: the amount stays due until you receive it from this tab or from Billing.</div>
     <label style="display:block;margin-top:10px">Notes {{ bill_form.notes }}</label>
-    <script>(function(){var form=document.getElementById('patientBill'),s=form.querySelector('[name=payment_status]'),rate=form.querySelector('[name=rate]'),given=form.querySelector('[name=amount_given]');var advance=parseFloat(form.dataset.advance)||0,dues=parseFloat(form.dataset.dues)||0;
+    <script>(function(){var form=document.getElementById('patientBill'),s=form.querySelector('[name=payment_status]'),rate=form.querySelector('[name=rate]'),given=form.querySelector('[name=amount_given]');var advance=parseFloat(form.dataset.advance)||0,dues=parseFloat(form.dataset.dues)||0,dueList=(form.dataset.duelist||'').split(/,\s*/).filter(Boolean),recv=form.querySelector('[name=amount_received]'),clr=form.querySelector('[name=clear_dues]');
 function n(el){var v=parseFloat(el.value);return isNaN(v)?0:v;}
 function m(x){return Math.round(x*100)/100;}
 function relabel(r){Array.prototype.forEach.call(s.options,function(o){if(o.value==='advance')o.textContent=advance>0?'Use advance balance (NPR '+m(advance)+' held'+(r>0?', NPR '+m(Math.max(advance-r,0))+' left after this bill':'')+')':'Use advance balance';if(o.value==='advance_cash')o.textContent=advance>0&&r>0?'Advance + pay the rest now (NPR '+m(Math.max(r-advance,0))+' in cash)':'Advance + pay the rest now';});}
+function remaining(st,r,g){var owed=(st==='advance_cash'||st==='advance')?Math.max(r-advance,0):r,old=dues,thisDue=0,cash=0;
+if(st==='due')thisDue=r;else if(st==='partial')thisDue=Math.max(r-n(recv),0);else if(st==='paid'||st==='advance_cash'){cash=g>0?g:owed;thisDue=Math.max(owed-cash,0);}else if(st==='advance'){cash=g>0?g:0;thisDue=Math.max(owed-cash,0);}
+var extra=cash-owed,cleared=extra>0&&old>0&&clr&&clr.checked;if(cleared)old=Math.max(old-extra,0);
+if(old<=0&&thisDue<=0)return '';function b(x){return '<b>NPR '+m(x)+'</b>';}var oldNote='old'+(!cleared&&dueList.length>1?': '+dueList.join(', '):'');
+if(thisDue>0)return 'Remaining due after this bill: '+(old>0?b(old)+' ('+oldNote+') + '+b(thisDue)+' (this bill) = '+b(old+thisDue):b(thisDue)+' (this bill)');return 'Remaining due: '+b(old)+' ('+oldNote+' dues)';}
 function sync(){var st=s.value,r=n(rate),g=n(given);relabel(r);document.getElementById('billReceivedWrap').hidden=st!=='partial';var show=st==='paid'||st==='advance_cash'||st==='advance';document.getElementById('billGivenWrap').hidden=!show;document.getElementById('billGivenHint').hidden=!show;document.getElementById('billCreditHint').hidden=st!=='due';
 var ah=document.getElementById('billAdvHint');ah.hidden=!(advance>0);ah.textContent='Advance held: NPR '+advance+'.'+(st==='advance'&&r>advance?' It covers NPR '+advance+' of this NPR '+r+' bill and the rest stays due; choose "Advance + pay the rest now" to take it now.':'');
-var owed=(st==='advance_cash'||st==='advance')?Math.max(r-advance,0):r,extra=g-owed,sc=dues>0&&show&&extra>0;document.getElementById('billClearWrap').hidden=!sc;if(sc)document.getElementById('billClearText').textContent='Use the extra NPR '+extra+' to clear old dues (NPR '+dues+' due) first; the rest, if any, is kept as advance.';}
+var owed=(st==='advance_cash'||st==='advance')?Math.max(r-advance,0):r,extra=g-owed,sc=dues>0&&show&&extra>0;document.getElementById('billClearWrap').hidden=!sc;var bn=document.getElementById('billDueBanner'),bt=remaining(st,r,g);bn.hidden=!bt;bn.innerHTML=bt;if(sc)document.getElementById('billClearText').textContent='Use the extra NPR '+extra+' to clear old dues (NPR '+dues+' due) first; the rest, if any, is kept as advance.';}
 form.addEventListener('submit',function(ev){if(!s.value){ev.preventDefault();document.getElementById('billPayErr').hidden=false;s.focus();}});s.addEventListener('change',function(){if(s.value)document.getElementById('billPayErr').hidden=true;});
-s.addEventListener('change',sync);rate.addEventListener('input',sync);given.addEventListener('input',sync);form.addEventListener('reset',function(){setTimeout(sync,0);});sync();})();</script>
+s.addEventListener('change',sync);rate.addEventListener('input',sync);given.addEventListener('input',sync);recv.addEventListener('input',sync);clr.addEventListener('change',sync);form.addEventListener('reset',function(){setTimeout(sync,0);});sync();})();</script>
     <div style="margin-top:10px;display:flex;gap:8px"><button type="submit" class="primary-btn">Save bill</button><button type="button" class="secondary-btn" onclick="document.getElementById('patientBill').reset()">Cancel</button></div>
   </form>
   <div class="section-title" style="padding-top:18px"><span class="bar">Advance paid</span><span>

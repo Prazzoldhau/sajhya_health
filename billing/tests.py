@@ -1785,7 +1785,7 @@ class RemainingDueOnTopTests(BillingBase):
         self.assertEqual((results[0]['dues'], results[0]['due_list']), (500.0, [200.0, 300.0]))
         page = self.client.get(reverse('billing:patient', args=[self.patient.pk]))
         self.assertContains(page, 'Remaining due: <b>NPR 200, 300</b>')
-        self.assertContains(page, 'total <b>NPR 500</b>')
+        self.assertContains(page, 'data-duelist="200, 300"')   # the page adds this bill's own unpaid part to it as the payment is chosen
         self.assertEqual(page.context['bill_form'].initial['payment_status'], '')   # nothing is chosen for the user
         self.assertContains(self.client.get(reverse('billing:billing')), 'id="dueBanner"')
 

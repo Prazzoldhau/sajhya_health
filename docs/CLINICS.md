@@ -264,7 +264,7 @@ The Edit bill window offers the same advance choices as a new bill. **Use advanc
 
 ## Remaining due on top of the Payment box
 
-When the patient has unpaid bills, an amber line sits on top of the Payment box: "Remaining due: NPR 200, 300 - total NPR 500" (each unpaid bill, oldest first), so nobody has to look the amount up. The Payment choices are unchanged ("Paid in full", Part paid, credit, advance); the extra cash of a bill can still clear old dues (the green tick). Works in the New entry window (the line appears when the patient is picked) and on the patient's billing page.
+When the patient has unpaid bills, an amber line sits on top of the Payment box and adds up what will still be due once this bill is saved, following the payment chosen: "Remaining due after this bill: NPR 200 (old) + NPR 100 (this bill) = NPR 300" (for a 600 bill part paid with 500 received and an old due of 200). With nothing chosen yet it shows the old dues only ("NPR 200 (old dues)"); extra cash that clears old dues (the green tick) reduces the old part. The Payment choices are unchanged ("Paid in full", Part paid, credit, advance); the extra cash of a bill can still clear old dues (the green tick). Works in the New entry window (the line appears when the patient is picked) and on the patient's billing page.
 
 ## The Payment box starts on "Choose the payment option"
 

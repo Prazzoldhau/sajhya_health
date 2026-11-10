@@ -155,6 +155,20 @@
       if (o.value === 'advance_cash') o.textContent = adv > 0 && rate > 0 ? 'Advance + pay the rest now (NPR ' + m(Math.max(rate - adv, 0)) + ' in cash)' : 'Advance + pay the rest now';
     });
   }
+  function remainingText(s, rate, given) {
+    var advance = held.advance, owed = (s === 'advance_cash' || s === 'advance') ? Math.max(rate - advance, 0) : rate, old = held.dues, thisDue = 0, cash = 0;
+    if (s === 'due') thisDue = rate;
+    else if (s === 'partial') thisDue = Math.max(rate - num('amount_received'), 0);
+    else if (s === 'paid' || s === 'advance_cash') { cash = given > 0 ? given : owed; thisDue = Math.max(owed - cash, 0); }
+    else if (s === 'advance') { cash = given > 0 ? given : 0; thisDue = Math.max(owed - cash, 0); }
+    var extra = cash - owed, clear = $('clearDues'), cleared = extra > 0 && old > 0 && clear && clear.checked;
+    if (cleared) old = Math.max(old - extra, 0);
+    if (old <= 0 && thisDue <= 0) return '';
+    function b(x) { return '<b>NPR ' + m(x) + '</b>'; }
+    var oldNote = 'old' + (!cleared && held.list.length > 1 ? ': ' + held.list.join(', ') : '');
+    if (thisDue > 0) return 'Remaining due after this bill: ' + (old > 0 ? b(old) + ' (' + oldNote + ') + ' + b(thisDue) + ' (this bill) = ' + b(old + thisDue) : b(thisDue) + ' (this bill)');
+    return 'Remaining due: ' + b(old) + ' (' + oldNote + ' dues)';
+  }
   function syncPay() {
     var s = f('payment_status').value, rate = num('rate'), given = num('amount_given');
     relabel(rate); if (s) $('payErr').hidden = true;
@@ -162,15 +176,14 @@
     var adv = $('advHint');
     adv.hidden = !(held.advance > 0);
     if (!adv.hidden) adv.textContent = 'Advance held: NPR ' + held.advance + '.' + (s === 'advance' && rate > held.advance ? ' It covers NPR ' + held.advance + ' of this NPR ' + rate + ' bill and the rest stays due; choose "Advance + pay the rest now" to take it now.' : '');
-    var db = $('dueBanner');  // what the patient still owes, on top of the Payment box
-    db.hidden = !(held.dues > 0);
-    if (!db.hidden) db.innerHTML = 'Remaining due: <b>NPR ' + held.list.join(', ') + '</b> &middot; total <b>NPR ' + m(held.dues) + '</b>';
+    var db = $('dueBanner'), html = remainingText(s, rate, given);  // what is still due once this bill is saved, on top of the Payment box
+    db.hidden = !html; db.innerHTML = html;
     var owed = (s === 'advance_cash' || s === 'advance') ? Math.max(rate - held.advance, 0) : rate, extra = given - owed, show = held.dues > 0 && (s === 'paid' || s === 'advance_cash' || s === 'advance') && extra > 0;
     $('clearWrap').hidden = !show;
     if (show) $('clearText').textContent = 'Use the extra NPR ' + extra + ' to clear old dues (NPR ' + held.dues + ' due) first; the rest, if any, is kept as advance.';
   }
   f('payment_status').addEventListener('change', syncPay);
-  f('rate').addEventListener('input', syncPay); f('amount_given').addEventListener('input', syncPay);
+  f('rate').addEventListener('input', syncPay); f('amount_given').addEventListener('input', syncPay); f('amount_received').addEventListener('input', syncPay); $('clearDues').addEventListener('change', syncPay);
   $('newEntry').addEventListener('click', function () {
     form.reset(); held = { advance: 0, dues: 0, list: [] }; form.action = form.dataset.create; $('entryTitle').textContent = 'New billing entry'; $('payFields').hidden = false; $('svcPicker').hidden = false; syncPay(); f('patient').value = ''; f('entry_date').value = "{{ selected|date:'Y-m-d' }}";
     $('patientPick').hidden = false; $('detailsNote').hidden = false; lockDetails(true); open();
