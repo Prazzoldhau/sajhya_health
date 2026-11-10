@@ -94,6 +94,13 @@ class BillingEntry(models.Model):
         return sum((m.amount for m in self.advance_moves.all() if m.kind == 'deposit' and m.amount > 0), Decimal('0'))
 
     @property
+    def paid_summary(self):
+        """For the bill tables, in one line: what the patient handed over or had settled (paid), how much of it came from their advance (used),
+        how much extra was kept as advance (kept) and what is still due."""
+        kept = self.carried_over
+        return {'paid': self.amount_paid + kept, 'used': self.advance_paid or None, 'kept': kept or None, 'due': self.amount_due or None}
+
+    @property
     def advance_trail(self):
         """What this bill did to the patient's advance, as a sum: held before, minus what it used, plus what it kept, equals held after.
         None when the bill never touched the advance. The figures come from the advance ledger, so they stay right when later bills follow."""

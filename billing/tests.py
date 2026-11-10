@@ -558,14 +558,14 @@ class AdvanceTests(BillingBase):
         self.assertContains(tab, 'Advance balance: NPR 0')
         self.assertContains(tab, 'Used for a bill')
         self.assertContains(tab, 'Advance balance remaining: NPR 0')  # the balance is shown with the billing history too
-        self.assertContains(tab, 'NPR 700.00 paid from advance')  # and which bill drew on it
+        self.assertContains(tab, 'from advance (700)')  # and which bill drew on it
 
     def test_the_billing_history_shows_the_advance_balance_left(self):
         self.take('1000')
         self.bill('800')
         tab = self.client.get(reverse('billing:patient', args=[self.patient.pk]))
         self.assertContains(tab, 'Advance balance remaining: NPR 200')
-        self.assertContains(tab, 'NPR 800.00 paid from advance')
+        self.assertContains(tab, 'from advance (800)')
 
     def test_take_advance_can_clear_unpaid_bills_and_credit_can_be_received_from_the_advance(self):
         self.client.post(reverse('billing:patient-bill', args=[self.patient.pk]), {'entry_date': self.today.isoformat(), 'service': 'S', 'rate': '600', 'payment_mode': 'cash', 'payment_status': 'due'})
@@ -796,8 +796,8 @@ class InvoiceExtraTests(BillingBase):
         self.assertEqual((page.context['carried'], page.context['advance_now']), (200, 200))
         self.assertIn('Your extra NPR 200.00 is kept as advance', page.context['message'])
         self.assertTrue(self.client.get(reverse('billing:invoice-pdf', args=[entry.pk])).content.startswith(b'%PDF'))
-        self.assertContains(self.client.get(reverse('billing:billing')), '+NPR 200')
-        self.assertContains(self.client.get(reverse('billing:patient', args=[self.patient.pk])), '+NPR 200')
+        self.assertContains(self.client.get(reverse('billing:billing')), 'advance (+200)')
+        self.assertContains(self.client.get(reverse('billing:patient', args=[self.patient.pk])), 'advance (+200)')
 
     def test_a_bill_with_no_extra_says_nothing_about_advance(self):
         self.client.post(reverse('billing:patient-bill', args=[self.patient.pk]), {'entry_date': self.today.isoformat(), 'service': 'Session', 'rate': '500', 'payment_mode': 'cash', 'payment_status': 'paid'})
@@ -1827,3 +1827,37 @@ class ChooseThePaymentOptionTests(BillingBase):
         self.client.post(reverse('billing:advance-add', args=[self.patient.pk]), {'amount': '500', 'payment_mode': 'cash'})
         page = self.client.get(reverse('billing:patient', args=[self.patient.pk]))
         self.assertEqual(page.context['bill_form'].initial['payment_status'], 'advance')
+
+
+class PaidColumnTests(BillingBase):
+    def post(self, rate, status, **extra):
+        return self.client.post(reverse('billing:patient-bill', args=[self.patient.pk]),
+                                {'entry_date': self.today.isoformat(), 'service': 'S', 'rate': str(rate), 'payment_mode': 'cash', 'payment_status': status, **extra}, follow=True)
+
+    def test_each_bill_reads_paid_then_advance_or_due(self):
+        self.post(700, 'paid', amount_given='1000')               # 1000 handed over, 300 kept
+        self.post(600, 'partial', amount_received='500')          # 500 paid, 100 due
+        entries = {e.rate: e for e in BillingEntry.objects.all()}
+        self.assertEqual(entries[700].paid_summary, {'paid': 1000, 'used': None, 'kept': 300, 'due': None})
+        self.assertEqual(entries[600].paid_summary, {'paid': 500, 'used': None, 'kept': None, 'due': 100})
+        for url in (reverse('billing:patient', args=[self.patient.pk]), reverse('billing:billing')):
+            page = self.client.get(url)
+            self.assertContains(page, '<b>Paid (1000)</b>')
+            self.assertContains(page, 'advance (+300)')
+            self.assertContains(page, '<b>Paid (500)</b>')
+            self.assertContains(page, 'due (100)')
+
+    def test_a_bill_settled_from_the_advance_says_so(self):
+        self.client.post(reverse('billing:advance-add', args=[self.patient.pk]), {'amount': '300', 'payment_mode': 'cash'})
+        self.post(500, 'advance')                                  # 300 from the advance, 200 still due
+        page = self.client.get(reverse('billing:patient', args=[self.patient.pk]))
+        self.assertContains(page, '<b>Paid (300)</b>')
+        self.assertContains(page, 'from advance (300)')
+        self.assertContains(page, 'due (200)')
+
+    def test_an_unpaid_bill_reads_unpaid_and_a_cancelled_one_a_dash(self):
+        self.post(400, 'due')
+        entry = BillingEntry.objects.get()
+        self.assertContains(self.client.get(reverse('billing:patient', args=[self.patient.pk])), '<b>Unpaid</b>')
+        self.client.post(reverse('billing:entry-cancel', args=[entry.pk]), {'reason': 'x'})
+        self.assertNotContains(self.client.get(reverse('billing:patient', args=[self.patient.pk])), '<b>Unpaid</b>')

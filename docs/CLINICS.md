@@ -269,3 +269,7 @@ When the patient has unpaid bills, an amber line sits on top of the Payment box 
 ## The Payment box starts on "Choose the payment option"
 
 A new bill is never assumed to be paid. In the New entry window, on the patient's billing page and in the front-desk form, the Payment box starts on **Choose the payment option**; saving without choosing is stopped with a red message (and refused by the server if it is posted anyway). The one default kept is for a patient who holds an advance: the box starts on **Use advance balance**, as asked in QA 11. Editing an old bill is not affected.
+
+## A Paid column in the bill tables
+
+The daily billing book and the patient's billing history have a **Paid** column after Amount that reads each bill at a glance: **Paid (1000) · advance (+300)** (1000 handed over for a 700 bill, 300 kept as advance), **Paid (500) · due (100)**, **Paid (300) · from advance (300) · due (200)** (settled from the advance, the rest still due), or **Unpaid · due (600)**. Under it the advance sum ("Advance: NPR 400 + 1200 kept = NPR 1600 held") is shown when the bill touched the advance. The Status column keeps the status word and the Receive button.

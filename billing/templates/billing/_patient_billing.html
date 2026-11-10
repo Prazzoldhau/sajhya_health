@@ -105,11 +105,12 @@ s.addEventListener('change',sync);rate.addEventListener('input',sync);given.addE
   </div>
   <div class="table-wrap" style="padding:0 24px 20px">
     <table>
-      <thead><tr><th>DATE</th><th>INVOICE</th><th>SERVICE</th><th>PAYMENT</th><th style="text-align:right">AMOUNT</th><th style="text-align:right">STATUS</th><th></th></tr></thead>
+      <thead><tr><th>DATE</th><th>INVOICE</th><th>SERVICE</th><th>PAYMENT</th><th style="text-align:right">AMOUNT</th><th>PAID</th><th style="text-align:right">STATUS</th><th></th></tr></thead>
       <tbody>
       {% for b in bill_entries %}
         <tr><td>{{ b.entry_date|date:"Y-m-d" }}</td><td>{{ b.invoice_number }}</td><td>{{ b.service }}{% if b.created_by_name %}<div class="patient-id">by {{ b.created_by_name }}{% if b.created_by_role %} ({{ b.created_by_role }}){% endif %}</div>{% endif %}</td><td>{% if b.advance_paid and b.advance_paid >= b.amount_paid %}Advance{% else %}{{ b.get_payment_mode_display }}{% endif %}</td><td style="text-align:right"><b>NPR {{ b.rate }}</b></td>
-          <td style="text-align:right">{% if b.advance_paid and not b.is_cancelled %}<div class="patient-id" style="color:#b78317;font-weight:700">NPR {{ b.advance_paid }} paid from advance</div>{% endif %}{% if b.carried_over and not b.is_cancelled %}<div class="patient-id" style="color:#16834f;font-weight:700">+NPR {{ b.carried_over }} kept as advance</div>{% endif %}{% with t=b.advance_trail %}{% if t and not b.is_cancelled %}<div class="patient-id" style="color:#116b43">Advance: NPR {{ t.before|floatformat:"-2" }}{% if t.used %} &minus; {{ t.used|floatformat:"-2" }} used{% endif %}{% if t.kept %} + {{ t.kept|floatformat:"-2" }} kept{% endif %} = <b>NPR {{ t.after|floatformat:"-2" }} held</b></div>{% endif %}{% endwith %}{% if b.is_cancelled %}<span style="color:#b83b3b;font-weight:700">Cancelled</span>{% elif b.status_key == 'paid' %}<span style="color:#16834f;font-weight:700">Paid</span>{% else %}<span style="color:#b78317;font-weight:700">{{ b.status_label }} · NPR {{ b.amount_due }} due</span> <button type="button" class="table-action" data-pay data-url="{% url 'billing:entry-payment' b.pk %}" data-next="{{ back_url }}" data-name="{{ patient.name }}" data-due="{{ b.amount_due }}" data-invoice="{{ b.invoice_number }}">Receive</button>{% endif %}</td>
+          <td>{% include 'billing/_paid_cell.html' with bill=b %}</td>
+          <td style="text-align:right">{% if b.is_cancelled %}<span style="color:#b83b3b;font-weight:700">Cancelled</span>{% elif b.status_key == 'paid' %}<span style="color:#16834f;font-weight:700">Paid</span>{% else %}<span style="color:#b78317;font-weight:700">{{ b.status_label }} · NPR {{ b.amount_due }} due</span> <button type="button" class="table-action" data-pay data-url="{% url 'billing:entry-payment' b.pk %}" data-next="{{ back_url }}" data-name="{{ patient.name }}" data-due="{{ b.amount_due }}" data-invoice="{{ b.invoice_number }}">Receive</button>{% endif %}</td>
           <td style="text-align:right;white-space:nowrap">
             <a class="table-action" href="{% url 'billing:invoice' b.pk %}?next={{ back_url|urlencode:'' }}" style="text-decoration:none" title="Invoice: PDF, WhatsApp, e-mail">Invoice</a>
             {% if b.is_cancelled %}<form method="post" action="{% url 'billing:entry-restore' b.pk %}" style="display:inline">{% csrf_token %}<input type="hidden" name="next" value="{{ back_url }}"><button class="table-action" type="submit">Restore</button></form>
@@ -117,7 +118,7 @@ s.addEventListener('change',sync);rate.addEventListener('input',sync);given.addE
             <form method="post" action="{% url 'billing:entry-cancel' b.pk %}" style="display:inline" data-cancel-bill>{% csrf_token %}<input type="hidden" name="next" value="{{ back_url }}"><input type="hidden" name="reason"><button class="table-action" type="submit">Cancel bill</button></form>{% endif %}
           </td></tr>
       {% empty %}
-        <tr><td colspan="7" style="padding:22px;text-align:center;color:var(--muted)">No bills recorded for this patient yet.</td></tr>
+        <tr><td colspan="8" style="padding:22px;text-align:center;color:var(--muted)">No bills recorded for this patient yet.</td></tr>
       {% endfor %}
       </tbody>
     </table>

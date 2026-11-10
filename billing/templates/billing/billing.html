@@ -49,7 +49,7 @@
   {% if not search %}<div class="modes">{% for label, value in by_mode %}<span class="mode-chip">{{ label }}: NPR {{ value }}</span>{% endfor %}</div>{% endif %}
   <div class="table-wrap">
     <table>
-      <thead><tr><th>INVOICE{% if search %} / DATE{% endif %}</th><th>PATIENT</th><th>SERVICE</th><th>PAYMENT</th><th style="text-align:right">AMOUNT</th><th>STATUS</th><th class="no-print"></th></tr></thead>
+      <thead><tr><th>INVOICE{% if search %} / DATE{% endif %}</th><th>PATIENT</th><th>SERVICE</th><th>PAYMENT</th><th style="text-align:right">AMOUNT</th><th>PAID</th><th>STATUS</th><th class="no-print"></th></tr></thead>
       <tbody>
       {% for e in entries %}
         <tr{% if e.is_cancelled %} style="opacity:.55"{% endif %}>
@@ -58,7 +58,8 @@
           <td>{{ e.service }}{% if e.notes %}<div class="patient-id">{{ e.notes }}</div>{% endif %}{% if e.created_by_name %}<div class="patient-id">Billed by {{ e.created_by_name }}{% if e.created_by_role %} ({{ e.created_by_role }}){% endif %}</div>{% endif %}</td>
           <td>{{ e.get_payment_mode_display }}</td>
           <td style="text-align:right"><b{% if e.is_cancelled %} style="text-decoration:line-through"{% endif %}>NPR {{ e.rate }}</b></td>
-          <td>{% if e.carried_over and not e.is_cancelled %}<div class="patient-id" style="color:#16834f;font-weight:700">+NPR {{ e.carried_over }} kept as advance</div>{% endif %}{% with t=e.advance_trail %}{% if t and not e.is_cancelled %}<div class="patient-id" style="color:#116b43">Advance: NPR {{ t.before|floatformat:"-2" }}{% if t.used %} &minus; {{ t.used|floatformat:"-2" }} used{% endif %}{% if t.kept %} + {{ t.kept|floatformat:"-2" }} kept{% endif %} = <b>NPR {{ t.after|floatformat:"-2" }} held</b></div>{% endif %}{% endwith %}{% if e.is_cancelled %}<span style="color:#b83b3b;font-weight:700">Cancelled</span>{% if e.cancel_reason %}<div class="patient-id">{{ e.cancel_reason }}</div>{% endif %}{% elif e.status_key == 'paid' %}<span style="color:#16834f;font-weight:700">Paid</span>{% else %}<span style="color:#b78317;font-weight:700">{{ e.status_label }}</span><div class="patient-id">NPR {{ e.amount_due }} due</div>{% endif %}</td>
+          <td>{% include 'billing/_paid_cell.html' with bill=e %}</td>
+          <td>{% if e.is_cancelled %}<span style="color:#b83b3b;font-weight:700">Cancelled</span>{% if e.cancel_reason %}<div class="patient-id">{{ e.cancel_reason }}</div>{% endif %}{% elif e.status_key == 'paid' %}<span style="color:#16834f;font-weight:700">Paid</span>{% else %}<span style="color:#b78317;font-weight:700">{{ e.status_label }}</span><div class="patient-id">NPR {{ e.amount_due }} due</div>{% endif %}</td>
           <td class="no-print"><div class="row-actions">
             <a class="table-action" href="{% url 'billing:invoice' e.pk %}" style="text-decoration:none" title="Invoice: PDF, WhatsApp, e-mail">Invoice</a>
             {% if e.is_cancelled %}
@@ -76,7 +77,7 @@
           </div></td>
         </tr>
       {% empty %}
-        <tr><td colspan="7" style="padding:28px;text-align:center;color:var(--muted)">{% if search %}No bills found for that search.{% else %}Nothing billed on this day. Click <b>New entry</b> to log a payment.{% endif %}</td></tr>
+        <tr><td colspan="8" style="padding:28px;text-align:center;color:var(--muted)">{% if search %}No bills found for that search.{% else %}Nothing billed on this day. Click <b>New entry</b> to log a payment.{% endif %}</td></tr>
       {% endfor %}
       </tbody>
       {% if entries %}<tfoot><tr><td colspan="4" style="text-align:right;font-weight:800;padding:12px">{% if search %}Total billed{% else %}Day total billed{% endif %}</td><td style="text-align:right;font-weight:800;padding:12px">NPR {% if search %}{{ search.billed }}{% else %}{{ total }}{% endif %}</td><td colspan="2" class="no-print"></td></tr></tfoot>{% endif %}
