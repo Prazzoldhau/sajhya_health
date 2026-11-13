@@ -8,7 +8,7 @@ from billing.models import PatientAllowance, SlotOrder
 
 from .forms import SettingsEmailForm, SettingsPracticeForm, SettingsProfileForm
 
-TABS = [('profile', 'My profile'), ('practice', 'Practice'), ('plan', 'Plan & usage'), ('account', 'Account & security')]
+TABS = [('profile', 'My profile'), ('practice', 'Practice'), ('plan', 'Plan & usage'), ('account', 'Account & security'), ('security', 'Two-step sign-in'), ('access', 'Access log')]
 
 
 @login_required
@@ -17,6 +17,8 @@ def settings_page(request):
     if profile is None:
         return redirect('accounts:welcome')
     tab = request.GET.get('tab') if request.GET.get('tab') in dict(TABS) else 'profile'
+    if tab in ('security', 'access'):  # their own pages
+        return redirect('accounts:security' if tab == 'security' else 'accounts:access-log')
     forms_by_tab = {
         'profile': lambda data=None, files=None: SettingsProfileForm(data, files, instance=profile),
         'practice': lambda data=None, files=None: SettingsPracticeForm(data, instance=profile),

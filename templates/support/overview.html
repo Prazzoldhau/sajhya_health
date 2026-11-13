@@ -1,0 +1,9 @@
+{% extends 'support/base.html' %}
+{% block title %}Support overview{% endblock %}
+{% block body %}
+<h1>Support overview</h1><div class="sub">Workspaces and how many patients each holds.</div>
+<div class="note">This screen shows counts and codes only, never names, phone numbers or notes. Every page you open here is written to that clinic's access log.</div>
+<table><thead><tr><th>#</th><th>Practice</th><th>Status</th><th>Patients</th><th>Type</th><th></th></tr></thead><tbody>
+{% for r in rows %}<tr><td>{{ r.id }}</td><td>{{ r.practice }}</td><td>{{ r.status }}</td><td>{{ r.patients }}</td><td>{% if r.clinic_login %}clinic login{% else %}professional{% endif %}</td><td><a href="{% url 'support-workspace' r.id %}">Open</a></td></tr>
+{% empty %}<tr><td colspan="6">No workspaces.</td></tr>{% endfor %}</tbody></table>
+{% endblock %}

@@ -1,0 +1,39 @@
+{% extends 'accounts/auth_base.html' %}
+{% block title %}Two-step sign-in - Sajhya Health{% endblock %}
+{% block card %}
+<h1>Two-step sign-in</h1>
+{% if new_codes %}
+<p class="auth-sub"><b>Save these recovery codes now.</b> Each works once if you lose your phone. They are not shown again.</p>
+<pre style="background:#f4faf6;border:1px solid #cfe6d8;border-radius:10px;padding:12px 16px;font-size:15px;line-height:1.8">{% for c in new_codes %}{{ c }}
+{% endfor %}</pre>
+<div class="auth-alert" role="status"><div>Two-step sign-in is on. From now on you enter a code from your authenticator app after your password.</div></div>
+<a class="btn-sj primary block" href="{% url 'accounts:welcome' %}">I have saved them: continue</a>
+{% elif on %}
+<p class="auth-sub">Two-step sign-in is <b>on</b>. {{ recovery_left }} recovery code{{ recovery_left|pluralize }} left.</p>
+{% if error %}<div class="auth-alert error" role="alert"><div>{{ error }}</div></div>{% endif %}
+<form method="post" novalidate>{% csrf_token %}<input type="hidden" name="action" value="regenerate">
+    <div class="field"><label for="c1">Make new recovery codes: enter a code from your app</label><div class="control"><input id="c1" name="code" inputmode="numeric" autocomplete="one-time-code" required></div></div>
+    <button class="btn-sj outline block" type="submit">Make new recovery codes</button></form>
+{% if not forced %}
+<div class="divider">Turn it off</div>
+<form method="post" novalidate>{% csrf_token %}<input type="hidden" name="action" value="disable">
+    <div class="field"><label for="c2">Code from your app</label><div class="control"><input id="c2" name="code" inputmode="numeric" autocomplete="one-time-code" required></div></div>
+    <div class="field"><label for="p2">Your password</label><div class="control"><input id="p2" name="password" type="password" autocomplete="current-password" required></div></div>
+    <button class="btn-sj ghost block" type="submit">Turn two-step sign-in off</button></form>
+{% else %}<p class="auth-sub" style="margin-top:14px">Platform staff accounts must keep two-step sign-in on.</p>{% endif %}
+{% else %}
+<p class="auth-sub">{% if forced %}Platform staff accounts need this to open the admin and support pages. {% endif %}Protect your account with a code from an authenticator app (Google Authenticator, Microsoft Authenticator, Authy or FreeOTP).</p>
+{% if error %}<div class="auth-alert error" role="alert"><div>{{ error }}</div></div>{% endif %}
+<ol style="padding-left:18px;line-height:1.7">
+  <li>Install an authenticator app on your phone.</li>
+  <li>Add a new account in the app and choose <b>Enter a setup key</b>. Type this key (spaces do not matter):<br>
+      <code style="font-size:16px;letter-spacing:1px;background:#f4faf6;padding:4px 8px;border-radius:6px;display:inline-block;margin:4px 0">{{ secret }}</code><br>
+      On a phone you can also <a href="{{ uri }}">tap here to open it in your authenticator app</a>.</li>
+  <li>Type the 6 digit code the app shows for this account.</li>
+</ol>
+<form method="post" novalidate>{% csrf_token %}<input type="hidden" name="action" value="confirm">
+    <div class="field"><label for="c0">6 digit code</label><div class="control"><input id="c0" name="code" inputmode="numeric" autocomplete="one-time-code" autofocus required></div></div>
+    <button class="btn-sj primary block" type="submit"><i class="fa-solid fa-shield-halved"></i> Turn on two-step sign-in</button></form>
+{% endif %}
+<div class="forgot-row" style="margin-top:12px"><a href="{% url 'accounts:welcome' %}" class="btn-sj soft">Back</a></div>
+{% endblock %}

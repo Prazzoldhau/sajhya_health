@@ -1,0 +1,31 @@
+{% extends 'accounts/pro_base.html' %}
+{% block title %}Access log | Sajhya Health{% endblock %}
+{% block main %}
+<div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:6px"><h1 style="margin:0;font-size:24px">Access log</h1>
+  <span class="patient-id" style="display:inline">Who opened, exported or shared your patients' records, who signed in, and what Sajhya's own staff opened.</span></div>
+<div class="panel" style="padding:12px 16px;margin-bottom:12px;font-size:13px;color:#426052">
+  Every line below is written by the app when it happens. {% if support_count %}<b style="color:#a97510">{{ support_count }} line{{ support_count|pluralize }} below {{ support_count|pluralize:"is,are" }} from Sajhya support staff.</b>{% else %}No Sajhya support staff opened your workspace in the lines shown.{% endif %}
+  Support staff see patient codes and counts only, never names or notes.
+</div>
+<form method="get" style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px">
+  <select name="what" style="height:34px;border:1px solid var(--line);border-radius:8px;padding:0 8px;background:#fff">
+    <option value="">Everything</option>
+    <option value="view" {% if what == 'view' %}selected{% endif %}>Records opened</option><option value="export" {% if what == 'export' %}selected{% endif %}>Exports</option>
+    <option value="share" {% if what == 'share' %}selected{% endif %}>Shared with a patient</option><option value="login" {% if what == 'login' %}selected{% endif %}>Sign-ins</option>
+    <option value="support" {% if what == 'support' %}selected{% endif %}>Support access</option></select>
+  <label style="display:flex;gap:6px;align-items:center;font-size:13px"><input type="checkbox" name="who" value="support" {% if only_operator %}checked{% endif %}> Sajhya staff only</label>
+  <button class="primary-btn" type="submit" style="height:34px">Show</button>
+</form>
+<div class="table-wrap"><table>
+  <thead><tr><th>WHEN</th><th>WHO</th><th>WHAT</th><th>PATIENT</th><th>FROM</th></tr></thead>
+  <tbody>
+  {% for r in rows %}
+    <tr><td style="white-space:nowrap">{{ r.row.at|date:"Y-m-d H:i" }}</td>
+      <td><b>{{ r.row.user_label|default:"-" }}</b>{% if r.row.operator %} <span class="status hold" style="background:#fff3d6;color:#a97510">Sajhya staff</span>{% endif %}<div class="patient-id">{{ r.row.role }}</div></td>
+      <td>{{ r.row.get_action_display_text }}{% if r.row.detail %}<div class="patient-id">{{ r.row.detail }}</div>{% endif %}</td>
+      <td>{% if r.row.patient_code %}{{ r.patient|default:"-" }}<div class="patient-id">{{ r.row.patient_code }}</div>{% else %}-{% endif %}</td>
+      <td class="patient-id">{{ r.row.ip }}</td></tr>
+  {% empty %}<tr><td colspan="5" style="padding:24px;text-align:center;color:var(--muted)">Nothing recorded yet.</td></tr>{% endfor %}
+  </tbody></table></div>
+<p class="patient-id" style="margin-top:8px">The newest 300 lines are shown.</p>
+{% endblock %}

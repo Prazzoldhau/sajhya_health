@@ -3,7 +3,7 @@ from django.contrib.auth.decorators import login_required
 from django.urls import path
 from django.views.generic import TemplateView
 
-from . import appointments, notices, plans, report_views, settings_views, treatments, views
+from . import appointments, notices, plans, report_views, security_views, settings_views, treatments, views
 from .forms import StyledAuthenticationForm
 from . import auth_views as password_views
 
@@ -14,7 +14,10 @@ urlpatterns = [
     path('signup/client/', views.signup, {'account_type': 'client'}, name='signup-client'),
     path('signup/<str:account_type>/', views.select_type, name='select-type'),
     path('signup/<str:account_type>/<int:subtype_id>/', views.signup, name='signup'),
-    path('login/', auth_views.LoginView.as_view(template_name='accounts/login.html', redirect_authenticated_user=True, authentication_form=StyledAuthenticationForm), name='login'),
+    path('login/', security_views.MfaLoginView.as_view(template_name='accounts/login.html', redirect_authenticated_user=True, authentication_form=StyledAuthenticationForm), name='login'),
+    path('login/verify/', security_views.login_verify, name='login-verify'),
+    path('security/', security_views.security_page, name='security'),
+    path('access-log/', security_views.access_log, name='access-log'),
     path('logout/', auth_views.LogoutView.as_view(), name='logout'),
     path('professional/step/<int:step>/', views.professional_step, name='professional-step'),
     path('professional/document/<str:field>/', views.professional_document, name='professional-document'),

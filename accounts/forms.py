@@ -77,7 +77,7 @@ class SignupForm(UserCreationForm):
     def clean_email(self):
         email = self.cleaned_data['email'].strip()
         if User.objects.filter(email__iexact=email).exists():
-            raise ValidationError('An account with this email address already exists. Sign in, or use "Forgot your password?".')
+            raise ValidationError('This e-mail address cannot be used to create an account. If you already registered, sign in, or use "Forgot your password?".')
         return email
 
     def __init__(self, *args, account_type, subtype, **kwargs):

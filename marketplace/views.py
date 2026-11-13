@@ -9,6 +9,8 @@ from django.contrib import messages
 from django.core.paginator import Paginator
 from django.http import Http404, JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
+
+from sajhya_health.safe import local_path, same_site_url
 from django.template.loader import render_to_string
 
 from sajhya_health.throttle import too_many
@@ -129,7 +131,7 @@ def add_to_cart(request, product_id, catalog):
     if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
         return JsonResponse({'success': True, 'cart_count': cart_count(request, catalog)})
     messages.success(request, f'"{product.name}" added to cart!')
-    return redirect(request.GET.get('next') or request.META.get('HTTP_REFERER') or catalog.urls['list'])
+    return redirect(local_path(request, request.GET.get('next'), '') or same_site_url(request, request.META.get('HTTP_REFERER'), '') or catalog.urls['list'])
 
 
 def remove_from_cart(request, product_id, catalog):

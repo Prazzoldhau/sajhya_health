@@ -552,3 +552,51 @@ class PlanItem(models.Model):
 
     class Meta:
         ordering = ['order', 'id']
+
+
+class AccessLog(models.Model):
+    """Who opened, exported or shared patient records, and when. Written by the app itself (accounts/audit.py), read by the clinic owner on the
+    Access log page. Entries made by the platform's own staff (operator=True) are shown to the clinic as "Sajhya support"."""
+    at = models.DateTimeField(default=timezone.now, db_index=True)
+    user = models.ForeignKey(settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.SET_NULL, related_name='+')
+    user_label = models.CharField(max_length=150, blank=True, help_text='The name at the time, kept even if the account is later removed.')
+    role = models.CharField(max_length=40, blank=True)
+    operator = models.BooleanField(default=False, db_index=True, help_text='The platform operator (staff account), not one of the clinic\'s own people.')
+    workspace = models.ForeignKey('ProfessionalProfile', null=True, blank=True, on_delete=models.SET_NULL, related_name='access_log', help_text='Whose records were touched.')
+    clinic = models.ForeignKey('clinics.Clinic', null=True, blank=True, on_delete=models.SET_NULL, related_name='access_log')
+    patient_code = models.CharField(max_length=40, blank=True)
+    action = models.CharField(max_length=20, db_index=True, help_text='view, export, share, download, login, operator, support')
+    detail = models.CharField(max_length=250, blank=True)
+    path = models.CharField(max_length=200, blank=True)
+    ip = models.CharField(max_length=45, blank=True)
+
+    class Meta:
+        ordering = ['-at', '-id']
+        indexes = [models.Index(fields=['workspace', '-at']), models.Index(fields=['clinic', '-at'])]
+
+    ACTION_TEXT = {'view': 'Opened', 'export': 'Exported', 'share': 'Shared with a patient', 'download': 'Downloaded', 'login': 'Signed in', 'support': 'Support opened',
+                   'operator': 'Staff opened an admin page', 'mfa': 'Two-step sign-in'}
+
+    @property
+    def get_action_display_text(self):
+        return self.ACTION_TEXT.get(self.action, self.action)
+
+    def __str__(self):
+        return f'{self.at:%Y-%m-%d %H:%M} {self.user_label} {self.action} {self.detail}'
+
+
+class TwoFactor(models.Model):
+    """Two-step sign-in with an authenticator app (a time-based six digit code, RFC 6238), and ten one-time recovery codes kept only as hashes."""
+    user = models.OneToOneField(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='two_factor')
+    secret = models.CharField(max_length=32)
+    confirmed_at = models.DateTimeField(null=True, blank=True)
+    last_step = models.BigIntegerField(default=0, help_text='The newest time step already used: a code cannot be used twice.')
+    recovery_hashes = models.JSONField(default=list, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    @property
+    def is_on(self):
+        return self.confirmed_at is not None
+
+    def __str__(self):
+        return f'Two-step sign-in for {self.user_id} ({"on" if self.is_on else "not confirmed"})'

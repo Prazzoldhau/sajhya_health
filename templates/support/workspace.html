@@ -1,0 +1,13 @@
+{% extends 'support/base.html' %}
+{% block title %}Support: {{ profile.practice_name|default:profile.full_name }}{% endblock %}
+{% block body %}
+<p><a href="{% url 'support-overview' %}">&larr; All workspaces</a></p>
+<h1>{{ profile.practice_name|default:profile.full_name }}</h1><div class="sub">Workspace {{ profile.pk }} &middot; {{ profile.get_status_display }}{% if clinic %} &middot; clinic {{ clinic.code }}{% endif %}</div>
+<div class="note">Patient CODES and counts only. Names, phone numbers, addresses and note text are not shown here. This visit is in the clinic's access log, and the owner has been told.</div>
+<table><thead><tr><th>Patient code</th><th>Status</th><th>Added</th><th>Last visit</th><th>Sessions</th><th>SOAP notes</th><th>Bills</th><th>Exercise programmes</th></tr></thead><tbody>
+{% for r in rows %}<tr><td>{{ r.code }}</td><td>{{ r.status }}</td><td>{{ r.created|date:"Y-m-d" }}</td><td>{{ r.last_visit|date:"Y-m-d"|default:"-" }}</td><td>{{ r.visits }}</td><td>{{ r.notes }}</td><td>{{ r.bills }}</td><td>{{ r.prescriptions }}</td></tr>
+{% empty %}<tr><td colspan="8">No patients.</td></tr>{% endfor %}</tbody></table>
+<h1 style="font-size:17px;margin-top:22px">Recent bills (numbers and amounts only)</h1>
+<table><thead><tr><th>Invoice</th><th>Date</th><th>Amount</th><th>Paid</th><th></th></tr></thead><tbody>
+{% for b in bills %}<tr><td>{{ b.invoice }}</td><td>{{ b.date|date:"Y-m-d" }}</td><td>NPR {{ b.amount }}</td><td>NPR {{ b.paid }}</td><td>{% if b.cancelled %}cancelled{% endif %}</td></tr>{% empty %}<tr><td colspan="5">No bills.</td></tr>{% endfor %}</tbody></table>
+{% endblock %}

@@ -19,6 +19,7 @@ from .access import actor_of, can_see_contact, first_error, own_patient, own_pro
 from .services import record_visit
 from .forms import BUSINESS_STEP_FORMS, BUSINESS_STEP_TITLES, SUBTYPES, STEP_FORMS, STEP_TITLES, NextVisitForm, PatientEditForm, PatientForm, PatientNotesForm, PatientPhotoForm, ProfilePictureForm, SignupForm, VisitForm
 from assessments import disciplines
+from . import audit
 from .treatments import parse_treatments, ui_for
 from billing.catalog import catalog_for
 from billing.models import advance_balance
@@ -144,6 +145,8 @@ def professional_document(request, field, profile_id=None):
     document = getattr(profile, field)
     if not document:
         raise Http404
+    if request.user.is_staff:
+        audit.log_access(request, 'operator', workspace=profile, detail=f'opened the credential file {field}', operator=True)
     content_type = mimetypes.guess_type(document.name)[0] or 'application/octet-stream'
     return FileResponse(document.open('rb'), content_type=content_type)
 
@@ -377,6 +380,7 @@ def patient_detail(request, pk):
         return redirect('billing:patient', patient_id=patient.pk)
     if tab not in ('overview', 'plan', 'exercises', 'visits', 'profile', 'assessments', 'soap', 'notes', 'documents'):
         tab = 'overview'
+    audit.log_access(request, 'view', patient=patient, detail=f'opened the {tab} tab')
     context = workspace_context(request.user, profile)
     context.update({
         'active': 'patients', 'patient': patient, 'tab': tab, 'show_contact': can_see_contact(profile, patient),

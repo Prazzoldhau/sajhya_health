@@ -13,6 +13,8 @@ from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
 from django.utils import timezone
 
+from sajhya_health.safe import local_path
+from accounts import audit
 from accounts.access import actor_of, can_see_contact, first_error
 from .access import billing_context, billing_manager, billing_patient, billing_profile, billing_require, staff_member
 
@@ -224,7 +226,7 @@ def patient_bill(request, patient_id):
 def _advance_back(request, patient):
     """Where to return after taking or refunding an advance: the page it came from, else the patient's billing tab."""
     nxt = request.POST.get('next', '')
-    if nxt.startswith('/') and not nxt.startswith('//'):
+    if local_path(request, nxt, ''):
         return redirect(nxt)
     return redirect(_patient_page(request, patient))
 
@@ -336,7 +338,7 @@ def entry_payment(request, pk):
     profile = billing_require(request)
     entry = get_object_or_404(BillingEntry, pk=pk, professional=profile)
     nxt = request.POST.get('next', '')
-    back = redirect(nxt if nxt.startswith('/') and not nxt.startswith('//') else reverse('billing:billing'))
+    back = redirect(local_path(request, nxt, '') or reverse('billing:billing'))
     if request.method != 'POST':
         return back
     form = EntryPaymentForm(request.POST)
@@ -369,7 +371,7 @@ def entry_correct(request, pk):
     profile = billing_require(request)
     entry = get_object_or_404(BillingEntry, pk=pk, professional=profile)
     nxt = request.POST.get('next', '')
-    back = redirect(nxt if nxt.startswith('/') and not nxt.startswith('//') else f"{reverse('billing:billing')}?date={entry.entry_date.isoformat()}")
+    back = redirect(local_path(request, nxt, '') or f"{reverse('billing:billing')}?date={entry.entry_date.isoformat()}")
     if request.method != 'POST':
         return back
     if entry.is_cancelled:
@@ -403,7 +405,7 @@ def entry_cancel(request, pk):
     profile = billing_require(request)
     entry = get_object_or_404(BillingEntry, pk=pk, professional=profile)
     nxt = request.POST.get('next', '')
-    back = redirect(nxt if nxt.startswith('/') and not nxt.startswith('//') else f"{reverse('billing:billing')}?date={entry.entry_date.isoformat()}")
+    back = redirect(local_path(request, nxt, '') or f"{reverse('billing:billing')}?date={entry.entry_date.isoformat()}")
     if request.method != 'POST':
         return back
     if entry.is_cancelled:
@@ -422,7 +424,7 @@ def entry_restore(request, pk):
     profile = billing_require(request)
     entry = get_object_or_404(BillingEntry, pk=pk, professional=profile)
     nxt = request.POST.get('next', '')
-    back = redirect(nxt if nxt.startswith('/') and not nxt.startswith('//') else f"{reverse('billing:billing')}?date={entry.entry_date.isoformat()}")
+    back = redirect(local_path(request, nxt, '') or f"{reverse('billing:billing')}?date={entry.entry_date.isoformat()}")
     if request.method == 'POST' and entry.is_cancelled:
         entry.cancelled_at, entry.cancel_reason = None, ''
         entry.save(update_fields=['cancelled_at', 'cancel_reason', 'updated_at'])
@@ -499,7 +501,7 @@ def _packages_back(request, patient=None):
     nxt = request.POST.get('next', '')
     if nxt == 'patient' and patient is not None:
         return redirect(_patient_page(request, patient))
-    if nxt.startswith('/') and not nxt.startswith('//'):  # e.g. back to the Payments due page
+    if local_path(request, nxt, ''):  # e.g. back to the Payments due page
         return redirect(nxt)
     return redirect('billing:packages')
 
@@ -617,9 +619,10 @@ def invoice(request, pk):
         'lines': entry.line_items, 'carried': entry.carried_over, 'cash_handed_over': entry.cash_handed_over, 'advance_now': advance_balance(entry.patient_id) if entry.patient_id else 0,
         'active': 'billing', 'entry': entry, 'practice': inv.practice_of(entry), 'payments': entry.payments.all(), 'public_url': public_url,
         'links': channel_links(phone, inv.share_message(entry, public_url), entry.patient.messaging_app if entry.patient_id else 'whatsapp', profile.whatsapp_web), 'whatsapp': inv.whatsapp_link(entry, phone, public_url), 'whatsapp_chat': inv.whatsapp_chat(phone, profile.whatsapp_web), 'message': inv.share_message(entry, public_url), 'phone': phone, 'email': email,
-        'back': back if back.startswith('/') and not back.startswith('//') else reverse('billing:billing') + f'?date={entry.entry_date.isoformat()}',
+        'back': local_path(request, back, '') or reverse('billing:billing') + f'?date={entry.entry_date.isoformat()}',
         'link_days': inv.LINK_DAYS,
     })
+    audit.log_access(request, 'view', patient=entry.patient if entry.patient_id else None, workspace=profile, detail=f'opened invoice {entry.invoice_number}')
     return render(request, 'billing/invoice.html', context)
 
 
@@ -725,6 +728,7 @@ def export_xlsx(request):
     if profile is None:
         raise Http404
     f = exports.Filters.from_query(request.GET)
+    audit.log_access(request, 'export', workspace=profile, detail=f'downloaded the billing Excel file {f.start} to {f.end}', dedupe=False)
     return _download(exports.build_workbook(exports.profile_scope(profile), f), f'billing_{f.start:%Y%m%d}_{f.end:%Y%m%d}.xlsx',
                      'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
 
@@ -735,6 +739,7 @@ def export_csv(request):
     if profile is None:
         raise Http404
     f = exports.Filters.from_query(request.GET)
+    audit.log_access(request, 'export', workspace=profile, detail=f'downloaded the billing CSV {f.start} to {f.end}', dedupe=False)
     return _download(exports.build_csv(exports.profile_scope(profile), f), f'billing_{f.start:%Y%m%d}_{f.end:%Y%m%d}.csv', 'text/csv; charset=utf-8')
 
 
@@ -1098,4 +1103,5 @@ def patient_billing(request, patient_id):
         'service_catalog': catalog.catalog_for(profile, member.clinic.owner if member else None),
         'totals': {'billed': sum((b.rate for b in live), Decimal('0')), 'received': sum((b.amount_paid for b in live), Decimal('0')), 'due': sum((b.amount_due for b in live), Decimal('0'))},
     })
+    audit.log_access(request, 'view', patient=patient, detail='opened the billing page of this patient')
     return render(request, 'billing/patient.html', context)

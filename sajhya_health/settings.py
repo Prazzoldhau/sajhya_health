@@ -40,7 +40,7 @@ CSRF_TRUSTED_ORIGINS = env.list('CSRF_TRUSTED_ORIGINS', default=[])
 # Application definition
 
 INSTALLED_APPS = [
-    'django.contrib.admin',
+    'sajhya_health.apps.SajhyaAdminConfig',  # the Django admin, minus the clinics' patient records
     'django.contrib.auth',
     'django.contrib.contenttypes',
     'django.contrib.sessions',
@@ -62,12 +62,15 @@ INSTALLED_APPS = [
 
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
+    'sajhya_health.security.SecurityHeadersMiddleware',
     'whitenoise.middleware.WhiteNoiseMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.common.CommonMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
     'django.contrib.auth.middleware.AuthenticationMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
+    'sajhya_health.security.IdleLogoutMiddleware',
+    'accounts.middleware.StaffGuardMiddleware',
     'accounts.middleware.VerifiedWorkspaceMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
     'axes.middleware.AxesMiddleware',  # must be last
@@ -203,6 +206,11 @@ FILE_UPLOAD_MAX_MEMORY_SIZE = 5 * 1024 * 1024
 # Security hardening (only when DEBUG is off)
 
 SESSION_COOKIE_HTTPONLY = True
+IDLE_LOGOUT_MINUTES = env.int('IDLE_LOGOUT_MINUTES', default=0 if TESTING else 30)  # 0 turns it off
+CSP_ENABLED = env.bool('CSP_ENABLED', default=True)
+SECURITY_ALERT_EMAILS = env.list('SECURITY_ALERT_EMAILS', default=[])  # who is e-mailed when a platform staff account signs in, fails to, or is locked out
+REQUIRE_STAFF_MFA = env.bool('REQUIRE_STAFF_MFA', default=not TESTING)  # the Django admin and /support/ need two-step sign-in
+ADMIN_SHOW_PATIENT_DATA = env.bool('ADMIN_SHOW_PATIENT_DATA', default=False)  # off: patient records are not in the admin at all
 SESSION_COOKIE_SAMESITE = 'Lax'
 CSRF_COOKIE_SAMESITE = 'Lax'
 SECURE_CONTENT_TYPE_NOSNIFF = True

@@ -9,6 +9,7 @@ When adding a new workspace area, add its URL prefix to WORKSPACE_PATH_PREFIXES 
 """
 from django.conf import settings
 from django.contrib import messages
+from django.contrib.auth import logout
 from django.http import JsonResponse
 from django.shortcuts import redirect
 
@@ -55,3 +56,31 @@ class VerifiedWorkspaceMiddleware:
             return JsonResponse({'ok': False, 'error': message}, status=403)
         messages.info(request, message)
         return redirect('clinics:detail', pk=clinic.pk)
+
+
+class StaffGuardMiddleware:
+    """The platform's own staff: the admin and /support/ need two-step sign-in (REQUIRE_STAFF_MFA), and every admin page they open is written to the access log,
+    shown to the clinic it is about."""
+
+    def __init__(self, get_response):
+        self.get_response = get_response
+
+    def __call__(self, request):
+        user = getattr(request, 'user', None)
+        if user is not None and user.is_authenticated and user.is_staff:
+            admin_prefix = '/' + settings.ADMIN_URL
+            path = request.path
+            if path.startswith(admin_prefix) or path.startswith('/support/'):
+                if getattr(settings, 'REQUIRE_STAFF_MFA', False) and not request.session.get('mfa_verified'):
+                    from .models import TwoFactor
+                    if TwoFactor.objects.filter(user=user, confirmed_at__isnull=False).exists():
+                        logout(request)  # signed in by password only (the admin's own sign-in page): start again through the code step
+                        messages.info(request, 'Sign in again: platform staff enter a two-step code.')
+                        return redirect('accounts:login')
+                    messages.info(request, 'Set up two-step sign-in to use the admin and support pages.')
+                    return redirect('accounts:security')
+                if path.startswith(admin_prefix) and request.method in ('GET', 'POST'):
+                    from . import audit
+                    workspace, clinic = audit.operator_targets(path)
+                    audit.log_access(request, 'operator', workspace=workspace, clinic=clinic, detail=f'{request.method} {path[:200]}', operator=True)
+        return self.get_response(request)

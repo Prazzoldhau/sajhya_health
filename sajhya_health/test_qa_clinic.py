@@ -137,7 +137,7 @@ class ClinicRoleSweepTests(ClinicWorld):
                 if 'logout' not in route:
                     c.get(path)
         after = snapshot()
-        lazy = {'PatientAllowance', 'PatientProfile', 'ClinicMonthlyUsage'}  # blank rows created the first time a page needs them (idempotent)
+        lazy = {'PatientAllowance', 'PatientProfile', 'ClinicMonthlyUsage', 'AccessLog'}  # blank rows created the first time a page needs them (idempotent)
         changed = [name for name in before if before[name] != after[name] and name not in lazy]
         self.assertEqual(changed, [], f'GET requests changed data in: {changed}')
 

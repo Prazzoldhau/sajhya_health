@@ -123,7 +123,7 @@ class PasswordResetTests(TestCase):
             'username': 'dup', 'password1': PASSWORD, 'password2': PASSWORD})
         self.assertEqual(r.status_code, 200)
         self.assertFalse(User.objects.filter(username='dup').exists())
-        self.assertContains(r, 'already exists')
+        self.assertContains(r, 'cannot be used to create an account')  # does not confirm that the address is registered
 
 
 class PasswordChangeTests(TestCase):

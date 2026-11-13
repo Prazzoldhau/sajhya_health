@@ -150,7 +150,7 @@ class UrlSweepTests(World):
                 if 'logout' not in route:
                     c.get(path)
         after = snapshot()
-        lazy_defaults = {'PatientAllowance', 'PatientProfile'}  # blank settings rows created the first time a page needs them (idempotent)
+        lazy_defaults = {'PatientAllowance', 'PatientProfile', 'AccessLog'}  # blank settings rows created the first time a page needs them (idempotent); the access log writes a line whenever a record is opened, by design
         changed = [name for name in before if before[name] != after[name] and name not in lazy_defaults]
         self.assertEqual(changed, [], f'GET requests changed data in: {changed}')
 
