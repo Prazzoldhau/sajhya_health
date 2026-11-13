@@ -1,0 +1,75 @@
+{% extends 'accounts/pro_base.html' %}
+{% block title %}Send exercise programme | Sajhya Health{% endblock %}
+{% block extra_css %}
+  .sd-wrap { display: grid; grid-template-columns: minmax(0, 1fr) 340px; gap: 16px; align-items: start; }
+  .sd-doc { background: #fff; border: 1px solid var(--line); border-radius: 12px; overflow: hidden; padding-bottom: 8px; }
+  .sd-head { background: #116b43; color: #fff; padding: 16px 22px; } .sd-head h2 { margin: 0 0 3px; font-size: 18px; } .sd-head .sub { font-size: 12px; opacity: .9; }
+  .sd-note { margin: 14px 22px 4px; padding: 10px 14px; border: 1px solid #cfe6d8; background: #f4faf6; border-radius: 10px; font-size: 12.5px; color: #426052; }
+  .sd-row { display: flex; gap: 14px; align-items: center; padding: 11px 22px; border-top: 1px solid var(--line); }
+  .sd-row img { width: 74px; height: 56px; object-fit: cover; border-radius: 8px; background: #eef3ef; flex: none; }
+  .sd-row .nm { font-weight: 800; } .sd-row .meta { font-size: 12px; color: var(--muted); }
+  .share { background: #fff; border: 1px solid var(--line); border-radius: 12px; padding: 16px; display: grid; gap: 10px; position: sticky; top: 90px; }
+  .share h3 { margin: 0; font-size: 15px; } .share .hint { font-size: 11.5px; color: var(--muted); margin: 0; }
+  .share .btn { display: flex; align-items: center; justify-content: center; gap: 8px; height: 40px; border-radius: 9px; border: 1px solid #cfe6d8; background: #fff; color: var(--green-dark); font-weight: 700; text-decoration: none; cursor: pointer; font-size: 13px; }
+  .share .btn.main { background: var(--green); border-color: var(--green); color: #fff; }
+  .share form { display: grid; gap: 8px; margin: 0; } .share input[type=email] { height: 38px; border: 1px solid var(--line); border-radius: 8px; padding: 0 10px; width: 100%; }
+  .share .sep { border-top: 1px solid var(--line); }
+  @media (max-width: 960px) { .sd-wrap { grid-template-columns: 1fr; } .share { position: static; order: -1; } }
+{% endblock %}
+
+{% block main %}
+<div style="margin-bottom:12px"><a class="text-link" href="{{ back_url }}" style="text-decoration:none">&larr; Back to {{ patient.name }}'s exercises</a></div>
+<div class="sd-wrap">
+  <article class="sd-doc">
+    <div class="sd-head"><h2>Home exercise programme for {{ patient.name }}</h2><div class="sub">{{ prescription.condition_label|default:"Exercise prescription" }} &middot; {{ prescription.created_at|date:"j M Y" }} &middot; {{ items|length }} exercise{{ items|length|pluralize }}</div></div>
+    <div class="sd-note">The PDF has one page for each exercise: the pictures in order, how many and when, and the instructions in <b>English and Nepali</b> as stored in the exercise library, with a plan at a glance, a weekly tick chart and your contact details.
+      {% if items %}<br><b>{{ with_pictures }}</b> of {{ items|length }} exercise{{ items|length|pluralize }} have pictures, <b>{{ with_nepali }}</b> have a Nepali description.{% endif %}</div>
+    {% for it in items %}
+    <div class="sd-row">{% if it.cover %}<img src="{{ it.cover }}" alt="">{% else %}<img alt="" style="visibility:hidden">{% endif %}
+      <div><div class="nm">{{ forloop.counter }}. {{ it.exercise_name }}</div><div class="meta">{{ it.dose_label }} &middot; {{ it.schedule_label }}{% if it.exercise_id and not it.exercise.exercise_description_nepali %} &middot; <span style="color:#b78317">no Nepali description</span>{% endif %}</div></div></div>
+    {% empty %}<div class="sd-row">No exercises in this prescription yet.</div>{% endfor %}
+  </article>
+
+  <aside class="share">
+    <h3>Send to {{ patient.name }}</h3>
+    <a class="btn main" href="{% url 'exercises:pdf' prescription.pk %}?download=1">&darr; Download PDF</a>
+    <a class="btn" href="{% url 'exercises:pdf' prescription.pk %}" target="_blank" rel="noopener">Open the PDF</a>
+    <div class="hint" style="margin:0">Send the message with the PDF link:</div>
+    {% for l in links %}<a class="btn{% if l.preferred %} main{% endif %}" href="{{ l.url }}" {% if l.key != 'sms' %}target="_blank" rel="noopener"{% endif %} {% if l.copy %}data-copy="{{ l.copy }}"{% endif %}>{{ l.label }}{% if l.preferred %} (patient's app){% endif %}</a>{% endfor %}
+    <button type="button" class="btn" id="shareBtn" hidden>&nearr; Share the PDF&hellip;</button>
+    <button type="button" class="btn" id="copyBtn">&#10697; Copy link</button>
+    <div class="sep"></div>
+    <form method="post" action="{% url 'exercises:email' prescription.pk %}">{% csrf_token %}
+      <label style="font-size:12px;font-weight:700;color:var(--muted)">E-mail the PDF</label>
+      <input type="email" name="email" value="{{ email }}" placeholder="patient@example.com" required>
+      {% if patient_has_email and email %}<span class="hint">Filled in from the patient's record.</span>
+      {% elif can_save_email and not patient_has_email %}<label style="font-size:12px;display:flex;gap:6px;align-items:center"><input type="checkbox" name="save_email" value="1" checked> Save this e-mail on the patient's record</label>
+      <span class="hint">This patient has no e-mail on record yet.</span>{% endif %}
+      <button class="btn" type="submit">&#9993; Send by e-mail</button>
+    </form>
+    <p class="hint">The link works without signing in for {{ link_days }} days. Anyone with it can open the programme, so send it only to the patient. WhatsApp cannot attach a file from a link: the message carries the link, and the PDF opens from it.</p>
+  </aside>
+</div>
+<script>
+(function () {
+  var link = "{{ public_url|escapejs }}", msg = "{{ message|escapejs }}", copy = document.getElementById('copyBtn');
+  copy.addEventListener('click', function () {
+    function done() { copy.textContent = '✓ Link copied'; setTimeout(function () { copy.textContent = '⧉ Copy link'; }, 2000); }
+    if (navigator.clipboard) navigator.clipboard.writeText(link).then(done, function () { window.prompt('Copy this link', link); });
+    else window.prompt('Copy this link', link);
+  });
+  document.querySelectorAll('[data-copy]').forEach(function (a) { a.addEventListener('click', function () { if (navigator.clipboard) navigator.clipboard.writeText(a.dataset.copy).catch(function () {}); }); });
+  // phones can hand the PDF itself to WhatsApp, Messenger, Mail... through the system share sheet
+  var share = document.getElementById('shareBtn');
+  if (navigator.share && navigator.canShare) {
+    share.hidden = false;
+    share.addEventListener('click', function () {
+      fetch("{% url 'exercises:pdf' prescription.pk %}", { credentials: 'same-origin' }).then(function (r) { return r.blob(); }).then(function (blob) {
+        var file = new File([blob], "{{ file_name|escapejs }}", { type: 'application/pdf' });
+        return navigator.share(navigator.canShare({ files: [file] }) ? { files: [file], text: msg } : { text: msg, url: link });
+      }).catch(function () {});
+    });
+  }
+})();
+</script>
+{% endblock %}

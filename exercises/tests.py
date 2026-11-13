@@ -387,3 +387,75 @@ class DepartmentExerciseSetsTests(TestCase):
         call_command('load_discipline_library', verbosity=0)
         ex.refresh_from_db()
         self.assertEqual((ExerciseMain.objects.count(), ex.default_reps), (before, 7))
+
+
+class HandoutTests(TestCase):
+    """The prescribed programme as a PDF handout with pictures and English and Nepali instructions, sent by link or e-mail."""
+
+    def setUp(self):
+        from accounts.tests.helpers import make_patient, make_professional
+        self.user, self.profile = make_professional()
+        self.profile.practice_name = 'Test Clinic'
+        self.profile.save()
+        self.patient = make_patient(self.profile, 'Sita Gurung')
+        region = Region.objects.create(region_name='Spine')
+        sub = SubRegion.objects.create(region_fk=region, sub_region_name='Lumbar')
+        self.exercise = ExerciseMain.objects.create(
+            sub_region_fk=sub, exercise_name='Supine Pelvic Tilt', exercise_type='Mobility', difficulty_level=1, default_sets=3, default_reps=12, hold_time_sec=2,
+            exercise_description='Starting Position\nLie on your back.\n\nSteps\n1. Breathe out.\n2. Tilt your pelvis.\n\nRemember: Stop if it hurts.',
+            exercise_description_nepali='सुरुको अवस्था\nढाडको बलमा सुत्नुहोस्।\n\nचरणहरू\n1. सास बाहिर फाल्नुहोस्।\n\nयाद राख्नुहोस्: दुखे रोक्नुहोस्।',
+            youtube_url='https://youtu.be/abc')
+        self.rx = Prescription.objects.create(patient=self.patient, professional=self.profile, condition_label='Low back pain')
+        PrescriptionExercise.objects.create(prescription=self.rx, exercise=self.exercise, exercise_name=self.exercise.exercise_name, sets=3, reps=12, hold_time_sec=2, rest_time_sec=60, order=0)
+        self.client.force_login(self.user)
+
+    def test_the_pdf_is_built_with_english_and_nepali_and_a_signed_link_opens_it(self):
+        from . import handout
+        pdf = self.client.get(reverse('exercises:pdf', args=[self.rx.pk]))
+        self.assertEqual((pdf.status_code, pdf['Content-Type']), (200, 'application/pdf'))
+        self.assertTrue(pdf.content.startswith(b'%PDF'))
+        self.assertGreater(len(pdf.content), 20000)  # the Nepali font is embedded
+        anon = self.client_class()
+        link = anon.get(reverse('exercises:public', args=[handout.token(self.rx)]))
+        self.assertEqual((link.status_code, link['Content-Type']), (200, 'application/pdf'))
+        self.assertEqual(anon.get(reverse('exercises:public', args=['not-a-token'])).status_code, 404)
+
+    def test_the_send_page_lists_the_exercises_and_the_ways_to_send(self):
+        page = self.client.get(reverse('exercises:send', args=[self.rx.pk]))
+        self.assertContains(page, 'Supine Pelvic Tilt')
+        self.assertContains(page, 'English and Nepali')
+        self.assertContains(page, 'Download PDF')
+        self.assertContains(page, '/exercises/shared/')
+        self.assertContains(page, 'Send by e-mail')
+        tab = self.client.get(reverse('accounts:patient-detail', args=[self.patient.pk]), {'tab': 'exercises'})
+        self.assertContains(tab, 'Send PDF to patient')
+
+    def test_another_professional_cannot_open_it(self):
+        from accounts.tests.helpers import make_professional
+        stranger, _ = make_professional('stranger-handout')
+        other = self.client_class()
+        other.force_login(stranger)
+        for name in ('send', 'pdf'):
+            self.assertEqual(other.get(reverse(f'exercises:{name}', args=[self.rx.pk])).status_code, 404)
+        self.assertEqual(other.post(reverse('exercises:email', args=[self.rx.pk]), {'email': 'a@b.com'}).status_code, 404)
+
+    def test_the_email_carries_the_pdf_and_a_bad_address_is_refused(self):
+        from django.core import mail
+        sent = self.client.post(reverse('exercises:email', args=[self.rx.pk]), {'email': 'sita@example.com', 'save_email': '1'}, follow=True)
+        self.assertEqual(len(mail.outbox), 1)
+        message = mail.outbox[0]
+        self.assertEqual(message.to, ['sita@example.com'])
+        self.assertEqual(len(message.attachments), 1)
+        self.assertEqual(message.attachments[0][2], 'application/pdf')
+        self.assertTrue(message.attachments[0][1].startswith(b'%PDF'))
+        self.assertIn('/exercises/shared/', message.body)
+        self.patient.refresh_from_db()
+        self.assertEqual(self.patient.email, 'sita@example.com')
+        self.client.post(reverse('exercises:email', args=[self.rx.pk]), {'email': 'not an email'})
+        self.assertEqual(len(mail.outbox), 1)
+
+    def test_an_exercise_without_pictures_or_nepali_still_builds(self):
+        from . import handout
+        bare = PrescriptionExercise.objects.create(prescription=self.rx, exercise=None, exercise_name='Custom walk', sets=1, reps=0, hold_time_sec=0, rest_time_sec=0, order=1)
+        self.assertTrue(handout.build_pdf(self.rx, self.profile).startswith(b'%PDF'))
+        self.assertEqual(bare.exercise_name, 'Custom walk')

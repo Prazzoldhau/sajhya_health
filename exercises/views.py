@@ -5,7 +5,7 @@ from django.contrib.auth.decorators import login_required
 from django.core.paginator import Paginator
 from django.db import transaction
 from django.db.models import Count, Max, Prefetch, Q
-from django.http import Http404, JsonResponse
+from django.http import Http404, HttpResponse, JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
 from django.utils import timezone
@@ -210,4 +210,108 @@ def prescription_action(request, pk):
                 rest_time_sec=item.rest_time_sec, order=item.order, schedule_morning=item.schedule_morning,
                 schedule_day=item.schedule_day, schedule_evening=item.schedule_evening)
         messages.success(request, 'Prescription re-assigned as a fresh copy.')
+    return back
+
+
+# ---------------------------------------------------------------------------
+# Sending a prescribed programme to the patient: a PDF with pictures and the instructions in English and Nepali
+# ---------------------------------------------------------------------------
+
+def _rx_for(request, pk):
+    profile = require_workspace(request)
+    prescription = get_object_or_404(Prescription.objects.select_related('patient', 'professional'), pk=pk, patient__in=accessible_patients(profile))
+    return profile, prescription
+
+
+def _pdf_response(prescription, online_url='', download=False):
+    from . import handout
+    response = HttpResponse(handout.build_pdf(prescription, prescription.professional, online_url), content_type='application/pdf')
+    response['Content-Disposition'] = f'{"attachment" if download else "inline"}; filename="{handout.file_name(prescription)}"'
+    response['Cache-Control'] = 'private, no-store'
+    return response
+
+
+@login_required
+def send(request, pk):
+    """The programme laid out for sending: download the PDF, open WhatsApp / Viber / SMS with the link, or e-mail the PDF."""
+    from accounts.access import can_see_contact
+    from accounts.messaging import channel_links
+    from billing.invoice import whatsapp_chat
+
+    from . import handout
+    profile, prescription = _rx_for(request, pk)
+    patient = prescription.patient
+    public_url = request.build_absolute_uri(reverse('exercises:public', args=[handout.token(prescription)]))
+    phone = patient.phone if can_see_contact(profile, patient) else ''
+    email = patient.email if can_see_contact(profile, patient) else ''
+    message = handout.share_message(prescription, prescription.professional, public_url)
+    items = list(prescription.exercises.select_related('exercise').prefetch_related('exercise__step_images'))
+    context = workspace_context(request.user, profile)
+    context.update({
+        'active': 'patients', 'patient': patient, 'prescription': prescription, 'items': items, 'public_url': public_url, 'message': message, 'phone': phone, 'email': email,
+        'patient_has_email': bool(patient.email), 'can_save_email': can_see_contact(profile, patient), 'link_days': handout.LINK_DAYS, 'file_name': handout.file_name(prescription),
+        'links': channel_links(phone, message, patient.messaging_app, profile.whatsapp_web), 'whatsapp_chat': whatsapp_chat(phone, profile.whatsapp_web),
+        'with_pictures': sum(1 for i in items if i.exercise_id and i.exercise.images), 'with_nepali': sum(1 for i in items if i.exercise_id and i.exercise.exercise_description_nepali),
+        'back_url': f"{reverse('accounts:patient-detail', args=[patient.pk])}?tab=exercises",
+    })
+    return render(request, 'exercises/send.html', context)
+
+
+@login_required
+def handout_pdf(request, pk):
+    profile, prescription = _rx_for(request, pk)
+    return _pdf_response(prescription, download=request.GET.get('download') == '1')
+
+
+def public(request, token):
+    """The link a patient receives: the PDF, no sign-in. It is signed, cannot be guessed, and expires."""
+    from . import handout
+    prescription = handout.prescription_from_token(token)
+    if prescription is None:
+        raise Http404
+    return _pdf_response(prescription, request.build_absolute_uri(request.path))
+
+
+@login_required
+def send_email(request, pk):
+    from django.core.exceptions import ValidationError
+    from django.core.mail import EmailMultiAlternatives
+    from django.core.validators import validate_email
+
+    from accounts.access import can_see_contact
+    from accounts.messaging import EMAIL_NOT_SET_UP, email_ready
+
+    from . import handout
+    if request.method != 'POST':
+        raise Http404
+    profile, prescription = _rx_for(request, pk)
+    patient = prescription.patient
+    back = redirect('exercises:send', pk=prescription.pk)
+    if not email_ready():
+        messages.error(request, EMAIL_NOT_SET_UP)
+        return back
+    address = request.POST.get('email', '').strip()
+    try:
+        validate_email(address)
+    except ValidationError:
+        messages.error(request, 'Enter a valid e-mail address.')
+        return back
+    url = request.build_absolute_uri(reverse('exercises:public', args=[handout.token(prescription)]))
+    practice = prescription.professional.practice_name or prescription.professional.full_name
+    message = handout.share_message(prescription, prescription.professional, url)
+    mail = EmailMultiAlternatives(subject=f'Your home exercise programme from {practice}', body=message + '\n\nThe programme is attached as a PDF.\n\n' + practice, to=[address],
+                                  reply_to=[e for e in [prescription.professional.account.user.email] if e])
+    mail.attach_alternative(handout.email_html(prescription, prescription.professional, url, message), 'text/html')
+    mail.attach(handout.file_name(prescription), handout.build_pdf(prescription, prescription.professional, url), 'application/pdf')
+    try:
+        mail.send()
+    except Exception:  # the mail server is outside our control: say so plainly instead of a server error
+        messages.error(request, 'The e-mail could not be sent right now. Use WhatsApp or the PDF download instead, or try again later.')
+        return back
+    saved = ''
+    if request.POST.get('save_email') and not patient.email and can_see_contact(profile, patient):
+        patient.email = address
+        patient.save(update_fields=['email'])
+        saved = " and saved on the patient's record"
+    messages.success(request, f'The programme was e-mailed to {address}{saved}.')
     return back

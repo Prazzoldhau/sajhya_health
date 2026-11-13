@@ -53,6 +53,11 @@ DEFAULTS = {
         'help': 'The text that goes with a receipt for a package payment.',
         'body': 'Hello {patient},\nReceipt {invoice} from {practice} dated {date}: NPR {amount} received for your {package}.\n{due_line}\nReceipt: {link}',
     },
+    'exercise_program': {
+        'label': 'Home exercise programme message',
+        'help': 'The text that goes with a home exercise programme (PDF with pictures, English and Nepali) sent to a patient by WhatsApp or e-mail.',
+        'body': 'Hello {patient},\nYour home exercise programme from {practice} dated {date}: {link}\nThe link works for {days} days. Do the exercises as shown, and stop and contact us if you feel more pain.\nThank you.',
+    },
     'soap_note': {
         'label': 'SOAP note message',
         'help': 'The text that goes with a finalised SOAP note sent to a patient by WhatsApp or e-mail.',

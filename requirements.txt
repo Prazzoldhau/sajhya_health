@@ -6,6 +6,8 @@ gunicorn==26.2.0
 pillow==13.0.0
 openpyxl==3.1.5
 reportlab==5.1.0
+fpdf2==2.9.0
+uharfbuzz==0.57.0
 PyMySQL==1.2.3
 simple_icd_10==2.1.1
 sqlparse==0.6.0

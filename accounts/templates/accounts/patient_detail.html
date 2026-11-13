@@ -130,6 +130,7 @@
         <span class="patient-id" style="display:inline">{{ rx.created_at|date:"M j, Y" }} · {{ rx.exercises.count }} exercise{{ rx.exercises.count|pluralize }} · {{ rx.completion_percentage }}% done</span>
         <span class="status {% if rx.status == 'cancelled' %}hold{% elif rx.status == 'completed' or rx.status == 'superseded' %}scheduled{% endif %}">{{ rx.get_status_display }}</span>
         <form method="post" action="{% url 'exercises:prescription-action' rx.pk %}" style="margin-left:auto;display:flex;gap:6px;flex-wrap:wrap">{% csrf_token %}
+          {% if rx.exercises.count %}<a class="table-action" href="{% url 'exercises:send' rx.pk %}" style="text-decoration:none;background:#168653;color:#fff;border-color:#168653" title="PDF with pictures and English and Nepali instructions, by WhatsApp, e-mail or download">Send PDF to patient</a>{% endif %}
           {% if rx.status == 'active' %}
             <a class="table-action" href="{% url 'exercises:library' %}?patient={{ patient.pk }}&prescription={{ rx.pk }}" style="text-decoration:none">＋ Add exercises</a>
             <button class="table-action" name="action" value="complete">Mark completed</button>
