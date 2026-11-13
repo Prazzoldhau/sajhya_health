@@ -10,6 +10,7 @@ from django.urls import reverse
 from django.utils import timezone
 from django.views.decorators.http import require_POST
 
+from accounts import audit
 from accounts.access import can_see_contact, own_patient, workspace_context
 from accounts.treatments import ui_for
 from assessments import disciplines
@@ -139,6 +140,7 @@ def detail(request, note_id):
     flag_names = dict(presets.RED_FLAGS)
     context.update({'active': 'patients', 'patient': patient, 'note': note, 'addenda': note.addenda.all(), 'is_author': note.author_id == profile.pk,
                     'flag_labels': [flag_names[k] for k in note.red_flags if k in flag_names], 'tab_url': tab_url(patient), 'last_share': note.shares.first()})
+    audit.log_access(request, 'view', patient=patient, detail=f'opened the SOAP note of {note.note_date:%d %b %Y}')
     return render(request, 'soapnotes/detail.html', context)
 
 
@@ -207,12 +209,14 @@ def send(request, note_id):
         'links': channel_links(phone, message, patient.messaging_app, profile.whatsapp_web), 'whatsapp_chat': whatsapp_chat(phone, profile.whatsapp_web),
         'practice': {'name': profile.practice_name or profile.full_name, 'address': profile.practice_address, 'phone': profile.practice_phone or profile.mobile},
     })
+    audit.log_access(request, 'view', patient=patient, detail='opened the send page of a SOAP note')
     return render(request, 'soapnotes/send.html', context)
 
 
 @login_required
 def pdf(request, note_id):
     profile, patient, note = _final_note_for(request, note_id)
+    audit.log_access(request, 'download', patient=patient, detail='downloaded the PDF of a SOAP note')
     return _pdf_response(note, download=request.GET.get('download') == '1')
 
 
@@ -251,6 +255,7 @@ def email(request, note_id):
         messages.error(request, 'The e-mail could not be sent right now. Use WhatsApp or the PDF download instead, or try again later.')
         return back
     SoapShare.objects.create(note=note, address=address, sent_by_name=profile.full_name)
+    audit.log_access(request, 'share', patient=patient, detail='e-mailed a SOAP note to the patient', dedupe=False)
     saved = ''
     if request.POST.get('save_email') and not patient.email and can_see_contact(profile, patient):  # keep a typed address on the patient's record for next time
         patient.email = address

@@ -10,6 +10,7 @@ from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
 from django.utils import timezone
 
+from accounts import audit
 from accounts.access import accessible_patients, own_patient, require_workspace, workspace_context
 from assessments import disciplines
 
@@ -254,12 +255,14 @@ def send(request, pk):
         'with_pictures': sum(1 for i in items if i.exercise_id and i.exercise.images), 'with_nepali': sum(1 for i in items if i.exercise_id and i.exercise.exercise_description_nepali),
         'back_url': f"{reverse('accounts:patient-detail', args=[patient.pk])}?tab=exercises",
     })
+    audit.log_access(request, 'view', patient=patient, detail='opened the send page of an exercise programme')
     return render(request, 'exercises/send.html', context)
 
 
 @login_required
 def handout_pdf(request, pk):
     profile, prescription = _rx_for(request, pk)
+    audit.log_access(request, 'download', patient=prescription.patient, detail='downloaded the PDF of an exercise programme')
     return _pdf_response(prescription, download=request.GET.get('download') == '1')
 
 
@@ -313,5 +316,6 @@ def send_email(request, pk):
         patient.email = address
         patient.save(update_fields=['email'])
         saved = " and saved on the patient's record"
+    audit.log_access(request, 'share', patient=patient, detail='e-mailed an exercise programme to the patient', dedupe=False)
     messages.success(request, f'The programme was e-mailed to {address}{saved}.')
     return back
